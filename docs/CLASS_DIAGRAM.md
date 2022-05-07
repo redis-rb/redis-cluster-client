@@ -230,11 +230,11 @@ classDiagram
   RedisClient ..> RedisClient_RubyConnection : new
   RedisClient ..> RedisClient_Config : new
   RedisClient ..> RedisClient_SentinelConfig : new
+  RedisClient ..> module_RedisClient_CommandBuilder : call
   RedisClient_Multi <|.. RedisClient_Pipeline : extend
 
   RedisClient_Config ..|> module_RedisClient_Config_Common : include
   RedisClient_SentinelConfig ..|> module_RedisClient_Config_Common : include
-  module_RedisClient_Config_Common ..> module_RedisClient_CommandBuilder : call
   module_RedisClient_Config_Common ..> RedisClient_Pooled : new
 
   module_RedisClient_Decorator ..> RedisClient_Decorator_Pipeline : new
