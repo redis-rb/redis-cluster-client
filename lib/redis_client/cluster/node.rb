@@ -108,7 +108,7 @@ class RedisClient
       end
 
       def find_node_key_of_replica(slot)
-        return @slots[slot] if replica_disabled?
+        return @slots[slot] if replica_disabled? || @replications[@slots[slot]].size.zero?
 
         @replications[@slots[slot]].sample
       end
