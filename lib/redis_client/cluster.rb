@@ -1,15 +1,10 @@
 # frozen_string_literal: true
 
-require 'redis_client/cluster/errors'
 require 'redis_client/cluster/command'
-require 'redis_client/cluster/command_loader'
+require 'redis_client/cluster/errors'
 require 'redis_client/cluster/key_slot_converter'
 require 'redis_client/cluster/node'
 require 'redis_client/cluster/node_key'
-require 'redis_client/cluster/node_loader'
-require 'redis_client/cluster/option'
-require 'redis_client/cluster/slot'
-require 'redis_client/cluster/slot_loader'
 
 class RedisClient
   class Cluster
@@ -30,7 +25,7 @@ class RedisClient
     end
 
     def blocking_call(timeout, *command, **kwargs, &block)
-      node = assign_node(*command)
+      node = assign_node(command)
       try_send(node, :blocking_call, *([timeout] + command), **kwargs, &block)
     end
 
@@ -145,7 +140,7 @@ class RedisClient
       when 'discard', 'exec', 'multi', 'unwatch'
         raise ::RedisClient::Cluster::AmbiguousNodeError, cmd
       else
-        node = assign_node(*command)
+        node = assign_node(command)
         try_send(node, method, *command, **kwargs, &block)
       end
     end
@@ -154,7 +149,7 @@ class RedisClient
       case command[1].to_s.downcase
       when 'resetstat', 'rewrite', 'set'
         @node.call_all(method, *command, **kwargs, &block).first
-      else assign_node(*command).send(method, *command, **kwargs, &block)
+      else assign_node(command).send(method, *command, **kwargs, &block)
       end
     end
 
@@ -162,7 +157,7 @@ class RedisClient
       case command[1].to_s.downcase
       when 'stats' then @node.call_all(method, *command, **kwargs, &block)
       when 'purge' then @node.call_all(method, *command, **kwargs, &block).first
-      else assign_node(*command).send(method, *command, **kwargs, &block)
+      else assign_node(command).send(method, *command, **kwargs, &block)
       end
     end
 
@@ -171,7 +166,7 @@ class RedisClient
       when 'list' then @node.call_all(method, *command, **kwargs, &block).flatten
       when 'pause', 'reply', 'setname'
         @node.call_all(method, *command, **kwargs, &block).first
-      else assign_node(*command).send(method, *command, **kwargs, &block)
+      else assign_node(command).send(method, *command, **kwargs, &block)
       end
     end
 
@@ -182,7 +177,7 @@ class RedisClient
            'reset', 'set-config-epoch', 'setslot'
         raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, 'cluster', subcommand
       when 'saveconfig' then @node.call_all(method, *command, **kwargs, &block).first
-      else assign_node(*command).send(method, *command, **kwargs, &block)
+      else assign_node(command).send(method, *command, **kwargs, &block)
       end
     end
 
@@ -192,7 +187,7 @@ class RedisClient
         @node.call_all(method, *command, **kwargs, &block).first
       when 'flush', 'load'
         @node.call_primary(method, *command, **kwargs, &block).first
-      else assign_node(*command).send(method, *command, **kwargs, &block)
+      else assign_node(command).send(method, *command, **kwargs, &block)
       end
     end
 
@@ -203,7 +198,7 @@ class RedisClient
         @node.call_all(method, *command, **kwargs, &block).reject(&:empty?).map { |e| Hash[*e] }
              .reduce({}) { |a, e| a.merge(e) { |_, v1, v2| v1 + v2 } }
       when 'numpat' then @node.call_all(method, *command, **kwargs, &block).sum
-      else assign_node(*command).send(method, *command, **kwargs, &block)
+      else assign_node(command).send(method, *command, **kwargs, &block)
       end
     end
 
