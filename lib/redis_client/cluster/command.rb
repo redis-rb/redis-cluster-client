@@ -39,11 +39,11 @@ class RedisClient
         hash_tag.empty? ? key : hash_tag
       end
 
-      def should_send_to_master?(command)
+      def should_send_to_primary?(command)
         dig_details(command, :write)
       end
 
-      def should_send_to_slave?(command)
+      def should_send_to_replica?(command)
         dig_details(command, :readonly)
       end
 

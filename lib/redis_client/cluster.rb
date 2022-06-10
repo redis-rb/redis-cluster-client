@@ -102,10 +102,10 @@ class RedisClient
       when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save'
         @node.call_all(command, &block).first
       when 'flushall', 'flushdb'
-        @node.call_master(command, &block).first
-      when 'wait'     then @node.call_master(command, &block).sum
-      when 'keys'     then @node.call_slave(command, &block).flatten.sort
-      when 'dbsize'   then @node.call_slave(command, &block).sum
+        @node.call_primary(command, &block).first
+      when 'wait'     then @node.call_primary(command, &block).sum
+      when 'keys'     then @node.call_replica(command, &block).flatten.sort
+      when 'dbsize'   then @node.call_replica(command, &block).sum
       when 'scan'     then _scan(command, &block)
       when 'lastsave' then @node.call_all(command, &block).sort
       when 'role'     then @node.call_all(command, &block)
@@ -166,7 +166,7 @@ class RedisClient
       when 'debug', 'kill'
         @node.call_all(command, &block).first
       when 'flush', 'load'
-        @node.call_master(command, &block).first
+        @node.call_primary(command, &block).first
       else assign_node(command).call(command, &block)
       end
     end
@@ -253,10 +253,10 @@ class RedisClient
       slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
       return unless @node.slot_exists?(slot)
 
-      if @command.should_send_to_master?(command) || primary_only
-        @node.find_node_key_of_master(slot)
+      if @command.should_send_to_primary?(command) || primary_only
+        @node.find_node_key_of_primary(slot)
       else
-        @node.find_node_key_of_slave(slot)
+        @node.find_node_key_of_replica(slot)
       end
     end
 

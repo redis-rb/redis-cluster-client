@@ -64,19 +64,19 @@ class RedisClient
         try_map { |_, client| client.call(command, &block) }.values
       end
 
-      def call_master(command, &block)
+      def call_primary(command, &block)
         try_map do |node_key, client|
-          next if slave?(node_key)
+          next if replica?(node_key)
 
           client.call(command, &block)
         end.values
       end
 
-      def call_slave(command, &block)
-        return call_master(command, &block) if replica_disabled?
+      def call_replica(command, &block)
+        return call_primary(command, &block) if replica_disabled?
 
         try_map do |node_key, client|
-          next if master?(node_key)
+          next if primary?(node_key)
 
           client.call(command, &block)
         end.values
@@ -90,7 +90,7 @@ class RedisClient
         reading_clients = []
 
         @clients.each do |node_key, client|
-          next unless replica_disabled? ? master?(node_key) : slave?(node_key)
+          next unless replica_disabled? ? primary?(node_key) : replica?(node_key)
 
           reading_clients << client
         end
@@ -102,11 +102,11 @@ class RedisClient
         !@slots[slot].nil?
       end
 
-      def find_node_key_of_master(slot)
+      def find_node_key_of_primary(slot)
         @slots[slot]
       end
 
-      def find_node_key_of_slave(slot)
+      def find_node_key_of_replica(slot)
         return @slots[slot] if replica_disabled?
 
         @replications[@slots[slot]].sample
@@ -122,21 +122,21 @@ class RedisClient
         !@with_replica
       end
 
-      def master?(node_key)
-        !slave?(node_key)
+      def primary?(node_key)
+        !replica?(node_key)
       end
 
-      def slave?(node_key)
+      def replica?(node_key)
         @replications[node_key].size.zero?
       end
 
       def build_clients(options, pool, **kwargs)
         options.filter_map do |node_key, option|
-          next if replica_disabled? && slave?(node_key)
+          next if replica_disabled? && replica?(node_key)
 
           config = ::RedisClient.config(option)
           client = pool.nil? ? config.new_client(**kwargs) : config.new_pool(**pool, **kwargs)
-          client.call('READONLY') if slave?(node_key) # FIXME: Send every pooled conns
+          client.call('READONLY') if replica?(node_key) # FIXME: Send every pooled conns
 
           [node_key, client]
         end.to_h
