@@ -60,28 +60,29 @@ class RedisClient
         raise ReloadNeeded
       end
 
-      def call_all(command, &block)
-        try_map { |_, client| client.call(command, &block) }.values
+      def call_all(method, *command, **kwargs, &block)
+        try_map { |_, client| client.send(method, *command, **kwargs, &block) }.values
       end
 
-      def call_primary(command, &block)
+      def call_primary(method, *command, **kwargs, &block)
         try_map do |node_key, client|
           next if replica?(node_key)
 
-          client.call(command, &block)
+          client.send(method, *command, **kwargs, &block)
         end.values
       end
 
-      def call_replica(command, &block)
-        return call_primary(command, &block) if replica_disabled?
+      def call_replica(method, *command, **kwargs, &block)
+        return call_primary(method, *command, **kwargs, &block) if replica_disabled?
 
         try_map do |node_key, client|
           next if primary?(node_key)
 
-          client.call(command, &block)
+          client.send(method, *command, **kwargs, &block)
         end.values
       end
 
+      # TODO: impl
       def process_all(commands, &block)
         try_map { |_, client| client.process(commands, &block) }.values
       end
