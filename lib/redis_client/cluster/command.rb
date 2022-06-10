@@ -1,8 +1,31 @@
 # frozen_string_literal: true
 
+require 'redis_client/cluster/errors'
+
 class RedisClient
   class Cluster
     class Command
+      class << self
+        def load(nodes)
+          errors = nodes.map do |node|
+            details = fetch_command_details(node)
+            return ::RedisClient::Cluster::Command.new(details)
+          rescue ::RedisClient::ConnectionError, ::RedisClient::CommandError => e
+            e
+          end
+
+          raise ::RedisClient::Cluster::InitialSetupError, errors
+        end
+
+        private
+
+        def fetch_command_details(node)
+          node.call(%w[COMMAND]).to_h do |reply|
+            [reply[0], { arity: reply[1], flags: reply[2], first: reply[3], last: reply[4], step: reply[5] }]
+          end
+        end
+      end
+
       def initialize(details)
         @details = pick_details(details)
       end

@@ -20,9 +20,18 @@ class RedisClient
       @pool = pool
       @client_kwargs = kwargs
       super(@config, **@client_kwargs)
-      @node, @slot = fetch_cluster_info!(@config, @pool, **@client_kwargs)
-      @command = fetch_command_details(@node)
+      @node = fetch_cluster_info!(@config, @pool, **@client_kwargs)
+      @command = ::RedisClient::Cluster::CommandLoader.load(@node)
     end
+
+    def size
+      # TODO: impl
+    end
+
+    def with(options = {})
+      # TODO: impl
+    end
+    alias then with
 
     def id
       @node.map(&:id).sort.join(' ')
@@ -81,24 +90,10 @@ class RedisClient
     private
 
     def fetch_cluster_info!(config, pool, **kwargs)
-      tmp_node = ::RedisClient::Cluster::Node.new(config.per_node_key, **kwargs)
-
-      available_slots = ::RedisClient::Cluster::SlotLoader.load(tmp_node)
-      node_flags = ::RedisClient::Cluster::NodeLoader.load_flags(tmp_node)
-      node_addrs = available_slots.keys.map { |k| ::RedisClient::Cluster::NodeKey.hashify(k) }
+      node_info = ::RedisClient::Cluster::Node.load_info(config.per_node_key, **kwargs)
+      node_addrs = node_info.map { |arr| ::RedisClient::Cluster::NodeKey.hashify(arr[1]) }
       config.update_node(node_addrs)
-
-      node = ::RedisClient::Cluster::Node.new(config.per_node_key, node_flags, pool, with_replica: config.use_replica?, **kwargs)
-      slot = ::RedisClient::Cluster::Slot.new(available_slots, node_flags, with_replica: config.use_replica?)
-
-      [node, slot]
-    ensure
-      tmp_node&.each(&:disconnect)
-    end
-
-    def fetch_command_details(nodes)
-      details = ::RedisClient::Cluster::CommandLoader.load(nodes)
-      ::RedisClient::Cluster::Command.new(details)
+      ::RedisClient::Cluster::Node.new(config.per_node_key, node_info, pool, with_replica: config.use_replica?, **kwargs)
     end
 
     def send_command(command, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
@@ -237,7 +232,7 @@ class RedisClient
     def assign_redirection_node(err_msg)
       _, slot, node_key = err_msg.split
       slot = slot.to_i
-      @slot.put(slot, node_key)
+      @node.update_slot(slot, node_key)
       find_node(node_key)
     end
 
@@ -256,12 +251,12 @@ class RedisClient
       return if key.empty?
 
       slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
-      return unless @slot.exists?(slot)
+      return unless @node.slot_exists?(slot)
 
       if @command.should_send_to_master?(command) || primary_only
-        @slot.find_node_key_of_master(slot)
+        @node.find_node_key_of_master(slot)
       else
-        @slot.find_node_key_of_slave(slot)
+        @node.find_node_key_of_slave(slot)
       end
     end
 
@@ -281,7 +276,7 @@ class RedisClient
       end
 
       @node.map(&:disconnect)
-      @node, @slot = fetch_cluster_info!(@config, @pool, **@client_kwargs)
+      @node = fetch_cluster_info!(@config, @pool, **@client_kwargs)
     end
   end
 end

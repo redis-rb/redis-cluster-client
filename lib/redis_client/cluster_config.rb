@@ -14,13 +14,13 @@ class RedisClient
     InvalidClientConfigError = Class.new(::RedisClient::Error)
 
     def initialize(nodes:, replica: false, fixed_hostname: nil, **client_config)
-      @node_cfgs = build_node_options(nodes)
+      @node_configs = build_node_options(nodes.dup)
       @replica = replica
       @fixed_hostname = fixed_hostname
       @client_config = client_config.dup
-      add_common_node_cfg_if_needed(@client_config, @node_cfgs, :scheme)
-      add_common_node_cfg_if_needed(@client_config, @node_cfgs, :username)
-      add_common_node_cfg_if_needed(@client_config, @node_cfgs, :password)
+      add_common_node_config_if_needed(@client_config, @node_configs, :scheme)
+      add_common_node_config_if_needed(@client_config, @node_configs, :username)
+      add_common_node_config_if_needed(@client_config, @node_configs, :password)
       super(**@client_config)
     end
 
@@ -33,9 +33,9 @@ class RedisClient
     end
 
     def per_node_key
-      @node_cfgs.to_h do |cfg|
-        node_key = ::RedisClient::Cluster::NodeKey.build_from_host_port(cfg[:host], cfg[:port])
-        config = @client_config.merge(cfg)
+      @node_configs.to_h do |config|
+        node_key = ::RedisClient::Cluster::NodeKey.build_from_host_port(config[:host], config[:port])
+        config = @client_config.merge(config)
         config = config.merge(host: @fixed_hostname) if @fixed_hostname && !@fixed_hostname.empty?
         [node_key, config]
       end
@@ -46,11 +46,15 @@ class RedisClient
     end
 
     def update_node(addrs)
-      @node_cfgs = build_node_options(addrs)
+      @node_configs = build_node_options(addrs)
     end
 
     def add_node(host, port)
-      @node_cfgs << { host: host, port: port }
+      @node_configs << { host: host, port: port }
+    end
+
+    def dup
+      self.class.new(nodes: @node_configs, replica: @replica, fixed_hostname: @fixed_hostname, **@client_config)
     end
 
     private
@@ -92,10 +96,10 @@ class RedisClient
       addr
     end
 
-    def add_common_node_cfg_if_needed(client_config, node_cfgs, key)
-      return client_config if client_config[key].nil? && node_cfgs.first[key].nil?
+    def add_common_node_config_if_needed(client_config, node_configs, key)
+      return client_config if client_config[key].nil? && node_configs.first[key].nil?
 
-      client_config[key] ||= node_cfgs.first[key]
+      client_config[key] ||= node_configs.first[key]
     end
   end
 end
