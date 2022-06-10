@@ -20,7 +20,7 @@ class RedisClient
         private
 
         def fetch_command_details(node)
-          node.call(%w[COMMAND]).to_h do |reply|
+          node.call('COMMAND').to_h do |reply|
             [reply[0], { arity: reply[1], flags: reply[2], first: reply[3], last: reply[4], step: reply[5] }]
           end
         end

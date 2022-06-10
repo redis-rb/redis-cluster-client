@@ -15,7 +15,7 @@ class RedisClient
           tmp_nodes = ::RedisClient::Cluster::Node.new(options, **kwargs)
 
           errors = tmp_nodes.map do |tmp_node|
-            reply = tmp_node.call(%w[CLUSTER NODES])
+            reply = tmp_node.call('CLUSTER', 'NODES')
             return parse_node_info(reply)
           rescue ::RedisClient::ConnectionError, ::RedisClient::CommandError => e
             e

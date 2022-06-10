@@ -25,8 +25,8 @@ class RedisClient
     end
 
     def blocking_call(timeout, *command, **kwargs, &block)
-      node = assign_node(command)
-      try_send(node, :blocking_call, *([timeout] + command), **kwargs, &block)
+      node = assign_node(*command)
+      try_send(node, :blocking_call, timeout, *command, **kwargs, &block)
     end
 
     def scan(*args, **kwargs, &block)
@@ -34,18 +34,18 @@ class RedisClient
     end
 
     def sscan(key, *args, **kwargs, &block)
-      node = assign_node(['SSCAN', key])
-      try_send(node, :sscan, *([key] + args), **kwargs, &block)
+      node = assign_node('SSCAN', key)
+      try_send(node, :sscan, key, *args, **kwargs, &block)
     end
 
     def hscan(key, *args, **kwargs, &block)
-      node = assign_node(['HSCAN', key])
-      try_send(node, :hscan, *([key] + args), **kwargs, &block)
+      node = assign_node('HSCAN', key)
+      try_send(node, :hscan, key, *args, **kwargs, &block)
     end
 
     def zscan(key, *args, **kwargs, &block)
-      node = assign_node(['ZSCAN', key])
-      try_send(node, :zscan, *([key] + args), **kwargs, &block)
+      node = assign_node('ZSCAN', key)
+      try_send(node, :zscan, key, *args, **kwargs, &block)
     end
 
     def pipelined
@@ -140,7 +140,7 @@ class RedisClient
       when 'discard', 'exec', 'multi', 'unwatch'
         raise ::RedisClient::Cluster::AmbiguousNodeError, cmd
       else
-        node = assign_node(command)
+        node = assign_node(*command)
         try_send(node, method, *command, **kwargs, &block)
       end
     end
@@ -149,7 +149,7 @@ class RedisClient
       case command[1].to_s.downcase
       when 'resetstat', 'rewrite', 'set'
         @node.call_all(method, *command, **kwargs, &block).first
-      else assign_node(command).send(method, *command, **kwargs, &block)
+      else assign_node(*command).send(method, *command, **kwargs, &block)
       end
     end
 
@@ -157,7 +157,7 @@ class RedisClient
       case command[1].to_s.downcase
       when 'stats' then @node.call_all(method, *command, **kwargs, &block)
       when 'purge' then @node.call_all(method, *command, **kwargs, &block).first
-      else assign_node(command).send(method, *command, **kwargs, &block)
+      else assign_node(*command).send(method, *command, **kwargs, &block)
       end
     end
 
@@ -166,7 +166,7 @@ class RedisClient
       when 'list' then @node.call_all(method, *command, **kwargs, &block).flatten
       when 'pause', 'reply', 'setname'
         @node.call_all(method, *command, **kwargs, &block).first
-      else assign_node(command).send(method, *command, **kwargs, &block)
+      else assign_node(*command).send(method, *command, **kwargs, &block)
       end
     end
 
@@ -177,7 +177,7 @@ class RedisClient
            'reset', 'set-config-epoch', 'setslot'
         raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, 'cluster', subcommand
       when 'saveconfig' then @node.call_all(method, *command, **kwargs, &block).first
-      else assign_node(command).send(method, *command, **kwargs, &block)
+      else assign_node(*command).send(method, *command, **kwargs, &block)
       end
     end
 
@@ -187,7 +187,7 @@ class RedisClient
         @node.call_all(method, *command, **kwargs, &block).first
       when 'flush', 'load'
         @node.call_primary(method, *command, **kwargs, &block).first
-      else assign_node(command).send(method, *command, **kwargs, &block)
+      else assign_node(*command).send(method, *command, **kwargs, &block)
       end
     end
 
@@ -198,7 +198,7 @@ class RedisClient
         @node.call_all(method, *command, **kwargs, &block).reject(&:empty?).map { |e| Hash[*e] }
              .reduce({}) { |a, e| a.merge(e) { |_, v1, v2| v1 + v2 } }
       when 'numpat' then @node.call_all(method, *command, **kwargs, &block).sum
-      else assign_node(command).send(method, *command, **kwargs, &block)
+      else assign_node(*command).send(method, *command, **kwargs, &block)
       end
     end
 
@@ -217,7 +217,7 @@ class RedisClient
         raise if retry_count <= 0
 
         node = assign_asking_node(e.message)
-        node.call(%w[ASKING])
+        node.call('ASKING')
         retry_count -= 1
         retry
       else
@@ -261,7 +261,7 @@ class RedisClient
       find_node(node_key)
     end
 
-    def assign_node(command)
+    def assign_node(*command)
       node_key = find_node_key(command)
       find_node(node_key)
     end
