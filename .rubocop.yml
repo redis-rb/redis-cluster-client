@@ -1,0 +1,37 @@
+---
+require:
+  - rubocop-performance
+  - rubocop-rake
+  - rubocop-minitest
+
+# https://rubocop.readthedocs.io/en/latest/
+AllCops:
+  TargetRubyVersion: 2.7
+  DisplayCopNames: true
+  NewCops: enable
+
+Metrics/AbcSize:
+  Exclude:
+    - 'test/**/*'
+
+Metrics/ClassLength:
+  Max: 400
+
+Metrics/MethodLength:
+  Exclude:
+    - 'test/**/*'
+
+Layout/LineLength:
+  Max: 200
+
+Style/NumericPredicate:
+  Enabled: false
+
+Style/FormatStringToken:
+  Enabled: false
+
+Style/Documentation:
+  Enabled: false
+
+Gemspec/RequiredRubyVersion:
+  Enabled: false

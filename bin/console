@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'irb'
+require 'bundler/setup'
+require 'redis_client'
+require 'redis_cluster_client'
+
+IRB.start(File.expand_path('..', __dir__))
