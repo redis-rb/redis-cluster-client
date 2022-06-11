@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 require 'uri'
-require 'redis_client/cluster/errors'
+require 'redis_client'
+require 'redis_client/config'
+require 'redis_client/cluster'
 require 'redis_client/cluster/node_key'
 
 class RedisClient

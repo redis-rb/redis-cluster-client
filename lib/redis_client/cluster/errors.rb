@@ -1,10 +1,12 @@
 # frozen_string_literal: true
 
+require 'redis_client'
+
 class RedisClient
   class Cluster
     # Raised when client connected to redis as cluster mode
     # and failed to fetch cluster state information by commands.
-    class InitialSetupError < StandardError
+    class InitialSetupError < ::RedisClient::Error
       # @param errors [Array<Redis::BaseError>]
       def initialize(errors)
         super("Redis client could not fetch cluster information: #{errors.map(&:message).uniq.join(',')}")
@@ -13,7 +15,7 @@ class RedisClient
 
     # Raised when client connected to redis as cluster mode
     # and some cluster subcommands were called.
-    class OrchestrationCommandNotSupported < StandardError
+    class OrchestrationCommandNotSupported < ::RedisClient::Error
       def initialize(command, subcommand = '')
         str = [command, subcommand].map(&:to_s).reject(&:empty?).join(' ').upcase
         msg = "#{str} command should be used with care "\
@@ -25,7 +27,7 @@ class RedisClient
     end
 
     # Raised when error occurs on any node of cluster.
-    class CommandErrorCollection < StandardError
+    class CommandErrorCollection < ::RedisClient::Error
       attr_reader :errors
 
       # @param errors [Hash{String => Redis::CommandError}]
@@ -37,14 +39,14 @@ class RedisClient
     end
 
     # Raised when cluster client can't select node.
-    class AmbiguousNodeError < StandardError
+    class AmbiguousNodeError < ::RedisClient::Error
       def initialize(command)
         super("Cluster client doesn't know which node the #{command} command should be sent to.")
       end
     end
 
     # Raised when commands in pipelining include cross slot keys.
-    class CrossSlotPipeliningError < StandardError
+    class CrossSlotPipeliningError < ::RedisClient::Error
       def initialize(keys)
         super("Cluster client couldn't send pipelining to single node. "\
               "The commands include cross slot keys. #{keys}")

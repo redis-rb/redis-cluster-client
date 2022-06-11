@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'redis_client'
 require 'redis_client/cluster/errors'
 
 class RedisClient
@@ -8,7 +9,7 @@ class RedisClient
       include Enumerable
 
       SLOT_SIZE = 16_384
-      ReloadNeeded = Class.new(StandardError)
+      ReloadNeeded = Class.new(::RedisClient::Error)
 
       class << self
         def load_info(options, **kwargs)

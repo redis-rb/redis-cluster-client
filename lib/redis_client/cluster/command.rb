@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'redis_client'
 require 'redis_client/cluster/errors'
 
 class RedisClient
