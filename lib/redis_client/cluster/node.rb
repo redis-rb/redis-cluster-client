@@ -31,20 +31,24 @@ class RedisClient
 
         # @see https://redis.io/commands/cluster-nodes/
         def parse_node_info(info) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-          info.split("\n").map(&:split)
-              .map { |arr| arr[2] = arr[2].split(',') }
-              .select { |arr| arr[7] == 'connected' && (arr[2] & %w[fail? fail handshake noaddr noflags]).empty? }
-              .map { |arr| arr[2] = (arr[2] & %w[master slave]).first }
-              .map { |arr| arr[1] = arr[1].split('@').first }
-              .map { |arr| arr[8] = arr[8].nil? ? [] : arr[8].split(',').map { |r| r.split('-') } }
+          rows = info.split("\n").map(&:split)
+          rows.each { |arr| arr[2] = arr[2].split(',') }
+          rows.select! { |arr| arr[7] == 'connected' && (arr[2] & %w[fail? fail handshake noaddr noflags]).empty? }
+          rows.each do |arr|
+            arr[1] = arr[1].split('@').first
+            arr[2] = (arr[2] & %w[master slave]).first
+            arr[8] = arr[8].nil? ? [] : arr[8].split(',').map { |r| r.split('-').map { |s| Integer(s) } }
+          end
+
+          rows
         end
       end
 
-      def initialize(options, node_info = {}, pool = nil, with_replica: false, **kwargs)
-        @with_replica = with_replica
+      def initialize(options, node_info = [], pool = nil, with_replica: false, **kwargs)
+        @clients = build_clients(options, pool, **kwargs)
         @slots = build_slot_node_mappings(node_info)
         @replications = build_replication_mappings(node_info)
-        @clients = build_clients(options, pool, **kwargs)
+        @with_replica = with_replica
       end
 
       def each(&block)
@@ -129,14 +133,14 @@ class RedisClient
       end
 
       def replica?(node_key)
-        @replications[node_key].size.zero?
+        !(@replications.nil? || @replications.size.empty?) && @replications[node_key].size.zero?
       end
 
       def build_clients(options, pool, **kwargs)
         options.filter_map do |node_key, option|
           next if replica_disabled? && replica?(node_key)
 
-          config = ::RedisClient.config(option)
+          config = ::RedisClient.config(**option)
           client = pool.nil? ? config.new_client(**kwargs) : config.new_pool(**pool, **kwargs)
           client.call('READONLY') if replica?(node_key) # FIXME: Send every pooled conns
 

@@ -13,7 +13,7 @@ class RedisClient
       @pool = pool
       @client_kwargs = kwargs
       @node = fetch_cluster_info!(@config, @pool, **@client_kwargs)
-      @command = ::RedisClient::Cluster::CommandLoader.load(@node)
+      @command = ::RedisClient::Cluster::Command.load(@node)
     end
 
     def call(*command, **kwargs, &block)
