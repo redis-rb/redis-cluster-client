@@ -1,0 +1,62 @@
+---
+name: Test
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
+jobs:
+  lint:
+    name: Lint
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+          bundler-cache: true
+      - name: Run rubocop
+        run: bundle exec rubocop
+  main:
+    name: Main
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-latest']
+        redis: ['6.2.7', '7.0.1']
+        ruby: ['3.1', '3.0', '2.7']
+    runs-on: ${{ matrix.os }}
+    services:
+      node1:
+        image: public.ecr.aws/docker/library/redis:${{ matrix.redis }}
+        ports:
+          - 7000:6379
+        options: >-
+          --health-cmd redis-cli
+          --health-interval 7s
+          --health-timeout 5s
+          --health-retries 10
+          --entrypoint
+          'redis-server
+          --maxmemory            64mb
+          --maxmemory-policy     allkeys-lru
+          --appendonly           yes
+          --cluster-enabled      yes
+          --cluster-config-file  nodes.conf
+          --cluster-node-timeout 5000'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - name: Run minitest
+        run: bundle exec rake test
