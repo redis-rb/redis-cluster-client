@@ -19,6 +19,15 @@ class RedisClient
               'set' => { arity: -3, flags: Set['write', 'denyoom', 'movablekeys'], first: 1, last: 1, step: 1 }
             }
           },
+          {
+            rows: [
+              ['GET', 2, Set['readonly', 'fast'], 1, 1, 1, Set['@read', '@string', '@fast'], Set[], Set[], Set[]]
+            ],
+            want: {
+              'get' => { arity: 2, flags: Set['readonly', 'fast'], first: 1, last: 1, step: 1 }
+            }
+          },
+          { rows: [[]], want: {} },
           { rows: [], want: {} },
           { rows: nil, want: {} }
         ].each do |c|
@@ -61,6 +70,32 @@ class RedisClient
             assert_equal(v[:write], a[:write])
             assert_equal(v[:readonly], a[:readonly])
           end
+        end
+      end
+
+      def test_dig_details
+        details = {
+          'get' => { arity: 2, flags: Set['readonly', 'fast'], first: 1, last: 1, step: 1 },
+          'set' => { arity: -3, flags: Set['write', 'denyoom', 'movablekeys'], first: 1, last: 1, step: 1 }
+        }
+
+        [
+          { params: { command: %w[SET foo 1], key: :first_key_position }, want: 1 },
+          { params: { command: %w[SET foo 1], key: :write }, want: true },
+          { params: { command: %w[set foo 1], key: :write }, want: true },
+          { params: { command: %w[SET foo 1], key: :readonly }, want: false },
+          { params: { command: %w[GET foo], key: :first_key_position }, want: 1 },
+          { params: { command: %w[GET foo], key: :write }, want: false },
+          { params: { command: %w[GET foo], key: :readonly }, want: true },
+          { params: { command: %w[get foo], key: :readonly }, want: true },
+          { params: { command: %w[UNKNOWN foo], key: :readonly }, want: nil },
+          { params: { command: [['SET'], 'foo', 1], key: :write }, want: true },
+          { params: { command: [], key: :readonly }, want: nil },
+          { params: { command: nil, key: :readonly }, want: nil }
+        ].each do |c|
+          cmd = ::RedisClient::Cluster::Command.new(details)
+          got = cmd.send(:dig_details, c[:params][:command], c[:params][:key])
+          c[:want].nil? ? assert_nil(got) : assert_equal(c[:want], got)
         end
       end
     end

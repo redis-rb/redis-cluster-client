@@ -22,8 +22,8 @@ class RedisClient
         private
 
         def parse_command_details(rows)
-          rows.to_h do |row|
-            [row[0], { arity: row[1], flags: row[2], first: row[3], last: row[4], step: row[5] }]
+          rows&.reject { |row| row[0].nil? }.to_h do |row|
+            [row[0].downcase, { arity: row[1], flags: row[2], first: row[3], last: row[4], step: row[5] }]
           end
         end
       end
@@ -62,8 +62,8 @@ class RedisClient
       end
 
       def dig_details(command, key)
-        name = command.first.to_s
-        return unless @details.key?(name)
+        name = command&.flatten&.first.to_s.downcase
+        return if name.empty? || !@details.key?(name)
 
         @details.fetch(name).fetch(key)
       end
