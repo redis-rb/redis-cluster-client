@@ -8,6 +8,7 @@ class RedisClient
   class Cluster
     class TestCommand < Minitest::Test
       def test_parse_command_details
+        keys = %i[arity flags first last step].freeze
         [
           {
             rows: [
@@ -30,22 +31,19 @@ class RedisClient
           { rows: [[]], want: {} },
           { rows: [], want: {} },
           { rows: nil, want: {} }
-        ].each do |c|
+        ].each_with_index do |c, idx|
+          msg = "Case: #{idx}"
           got = ::RedisClient::Cluster::Command.send(:parse_command_details, c[:rows])
-          assert_equal(c[:want].size, got.size)
-          assert_equal(c[:want].keys.sort, got.keys.sort)
-          c[:want].each do |k, v|
-            a = got[k]
-            assert_equal(v[:arity], a[:arity])
-            assert_equal(v[:flags], a[:flags])
-            assert_equal(v[:first], a[:first])
-            assert_equal(v[:last], a[:last])
-            assert_equal(v[:step], a[:step])
+          assert_equal(c[:want].size, got.size, msg)
+          assert_equal(c[:want].keys.sort, got.keys.sort, msg)
+          c[:want].each do |k1, v|
+            keys.each { |k2| assert_equal(v[k2], got[k1][k2], "#{msg}: #{k2}") }
           end
         end
       end
 
       def test_pick_details
+        keys = %i[first_key_position write readonly].freeze
         [
           {
             details: {
@@ -59,16 +57,14 @@ class RedisClient
           },
           { details: {}, want: {} },
           { details: nil, want: {} }
-        ].each do |c|
+        ].each_with_index do |c, idx|
+          msg = "Case: #{idx}"
           cmd = ::RedisClient::Cluster::Command.new(c[:details])
           got = cmd.send(:pick_details, c[:details])
-          assert_equal(c[:want].size, got.size)
-          assert_equal(c[:want].keys.sort, got.keys.sort)
-          c[:want].each do |k, v|
-            a = got[k]
-            assert_equal(v[:first_key_position], a[:first_key_position])
-            assert_equal(v[:write], a[:write])
-            assert_equal(v[:readonly], a[:readonly])
+          assert_equal(c[:want].size, got.size, msg)
+          assert_equal(c[:want].keys.sort, got.keys.sort, msg)
+          c[:want].each do |k1, v|
+            keys.each { |k2| assert_equal(v[k2], got[k1][k2], "#{msg}: #{k2}") }
           end
         end
       end
@@ -92,10 +88,11 @@ class RedisClient
           { params: { command: [['SET'], 'foo', 1], key: :write }, want: true },
           { params: { command: [], key: :readonly }, want: nil },
           { params: { command: nil, key: :readonly }, want: nil }
-        ].each do |c|
+        ].each_with_index do |c, idx|
+          msg = "Case: #{idx}"
           cmd = ::RedisClient::Cluster::Command.new(details)
           got = cmd.send(:dig_details, c[:params][:command], c[:params][:key])
-          c[:want].nil? ? assert_nil(got) : assert_equal(c[:want], got)
+          c[:want].nil? ? assert_nil(got, msg) : assert_equal(c[:want], got, msg)
         end
       end
     end
