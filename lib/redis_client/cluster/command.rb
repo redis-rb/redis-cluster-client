@@ -9,7 +9,8 @@ class RedisClient
       class << self
         def load(nodes)
           errors = nodes.map do |node|
-            details = fetch_command_details(node)
+            reply = node.call('COMMAND')
+            details = parse_command_details(reply)
             return ::RedisClient::Cluster::Command.new(details)
           rescue ::RedisClient::ConnectionError, ::RedisClient::CommandError => e
             e
@@ -20,9 +21,9 @@ class RedisClient
 
         private
 
-        def fetch_command_details(node)
-          node.call('COMMAND').to_h do |reply|
-            [reply[0], { arity: reply[1], flags: reply[2], first: reply[3], last: reply[4], step: reply[5] }]
+        def parse_command_details(rows)
+          rows.to_h do |row|
+            [row[0], { arity: row[1], flags: row[2], first: row[3], last: row[4], step: row[5] }]
           end
         end
       end
@@ -51,7 +52,7 @@ class RedisClient
       private
 
       def pick_details(details)
-        details.transform_values do |detail|
+        (details || {}).transform_values do |detail|
           {
             first_key_position: detail[:first],
             write: detail[:flags].include?('write'),
