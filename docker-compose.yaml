@@ -1,7 +1,7 @@
 ---
 services:
   node1: &node
-    image: "redis:7"
+    image: "redis:${REDIS_VERSION:-7}"
     command: >
       redis-server
       --maxmemory            64mb
@@ -38,7 +38,7 @@ services:
     ports:
       - "7005:6379"
   clustering:
-    image: "redis:7"
+    image: "redis:${REDIS_VERSION:-7}"
     command: >
       bash -c "apt-get update > /dev/null
       && apt-get install --no-install-recommends --no-install-suggests -y dnsutils > /dev/null
