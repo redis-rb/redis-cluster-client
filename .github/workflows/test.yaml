@@ -51,6 +51,8 @@ jobs:
       - name: Docker compose up
         run: docker compose up -d
       - name: Wait for Redis cluster to be ready
+        run: bundle exec rake wait
+      - name: Print containers
         run: docker compose ps
       - name: Run minitest
         run: bundle exec rake test
