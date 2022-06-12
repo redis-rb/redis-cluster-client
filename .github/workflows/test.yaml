@@ -33,6 +33,8 @@ jobs:
         redis: ['6.2.7', '7.0.1']
         ruby: ['3.1', '3.0', '2.7']
     runs-on: ${{ matrix.os }}
+    env:
+      REDIS_VERSION: ${{ matrix.redis }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -44,13 +46,11 @@ jobs:
       # Services feature of GitHub Actions isn't fit for our purposes for testing.
       # We cannot overwrite arguments of ENTRYPOINT.
       # @see https://docs.docker.com/engine/reference/commandline/create/#options
-      - name: Docker Compose up
+      - name: Pull Docker images
+        run: docker pull redis:$REDIS_VERSION
+      - name: Docker compose up
         run: docker compose up -d
-        env:
-          REDIS_VERSION: ${{ matrix.redis }}
       - name: Wait for Redis cluster to be ready
         run: docker compose ps
-        env:
-          REDIS_VERSION: ${{ matrix.redis }}
       - name: Run minitest
         run: bundle exec rake test
