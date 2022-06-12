@@ -3,10 +3,10 @@ name: Test
 on:
   push:
     branches:
-      - "*"
+      - '*'
   pull_request:
     branches:
-      - "*"
+      - '*'
 jobs:
   lint:
     name: Lint
@@ -37,19 +37,19 @@ jobs:
         image: public.ecr.aws/docker/library/redis:${{ matrix.redis }}
         ports:
           - 7000:6379
+        # @see https://docs.docker.com/engine/reference/commandline/create/#options
         options: >-
           --health-cmd redis-cli
           --health-interval 7s
           --health-timeout 5s
           --health-retries 10
-          --entrypoint
-          'redis-server
-          --maxmemory            64mb
-          --maxmemory-policy     allkeys-lru
-          --appendonly           yes
-          --cluster-enabled      yes
-          --cluster-config-file  nodes.conf
-          --cluster-node-timeout 5000'
+          --entrypoint="['docker-entrypoint.sh', 'redis-server',
+          '--maxmemory',            '64mb',
+          '--maxmemory-policy',     'allkeys-lru',
+          '--appendonly',           'yes',
+          '--cluster-enabled',      'yes',
+          '--cluster-config-file',  'nodes.conf',
+          '--cluster-node-timeout', '5000']"
     steps:
       - name: Check out code
         uses: actions/checkout@v3
