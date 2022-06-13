@@ -8,7 +8,7 @@ class RedisClient
     class Command
       class << self
         def load(nodes)
-          errors = nodes.map do |node|
+          errors = nodes&.map do |node|
             reply = node.call('COMMAND')
             details = parse_command_details(reply)
             return ::RedisClient::Cluster::Command.new(details)
@@ -36,7 +36,7 @@ class RedisClient
         i = determine_first_key_position(command)
         return '' if i == 0
 
-        key = command[i].to_s
+        key = (command[i].is_a?(Array) ? command[i].flatten.first : command[i]).to_s
         hash_tag = extract_hash_tag(key)
         hash_tag.empty? ? key : hash_tag
       end
