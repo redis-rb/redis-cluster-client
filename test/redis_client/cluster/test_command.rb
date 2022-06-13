@@ -4,11 +4,29 @@ require 'set'
 require 'testing_helper'
 require 'redis_client/cluster'
 require 'redis_client/cluster/command'
+require 'redis_client/cluster/errors'
 
 class RedisClient
   class Cluster
     class TestCommand < Minitest::Test
       include ::RedisClient::TestingHelper
+
+      def test_load
+        [
+          { nodes: @clients, error: nil },
+          { nodes: [], error: ::RedisClient::Cluster::InitialSetupError },
+          { nodes: [''], error: NoMethodError },
+          { nodes: nil, error: ::RedisClient::Cluster::InitialSetupError }
+        ].each_with_index do |c, idx|
+          msg = "Case: #{idx}"
+          got = -> { ::RedisClient::Cluster::Command.load(c[:nodes]) }
+          if c[:error].nil?
+            assert_instance_of(::RedisClient::Cluster::Command, got.call, msg)
+          else
+            assert_raises(c[:error], msg, &got)
+          end
+        end
+      end
 
       def test_parse_command_details
         keys = %i[arity flags first last step].freeze
@@ -42,6 +60,55 @@ class RedisClient
           c[:want].each do |k1, v|
             keys.each { |k2| assert_equal(v[k2], got[k1][k2], "#{msg}: #{k2}") }
           end
+        end
+      end
+
+      def test_extract_first_key
+        cmd = ::RedisClient::Cluster::Command.load(@clients)
+        [
+          { command: %w[SET foo 1], want: 'foo' },
+          { command: %w[GET foo], want: 'foo' },
+          { command: %w[GET foo{bar}baz], want: 'bar' },
+          { command: %w[MGET foo bar baz], want: 'foo' },
+          { command: %w[UNKNOWN foo bar], want: '' },
+          { command: [['GET'], 'foo'], want: 'foo' },
+          { command: ['GET', ['foo']], want: 'foo' },
+          { command: [], want: '' },
+          { command: nil, want: '' }
+        ].each_with_index do |c, idx|
+          msg = "Case: #{idx}"
+          got = cmd.extract_first_key(c[:command])
+          assert_equal(c[:want], got, msg)
+        end
+      end
+
+      def test_should_send_to_primary?
+        cmd = ::RedisClient::Cluster::Command.load(@clients)
+        [
+          { command: %w[SET foo 1], want: true },
+          { command: %w[GET foo], want: false },
+          { command: %w[UNKNOWN foo bar], want: nil },
+          { command: [], want: nil },
+          { command: nil, want: nil }
+        ].each_with_index do |c, idx|
+          msg = "Case: #{idx}"
+          got = cmd.should_send_to_primary?(c[:command])
+          c[:want].nil? ? assert_nil(got, msg) : assert_equal(c[:want], got, msg)
+        end
+      end
+
+      def test_should_send_to_replica?
+        cmd = ::RedisClient::Cluster::Command.load(@clients)
+        [
+          { command: %w[SET foo 1], want: false },
+          { command: %w[GET foo], want: true },
+          { command: %w[UNKNOWN foo bar], want: nil },
+          { command: [], want: nil },
+          { command: nil, want: nil }
+        ].each_with_index do |c, idx|
+          msg = "Case: #{idx}"
+          got = cmd.should_send_to_replica?(c[:command])
+          c[:want].nil? ? assert_nil(got, msg) : assert_equal(c[:want], got, msg)
         end
       end
 

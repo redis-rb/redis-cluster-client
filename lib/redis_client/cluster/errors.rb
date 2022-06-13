@@ -9,7 +9,7 @@ class RedisClient
     class InitialSetupError < ::RedisClient::Error
       # @param errors [Array<Redis::BaseError>]
       def initialize(errors)
-        super("Redis client could not fetch cluster information: #{errors.map(&:message).uniq.join(',')}")
+        super("Redis client could not fetch cluster information: #{errors&.map(&:message)&.uniq&.join(',')}")
       end
     end
 
