@@ -48,7 +48,7 @@ jobs:
       # @see https://docs.docker.com/engine/reference/commandline/create/#options
       - name: Pull Docker images
         run: docker pull redis:$REDIS_VERSION
-      - name: Docker compose up
+      - name: Run containers
         run: docker compose up -d
       - name: Wait for Redis cluster to be ready
         run: bundle exec rake wait
@@ -56,3 +56,5 @@ jobs:
         run: docker compose ps
       - name: Run minitest
         run: bundle exec rake test
+      - name: Stop containers
+        run: docker compose down

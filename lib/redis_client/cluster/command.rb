@@ -22,8 +22,8 @@ class RedisClient
         private
 
         def parse_command_details(rows)
-          rows.to_h do |row|
-            [row[0], { arity: row[1], flags: row[2], first: row[3], last: row[4], step: row[5] }]
+          rows&.reject { |row| row[0].nil? }.to_h do |row|
+            [row[0].downcase, { arity: row[1], flags: row[2], first: row[3], last: row[4], step: row[5] }]
           end
         end
       end
@@ -62,14 +62,14 @@ class RedisClient
       end
 
       def dig_details(command, key)
-        name = command.first.to_s
-        return unless @details.key?(name)
+        name = command&.flatten&.first.to_s.downcase
+        return if name.empty? || !@details.key?(name)
 
         @details.fetch(name).fetch(key)
       end
 
-      def determine_first_key_position(command)
-        case command.first.to_s.downcase
+      def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity
+        case command&.flatten&.first.to_s.downcase
         when 'eval', 'evalsha', 'migrate', 'zinterstore', 'zunionstore' then 3
         when 'object' then 2
         when 'memory'
@@ -81,13 +81,14 @@ class RedisClient
         end
       end
 
-      def determine_optional_key_position(command, option_name)
-        idx = command.map(&:to_s).map(&:downcase).index(option_name)
+      def determine_optional_key_position(command, option_name) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        idx = command&.flatten&.map(&:to_s)&.map(&:downcase)&.index(option_name&.downcase)
         idx.nil? ? 0 : idx + 1
       end
 
       # @see https://redis.io/topics/cluster-spec#keys-hash-tags Keys hash tags
       def extract_hash_tag(key)
+        key = key.to_s
         s = key.index('{')
         e = key.index('}', s.to_i + 1)
 
