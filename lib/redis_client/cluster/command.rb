@@ -68,8 +68,8 @@ class RedisClient
         @details.fetch(name).fetch(key)
       end
 
-      def determine_first_key_position(command)
-        case command.first.to_s.downcase
+      def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity
+        case command&.flatten&.first.to_s.downcase
         when 'eval', 'evalsha', 'migrate', 'zinterstore', 'zunionstore' then 3
         when 'object' then 2
         when 'memory'
@@ -81,8 +81,8 @@ class RedisClient
         end
       end
 
-      def determine_optional_key_position(command, option_name)
-        idx = command.map(&:to_s).map(&:downcase).index(option_name)
+      def determine_optional_key_position(command, option_name) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        idx = command&.flatten&.map(&:to_s)&.map(&:downcase)&.index(option_name&.downcase)
         idx.nil? ? 0 : idx + 1
       end
 

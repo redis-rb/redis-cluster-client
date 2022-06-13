@@ -7,11 +7,11 @@ class RedisClient
     class Controller
       SLOT_SIZE = 16_384
 
-      def initialize(node_addrs, timeout: 30.0, reconnect_attempts: 10)
+      def initialize(node_addrs, timeout: 30.0, reconnect_attempts: 10, **kwargs)
         raise 'Redis Cluster requires at least 3 master nodes.' if node_addrs.size < 3
 
         @clients = node_addrs.map do |addr|
-          RedisClient.new(url: addr, timeout: timeout, reconnect_attempts: reconnect_attempts)
+          RedisClient.new(url: addr, timeout: timeout, reconnect_attempts: reconnect_attempts, **kwargs)
         end
 
         @timeout = timeout
