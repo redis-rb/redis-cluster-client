@@ -16,10 +16,15 @@ class RedisClient
       end
 
       def split(node_key)
-        node_key.split(DELIMITER)
+        pos = node_key&.rindex(DELIMITER, -1)
+        return [node_key, nil] if pos.nil?
+
+        [node_key[0, pos], node_key[pos + 1, node_key.size - pos - 1]]
       end
 
       def build_from_uri(uri)
+        return '' if uri.nil?
+
         "#{uri.host}#{DELIMITER}#{uri.port}"
       end
 
