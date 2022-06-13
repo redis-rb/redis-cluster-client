@@ -4,22 +4,24 @@ require 'redis_client'
 
 class RedisClient
   class Cluster
+    ERR_ARG_NORMALIZATION = ->(arg) { Array[arg].flatten.reject { |e| e.nil? || (e.respond_to?(:empty?) && e.empty?) } }
+
     # Raised when client connected to redis as cluster mode
     # and failed to fetch cluster state information by commands.
     class InitialSetupError < ::RedisClient::Error
-      # @param errors [Array<Redis::BaseError>]
       def initialize(errors)
-        super("Redis client could not fetch cluster information: #{errors&.map(&:message)&.uniq&.join(',')}")
+        msg = ERR_ARG_NORMALIZATION.call(errors).map(&:message).uniq.join(',')
+        super("Redis client could not fetch cluster information: #{msg}")
       end
     end
 
     # Raised when client connected to redis as cluster mode
     # and some cluster subcommands were called.
     class OrchestrationCommandNotSupported < ::RedisClient::Error
-      def initialize(command, subcommand = '')
-        str = [command, subcommand].map(&:to_s).reject(&:empty?).join(' ').upcase
+      def initialize(command)
+        str = ERR_ARG_NORMALIZATION.call(command).map(&:to_s).join(' ').upcase
         msg = "#{str} command should be used with care "\
-              'only by applications orchestrating Redis Cluster, like redis-trib, '\
+              'only by applications orchestrating Redis Cluster, like redis-cli, '\
               'and the command if used out of the right context can leave the cluster '\
               'in a wrong state or cause data loss.'
         super(msg)
@@ -30,11 +32,9 @@ class RedisClient
     class CommandErrorCollection < ::RedisClient::Error
       attr_reader :errors
 
-      # @param errors [Hash{String => Redis::CommandError}]
-      # @param error_message [String]
-      def initialize(errors, error_message = 'Command errors were replied on any node')
-        @errors = errors
-        super(error_message)
+      def initialize(errors)
+        @errors = ERR_ARG_NORMALIZATION.call(errors)
+        super("Command errors were replied on any node: #{@errors.map(&:message).uniq.join(',')}")
       end
     end
 
@@ -49,7 +49,7 @@ class RedisClient
     class CrossSlotPipeliningError < ::RedisClient::Error
       def initialize(keys)
         super("Cluster client couldn't send pipelining to single node. "\
-              "The commands include cross slot keys. #{keys}")
+              "The commands include cross slot keys: #{ERR_ARG_NORMALIZATION.call(keys).join(',')}")
       end
     end
   end

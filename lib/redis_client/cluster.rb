@@ -179,7 +179,7 @@ class RedisClient
       case subcommand
       when 'addslots', 'delslots', 'failover', 'forget', 'meet', 'replicate',
            'reset', 'set-config-epoch', 'setslot'
-        raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, 'cluster', subcommand
+        raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, ['cluster', subcommand]
       when 'saveconfig' then @node.call_all(method, *command, **kwargs, &block).first
       else assign_node(*command).send(method, *command, **kwargs, &block)
       end
