@@ -6,8 +6,8 @@ sequenceDiagram
     participant Server Shard 1
     participant Server Shard 2
     participant Server Shard 3
-    Note over Client,Server Shard 3: Redis.new(cluster: %w[redis://node1:6379])
-    Client->>+Server Shard 1: CLUSTER SLOTS
+    Note over Client,Server Shard 3: RedisClient.cluster(nodes: %w[redis://node1:6379]).new_client
+    Client->>+Server Shard 1: CLUSTER NODES
     Server Shard 1-->>-Client: nodes and slots data
     Client->>+Server Shard 1: GET key1
     Server Shard 1-->>-Client: value1
@@ -20,5 +20,5 @@ sequenceDiagram
     Note over Client,Server Shard 3: Client needs to redirect to correct node
     Client->>+Server Shard 2: MGET key2 key3
     Server Shard 2-->>-Client: CROSSSLOTS
-    Note over Client,Server Shard 2: Cannot command across shards
+    Note over Client,Server Shard 2: Client cannot command across shards
 ```
