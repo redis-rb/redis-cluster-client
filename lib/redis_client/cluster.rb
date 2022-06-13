@@ -195,7 +195,7 @@ class RedisClient
       end
     end
 
-    def send_pubsub_command(method, *command, **kwargs, &block) # rubocop:disable Metircs/AbcSize, Metrics/CyclomaticComplexity
+    def send_pubsub_command(method, *command, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
       case command[1].to_s.downcase
       when 'channels' then @node.call_all(method, *command, **kwargs, &block).flatten.uniq.sort
       when 'numsub'

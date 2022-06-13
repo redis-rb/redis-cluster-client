@@ -154,7 +154,9 @@ class RedisClient
           { key: 'foo{}bar', want: '' },
           { key: '{}foo', want: '' },
           { key: 'foo{}', want: '' },
-          { key: '{}', want: '' }
+          { key: '{}', want: '' },
+          { key: '', want: '' },
+          { key: nil, want: '' }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
           got = cmd.send(:extract_hash_tag, c[:key])

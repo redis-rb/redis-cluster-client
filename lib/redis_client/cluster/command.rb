@@ -88,6 +88,7 @@ class RedisClient
 
       # @see https://redis.io/topics/cluster-spec#keys-hash-tags Keys hash tags
       def extract_hash_tag(key)
+        key = key.to_s
         s = key.index('{')
         e = key.index('}', s.to_i + 1)
 
