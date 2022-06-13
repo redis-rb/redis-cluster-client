@@ -14,7 +14,7 @@ desc 'Wait for cluster to be ready'
 task :wait do
   $LOAD_PATH.unshift(File.expand_path('test', __dir__))
   require 'redis_client/cluster/controller'
-  nodes = (7000..7005).map { |port| "redis://127.0.0.1:#{port}" }
+  nodes = (7000..7005).map { |port| "#{ENV.fetch('REDIS_SCHEME', 'redis')}://127.0.0.1:#{port}" }
   ctrl = ::RedisClient::Cluster::Controller.new(nodes)
   ctrl.wait_for_cluster_to_be_ready
 end

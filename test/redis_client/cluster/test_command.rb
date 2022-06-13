@@ -13,7 +13,7 @@ class RedisClient
 
       def test_load
         [
-          { nodes: @clients, error: nil },
+          { nodes: @raw_clients, error: nil },
           { nodes: [], error: ::RedisClient::Cluster::InitialSetupError },
           { nodes: [''], error: NoMethodError },
           { nodes: nil, error: ::RedisClient::Cluster::InitialSetupError }
@@ -64,7 +64,7 @@ class RedisClient
       end
 
       def test_extract_first_key
-        cmd = ::RedisClient::Cluster::Command.load(@clients)
+        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
         [
           { command: %w[SET foo 1], want: 'foo' },
           { command: %w[GET foo], want: 'foo' },
@@ -83,7 +83,7 @@ class RedisClient
       end
 
       def test_should_send_to_primary?
-        cmd = ::RedisClient::Cluster::Command.load(@clients)
+        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
         [
           { command: %w[SET foo 1], want: true },
           { command: %w[GET foo], want: false },
@@ -98,7 +98,7 @@ class RedisClient
       end
 
       def test_should_send_to_replica?
-        cmd = ::RedisClient::Cluster::Command.load(@clients)
+        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
         [
           { command: %w[SET foo 1], want: false },
           { command: %w[GET foo], want: true },
@@ -167,7 +167,7 @@ class RedisClient
       end
 
       def test_determine_first_key_position
-        cmd = ::RedisClient::Cluster::Command.load(@clients)
+        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
         [
           { command: %w[EVAL "return ARGV[1]" 0 hello], want: 3 },
           { command: [['EVAL'], '"return ARGV[1]"', 0, 'hello'], want: 3 },
@@ -192,7 +192,7 @@ class RedisClient
       end
 
       def test_determine_optional_key_position
-        cmd = ::RedisClient::Cluster::Command.load(@clients)
+        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
         [
           { params: { command: %w[XREAD COUNT 2 STREAMS mystream writers 0-0 0-0], option_name: 'streams' }, want: 4 },
           { params: { command: %w[XREADGROUP GROUP group consumer STREAMS key id], option_name: 'streams' }, want: 5 },
@@ -210,7 +210,7 @@ class RedisClient
       end
 
       def test_extract_hash_tag
-        cmd = ::RedisClient::Cluster::Command.load(@clients)
+        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
         [
           { key: 'foo', want: '' },
           { key: 'foo{bar}baz', want: 'bar' },
