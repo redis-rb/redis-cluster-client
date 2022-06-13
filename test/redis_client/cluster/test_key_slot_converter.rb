@@ -9,7 +9,7 @@ class RedisClient
       include TestingHelper
 
       def test_convert
-        %w[key1 key2 key3].each_with_index do |key, idx|
+        (1..255).map { |i| "key#{i}" }.each_with_index do |key, idx|
           want = @raw_clients.first.call('CLUSTER', 'KEYSLOT', key)
           got = ::RedisClient::Cluster::KeySlotConverter.convert(key)
           assert_equal(want, got, "Case: #{idx}")
