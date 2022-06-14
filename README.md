@@ -7,7 +7,7 @@ Redis Cluster Client
 TODO
 
 ```ruby
-cli = RedisClient.cluster(nodes: %w[redis://127.0.0.1:7000]).new_client
+cli = RedisClient.cluster(nodes: %w[redis://127.0.0.1:6379]).new_client
 
 cli.call('PING')
 #=> PONG
