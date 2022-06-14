@@ -18,6 +18,8 @@ class RedisClient
           super(**kwargs)
         end
 
+        private
+
         def build_connection_prelude
           prelude = super.dup
           prelude << ['READONLY'] if @scale_read
