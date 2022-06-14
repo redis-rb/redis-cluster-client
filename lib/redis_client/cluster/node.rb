@@ -18,6 +18,8 @@ class RedisClient
           super(**kwargs)
         end
 
+        private
+
         def build_connection_prelude
           prelude = super.dup
           prelude << ['READONLY'] if @scale_read
@@ -27,10 +29,10 @@ class RedisClient
 
       class << self
         def load_info(options, **kwargs)
-          tmp_nodes = ::RedisClient::Cluster::Node.new(options, **kwargs)
+          startup_nodes = ::RedisClient::Cluster::Node.new(options, **kwargs)
 
-          errors = tmp_nodes.map do |tmp_node|
-            reply = tmp_node.call('CLUSTER', 'NODES')
+          errors = startup_nodes.map do |n|
+            reply = n.call('CLUSTER', 'NODES')
             return parse_node_info(reply)
           rescue ::RedisClient::ConnectionError, ::RedisClient::CommandError => e
             e
@@ -38,12 +40,13 @@ class RedisClient
 
           raise ::RedisClient::Cluster::InitialSetupError, errors
         ensure
-          tmp_nodes&.each(&:close)
+          startup_nodes&.each(&:close)
         end
 
         private
 
         # @see https://redis.io/commands/cluster-nodes/
+        # @see https://github.com/redis/redis/blob/78960ad57b8a5e6af743d789ed8fd767e37d42b8/src/cluster.c#L4660-L4683
         def parse_node_info(info) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
           rows = info.split("\n").map(&:split)
           rows.each { |arr| arr[2] = arr[2].split(',') }
@@ -51,7 +54,13 @@ class RedisClient
           rows.each do |arr|
             arr[1] = arr[1].split('@').first
             arr[2] = (arr[2] & %w[master slave]).first
-            arr[8] = arr[8].nil? ? [] : arr[8].split(',').map { |r| r.split('-').map { |s| Integer(s) } }
+            if arr[8].nil?
+              arr[8] = []
+              next
+            end
+
+            arr[8] = arr[8].split(',').map { |r| r.split('-').map { |s| Integer(s) } }
+            arr[8] = arr[8].map { |a| a.size == 1 ? a << a.first : a }.map(&:sort)
           end
 
           rows.map do |arr|
