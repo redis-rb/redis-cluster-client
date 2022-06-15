@@ -12,12 +12,12 @@ class RedisClient
       @config = config.dup
       @pool = pool
       @client_kwargs = kwargs
-      @node = fetch_cluster_info!(@config, @pool, **@client_kwargs)
+      @node = fetch_cluster_info!(@config, pool: @pool, **@client_kwargs)
       @command = ::RedisClient::Cluster::Command.load(@node)
     end
 
     def inspect
-      @node.inspect
+      "#<#{self.class.name} #{@node.node_keys.join(', ')}>"
     end
 
     def call(*command, **kwargs, &block)
@@ -113,11 +113,12 @@ class RedisClient
 
     private
 
-    def fetch_cluster_info!(config, pool, **kwargs)
+    def fetch_cluster_info!(config, pool: nil, **kwargs)
       node_info = ::RedisClient::Cluster::Node.load_info(config.per_node_key, **kwargs)
       node_addrs = node_info.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info[:node_key]) }
       config.update_node(node_addrs)
-      ::RedisClient::Cluster::Node.new(config.per_node_key, node_info, pool, with_replica: config.use_replica?, **kwargs)
+      ::RedisClient::Cluster::Node.new(config.per_node_key,
+                                       node_info: node_info, pool: pool, with_replica: config.use_replica?, **kwargs)
     end
 
     def send_command(method, *command, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
@@ -300,7 +301,7 @@ class RedisClient
       end
 
       @node.each(&:close)
-      @node = fetch_cluster_info!(@config, @pool, **@client_kwargs)
+      @node = fetch_cluster_info!(@config, pool: @pool, **@client_kwargs)
     end
   end
 end

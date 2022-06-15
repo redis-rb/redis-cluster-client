@@ -26,7 +26,7 @@ class RedisClient
     end
 
     def inspect
-      "#<#{self.class.name}: #{per_node_key.values}>"
+      "#<#{self.class.name} #{per_node_key.values}>"
     end
 
     def new_pool(size: 5, timeout: 5, **kwargs)

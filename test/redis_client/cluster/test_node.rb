@@ -3,6 +3,7 @@
 require 'uri'
 require 'testing_helper'
 require 'redis_client/cluster/node'
+require 'redis_client/cluster/node_key'
 
 class RedisClient
   class Cluster
@@ -22,11 +23,34 @@ class RedisClient
     end
 
     class TestNode < Minitest::Test
+      def setup
+        config = ::RedisClient::ClusterConfig.new(nodes: TEST_NODE_URIS)
+        @node_info = ::RedisClient::Cluster::Node.load_info(config.per_node_key, timeout: TEST_TIMEOUT_SEC)
+        node_addrs = @node_info.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info[:node_key]) }
+        config.update_node(node_addrs)
+        @test_node = ::RedisClient::Cluster::Node.new(config.per_node_key, node_info: @node_info, timeout: TEST_TIMEOUT_SEC)
+        @test_node_with_scale_read = ::RedisClient::Cluster::Node.new(config.per_node_key, node_info: @node_info, with_replica: true, timeout: TEST_TIMEOUT_SEC)
+      end
+
+      def teardown
+        @test_node&.each(&:close)
+        @test_node_with_scale_read&.each(&:close)
+      end
+
       def test_load_info
         [
-          { params: { options: TEST_NODE_OPTIONS, kwargs: {} }, want: { size: TEST_NODE_OPTIONS.size } },
-          { params: { options: { '127.0.0.1:11211' => { host: '127.0.0.1', port: 11_211 } }, kwargs: {} }, want: { error: ::RedisClient::Cluster::InitialSetupError } },
-          { params: { options: {}, kwargs: {} }, want: { error: ::RedisClient::Cluster::InitialSetupError } }
+          {
+            params: { options: TEST_NODE_OPTIONS, kwargs: { timeout: TEST_TIMEOUT_SEC } },
+            want: { size: TEST_NODE_OPTIONS.size }
+          },
+          {
+            params: { options: { '127.0.0.1:11211' => { host: '127.0.0.1', port: 11_211 } }, kwargs: { timeout: TEST_TIMEOUT_SEC } },
+            want: { error: ::RedisClient::Cluster::InitialSetupError }
+          },
+          {
+            params: { options: {}, kwargs: { timeout: TEST_TIMEOUT_SEC } },
+            want: { error: ::RedisClient::Cluster::InitialSetupError }
+          }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
           got = -> { ::RedisClient::Cluster::Node.load_info(c[:params][:options], **c[:params][:kwargs]) }
@@ -125,46 +149,140 @@ class RedisClient
       end
 
       def test_inspect
-        skip('TODO')
+        assert_match(/^#<RedisClient::Cluster::Node [0-9., :]*>$/, @test_node.inspect)
       end
 
       def test_enumerable
-        skip('TODO')
+        refute(@test_node.any?(&:nil?))
+      end
+
+      def test_node_keys
+        want = @node_info.map { |info| info[:node_key] }
+        @test_node.node_keys.each do |got|
+          assert_includes(want, got, "Case: #{got}")
+        end
       end
 
       def test_find_by
-        skip('TODO')
+        @node_info.each do |info|
+          msg = "Case: primary only: #{info[:node_key]}"
+          got = -> { @test_node.find_by(info[:node_key]) }
+          if info[:role] == 'master'
+            assert_instance_of(::RedisClient, got.call, msg)
+          else
+            assert_raises(::RedisClient::Cluster::Node::ReloadNeeded, msg, &got)
+          end
+
+          msg = "Case: scale read: #{info[:node_key]}"
+          got = @test_node_with_scale_read.find_by(info[:node_key])
+          assert_instance_of(::RedisClient, got, msg)
+        end
       end
 
       def test_call_all
-        skip('TODO')
+        want = (1..(@node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
+        got = @test_node.call_all(:call, 'PING')
+        assert_equal(want, got, 'Case: primary only')
+
+        want = (1..(@node_info.count)).map { |_| 'PONG' }
+        got = @test_node_with_scale_read.call_all(:call, 'PING')
+        assert_equal(want, got, 'Case: scale read')
       end
 
       def test_call_primary
-        skip('TODO')
+        want = (1..(@node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
+        got = @test_node.call_primary(:call, 'PING')
+        assert_equal(want, got)
       end
 
       def test_call_replica
-        skip('TODO')
+        want = (1..(@node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
+        got = @test_node.call_replica(:call, 'PING')
+        assert_equal(want, got, 'Case: primary only')
+
+        want = (1..(@node_info.count { |info| info[:role] == 'slave' })).map { |_| 'PONG' }
+        got = @test_node_with_scale_read.call_replica(:call, 'PING')
+        assert_equal(want, got, 'Case: scale read')
       end
 
       def test_scale_reading_clients
-        skip('TODO')
+        want = @node_info.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }.sort
+        got = @test_node.scale_reading_clients.map { |client| "#{client.config.host}:#{client.config.port}" }.sort
+        assert_equal(want, got, 'Case: primary only')
+
+        want = @node_info.select { |info| info[:role] == 'slave' }.map { |info| info[:node_key] }.sort
+        got = @test_node_with_scale_read.scale_reading_clients.map { |client| "#{client.config.host}:#{client.config.port}" }.sort
+        assert_equal(want, got, 'Case: scale read')
       end
 
       def test_slot_exists?
-        skip('TODO')
+        refute(@test_node.slot_exists?(-1))
+        assert(@test_node.slot_exists?(0))
+        assert(@test_node.slot_exists?(16_383))
+        refute(@test_node.slot_exists?(16_384))
+        assert_raises(TypeError) { @test_node.slot_exists?(:foo) }
       end
 
       def test_find_node_key_of_primary
-        skip('TODO')
+        sample_node = @node_info.find { |info| info[:role] == 'master' }
+        sample_slot = sample_node[:slots].first.first
+        got = @test_node.find_node_key_of_primary(sample_slot)
+        assert_equal(sample_node[:node_key], got)
       end
 
       def test_find_node_key_of_replica
-        skip('TODO')
+        sample_node = @node_info.find { |info| info[:role] == 'master' }
+        sample_slot = sample_node[:slots].first.first
+        got = @test_node.find_node_key_of_replica(sample_slot)
+        assert_equal(sample_node[:node_key], got, 'Case: primary only')
+
+        sample_replica = @node_info.find { |info| info[:role] == 'slave' }
+        sample_primary = @node_info.find { |info| info[:id] == sample_replica[:primary_id] }
+        sample_slot = sample_primary[:slots].first.first
+        got = @test_node_with_scale_read.find_node_key_of_replica(sample_slot)
+        assert_equal(sample_replica[:node_key], got, 'Case: scale read')
       end
 
       def test_update_slot
+        sample_slot = 0
+        base_node_key = @test_node.find_node_key_of_primary(sample_slot)
+        another_node_key = @node_info.find { |info| info[:node_key] != base_node_key && info[:role] == 'master' }
+        @test_node.update_slot(sample_slot, another_node_key)
+        assert_equal(another_node_key, @test_node.find_node_key_of_primary(sample_slot))
+      end
+
+      def test_replica_disabled?
+        assert(@test_node.send(:replica_disabled?))
+        refute(@test_node_with_scale_read.send(:replica_disabled?))
+      end
+
+      def test_primary?
+        sample_primary = @node_info.find { |info| info[:role] == 'master' }
+        sample_replica = @node_info.find { |info| info[:role] == 'slave' }
+        assert(@test_node.send(:primary?, sample_primary[:node_key]))
+        refute(@test_node.send(:primary?, sample_replica[:node_key]))
+      end
+
+      def test_replica?
+        sample_primary = @node_info.find { |info| info[:role] == 'master' }
+        sample_replica = @node_info.find { |info| info[:role] == 'slave' }
+        refute(@test_node.send(:replica?, sample_primary[:node_key]))
+        assert(@test_node.send(:replica?, sample_replica[:node_key]))
+      end
+
+      def test_build_slot_node_mappings
+        skip('TODO')
+      end
+
+      def test_build_replication_mappings
+        skip('TODO')
+      end
+
+      def test_build_clients
+        skip('TODO')
+      end
+
+      def test_try_map
         skip('TODO')
       end
     end

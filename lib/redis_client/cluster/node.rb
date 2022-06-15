@@ -10,6 +10,8 @@ class RedisClient
       include Enumerable
 
       SLOT_SIZE = 16_384
+      MIN_SLOT = 0
+      MAX_SLOT = SLOT_SIZE - 1
       ReloadNeeded = Class.new(::RedisClient::Error)
 
       class Config < ::RedisClient::Config
@@ -70,15 +72,15 @@ class RedisClient
         end
       end
 
-      def initialize(options, node_info = [], pool = nil, with_replica: false, **kwargs)
+      def initialize(options, node_info: [], pool: nil, with_replica: false, **kwargs)
         @with_replica = with_replica
         @slots = build_slot_node_mappings(node_info)
         @replications = build_replication_mappings(node_info)
-        @clients = build_clients(options, pool, **kwargs)
+        @clients = build_clients(options, pool: pool, **kwargs)
       end
 
       def inspect
-        @clients.keys.sort.to_s
+        "#<#{self.class.name} #{node_keys.join(', ')}>"
       end
 
       def each(&block)
@@ -87,6 +89,10 @@ class RedisClient
 
       def sample
         @clients.values.sample
+      end
+
+      def node_keys
+        @clients.keys.sort
       end
 
       def find_by(node_key)
@@ -123,26 +129,29 @@ class RedisClient
       end
 
       def scale_reading_clients
-        reading_clients = []
-
-        @clients.each do |node_key, client|
-          next unless replica_disabled? ? primary?(node_key) : replica?(node_key)
-
-          reading_clients << client
-        end
-
-        reading_clients
+        @clients.select do |node_key, _|
+          replica_disabled? ? primary?(node_key) : replica?(node_key)
+        end.values
       end
 
       def slot_exists?(slot)
+        slot = Integer(slot)
+        return false if slot < MIN_SLOT || slot > MAX_SLOT
+
         !@slots[slot].nil?
       end
 
       def find_node_key_of_primary(slot)
+        slot = Integer(slot)
+        return if slot < MIN_SLOT || slot > MAX_SLOT
+
         @slots[slot]
       end
 
       def find_node_key_of_replica(slot)
+        slot = Integer(slot)
+        return if slot < MIN_SLOT || slot > MAX_SLOT
+
         return @slots[slot] if replica_disabled? || @replications[@slots[slot]].size.zero?
 
         @replications[@slots[slot]].sample
@@ -186,12 +195,12 @@ class RedisClient
         end
       end
 
-      def build_clients(options, pool, **kwargs)
+      def build_clients(options, pool: nil, **kwargs)
         options.filter_map do |node_key, option|
           next if replica_disabled? && replica?(node_key)
 
-          config = ::RedisClient::Cluster::Node::Config.new(scale_read: replica?(node_key), **option)
-          client = pool.nil? ? config.new_client(**kwargs) : config.new_pool(**pool, **kwargs)
+          config = ::RedisClient::Cluster::Node::Config.new(scale_read: replica?(node_key), **option.merge(kwargs))
+          client = pool.nil? ? config.new_client : config.new_pool(**pool)
 
           [node_key, client]
         end.to_h
