@@ -44,16 +44,16 @@ class RedisClient
       def test_command_error_collection_error
         [
           {
-            errors: [DummyError.new('foo')],
-            want: { msg: 'Command errors were replied on any node: foo', size: 1 }
+            errors: { '127.0.0.1:6379' => DummyError.new('foo') },
+            want: { msg: 'Command errors were replied on any node: 127.0.0.1:6379: foo', size: 1 }
           },
           {
-            errors: [DummyError.new('foo'), DummyError.new('bar')],
-            want: { msg: 'Command errors were replied on any node: foo,bar', size: 2 }
+            errors: { '127.0.0.1:6379' => DummyError.new('foo'), '127.0.0.1:6380' => DummyError.new('bar') },
+            want: { msg: 'Command errors were replied on any node: 127.0.0.1:6379: foo, 127.0.0.1:6380: bar', size: 2 }
           },
-          { errors: [], want: { msg: 'Command errors were replied on any node: ', size: 0 } },
-          { errors: '', want: { msg: 'Command errors were replied on any node: ', size: 0 } },
-          { errors: nil, want: { msg: 'Command errors were replied on any node: ', size: 0 } }
+          { errors: {}, want: { msg: '', size: 0 } },
+          { errors: '', want: { msg: '', size: 0 } },
+          { errors: nil, want: { msg: '', size: 0 } }
         ].each_with_index do |c, idx|
           raise ::RedisClient::Cluster::CommandErrorCollection, c[:errors]
         rescue StandardError => e
