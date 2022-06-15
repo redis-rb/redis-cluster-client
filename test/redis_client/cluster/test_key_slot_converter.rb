@@ -6,7 +6,13 @@ require 'redis_client/cluster/key_slot_converter'
 class RedisClient
   class Cluster
     class TestKeySlotConverter < Minitest::Test
-      include TestingHelper
+      def setup
+        @raw_clients = TEST_NODE_URIS.map { |addr| ::RedisClient.config(url: addr, timeout: TEST_TIMEOUT_SEC).new_client }
+      end
+
+      def teardown
+        @raw_clients&.each(&:close)
+      end
 
       def test_convert
         (1..255).map { |i| "key#{i}" }.each_with_index do |key, idx|

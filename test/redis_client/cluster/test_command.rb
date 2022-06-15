@@ -9,7 +9,13 @@ require 'redis_client/cluster/errors'
 class RedisClient
   class Cluster
     class TestCommand < Minitest::Test
-      include ::RedisClient::TestingHelper
+      def setup
+        @raw_clients = TEST_NODE_URIS.map { |addr| ::RedisClient.config(url: addr, timeout: TEST_TIMEOUT_SEC).new_client }
+      end
+
+      def teardown
+        @raw_clients&.each(&:close)
+      end
 
       def test_load
         [
