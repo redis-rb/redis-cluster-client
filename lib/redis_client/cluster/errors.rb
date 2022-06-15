@@ -33,8 +33,15 @@ class RedisClient
       attr_reader :errors
 
       def initialize(errors)
-        @errors = ERR_ARG_NORMALIZATION.call(errors)
-        super("Command errors were replied on any node: #{@errors.map(&:message).uniq.join(',')}")
+        @errors = {}
+        if !errors.is_a?(Hash) || errors.empty?
+          super('')
+          return
+        end
+
+        @errors = errors
+        messages = @errors.map { |node_key, error| "#{node_key}: #{error.message}" }
+        super("Command errors were replied on any node: #{messages.join(', ')}")
       end
     end
 

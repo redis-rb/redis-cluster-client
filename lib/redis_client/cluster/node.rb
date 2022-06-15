@@ -129,9 +129,11 @@ class RedisClient
       end
 
       def scale_reading_clients
-        @clients.select do |node_key, _|
+        clients = @clients.select do |node_key, _|
           replica_disabled? ? primary?(node_key) : replica?(node_key)
-        end.values
+        end
+
+        clients.values.sort_by { |client| "#{client.config.host}:#{client.config.port}" }
       end
 
       def slot_exists?(slot)
