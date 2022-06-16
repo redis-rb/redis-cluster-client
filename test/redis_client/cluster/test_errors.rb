@@ -72,18 +72,6 @@ class RedisClient
           assert_equal(e.message, c[:want], "Case: #{idx}")
         end
       end
-
-      def test_cross_slot_pipelining_error
-        [
-          { keys: %w[foo bar baz], want: 'keys: foo,bar,baz' },
-          { keys: '', want: 'keys: ' },
-          { keys: nil, want: 'keys: ' }
-        ].each_with_index do |c, idx|
-          raise ::RedisClient::Cluster::CrossSlotPipeliningError, c[:keys]
-        rescue StandardError => e
-          assert(e.message.end_with?(c[:want]), "Case: #{idx}")
-        end
-      end
     end
   end
 end
