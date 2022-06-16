@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'set'
+require 'minitest/autorun'
 require 'testing_helper'
 require 'redis_client/cluster'
 require 'redis_client/cluster/command'
@@ -9,8 +10,10 @@ require 'redis_client/cluster/errors'
 class RedisClient
   class Cluster
     class TestCommand < Minitest::Test
+      include TestingHelper
+
       def setup
-        @raw_clients = TEST_NODE_URIS.map { |addr| ::RedisClient.config(url: addr, timeout: TEST_TIMEOUT_SEC).new_client }
+        @raw_clients = TEST_NODE_URIS.map { |addr| ::RedisClient.config(url: addr, **TEST_GENERIC_OPTIONS).new_client }
       end
 
       def teardown

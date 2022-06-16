@@ -1,7 +1,10 @@
 # frozen_string_literal: true
 
 require 'uri'
+require 'minitest/autorun'
 require 'testing_helper'
+require 'redis_client/pooled'
+require 'redis_client/cluster/errors'
 require 'redis_client/cluster/node'
 require 'redis_client/cluster/node_key'
 
@@ -23,13 +26,16 @@ class RedisClient
     end
 
     class TestNode < Minitest::Test
+      include TestingHelper
+
       def setup
-        @test_config = ::RedisClient::ClusterConfig.new(nodes: TEST_NODE_URIS)
-        @test_node_info = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key, timeout: TEST_TIMEOUT_SEC)
+        @test_config = ::RedisClient::ClusterConfig.new(nodes: TEST_NODE_URIS, **TEST_GENERIC_OPTIONS)
+        @test_node_info = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key)
         node_addrs = @test_node_info.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info[:node_key]) }
         @test_config.update_node(node_addrs)
-        @test_node = ::RedisClient::Cluster::Node.new(@test_config.per_node_key, node_info: @test_node_info, timeout: TEST_TIMEOUT_SEC)
-        @test_node_with_scale_read = ::RedisClient::Cluster::Node.new(@test_config.per_node_key, node_info: @test_node_info, with_replica: true, timeout: TEST_TIMEOUT_SEC)
+        @test_node = ::RedisClient::Cluster::Node.new(@test_config.per_node_key, node_info: @test_node_info)
+        @test_node_with_scale_read = ::RedisClient::Cluster::Node.new(@test_config.per_node_key,
+                                                                      node_info: @test_node_info, with_replica: true)
       end
 
       def teardown
@@ -40,15 +46,15 @@ class RedisClient
       def test_load_info
         [
           {
-            params: { options: TEST_NODE_OPTIONS, kwargs: { timeout: TEST_TIMEOUT_SEC } },
+            params: { options: TEST_NODE_OPTIONS, kwargs: TEST_GENERIC_OPTIONS },
             want: { size: TEST_NODE_OPTIONS.size }
           },
           {
-            params: { options: { '127.0.0.1:11211' => { host: '127.0.0.1', port: 11_211 } }, kwargs: { timeout: TEST_TIMEOUT_SEC } },
+            params: { options: { '127.0.0.1:11211' => { host: '127.0.0.1', port: 11_211 } }, kwargs: TEST_GENERIC_OPTIONS },
             want: { error: ::RedisClient::Cluster::InitialSetupError }
           },
           {
-            params: { options: {}, kwargs: { timeout: TEST_TIMEOUT_SEC } },
+            params: { options: {}, kwargs: TEST_GENERIC_OPTIONS },
             want: { error: ::RedisClient::Cluster::InitialSetupError }
           }
         ].each_with_index do |c, idx|
@@ -320,20 +326,34 @@ class RedisClient
         assert_same(node_key9, got[node_key3][1])
       end
 
-      def test_build_clients
+      def test_build_clients # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         attrs = %i[connect_timeout read_timeout write_timeout].freeze
 
-        got = @test_node.send(:build_clients, @test_config.per_node_key, timeout: 10)
+        got = @test_node.send(:build_clients, @test_config.per_node_key, **TEST_GENERIC_OPTIONS.merge(timeout: 10))
+        got.each { |_, client| assert_instance_of(::RedisClient, client, 'Case: primary only: is_a?') }
         assert_equal(@test_node_info.count { |info| info[:role] == 'master' }, got.size, 'Case: primary only: size')
         got.each do |_, client|
           attrs.each { |attr| assert_equal(10, client.config.send(attr), "Case: primary only: #{attr}") }
         end
+        got.each_value(&:close)
 
-        got = @test_node_with_scale_read.send(:build_clients, @test_config.per_node_key, timeout: 11)
+        got = @test_node_with_scale_read.send(:build_clients, @test_config.per_node_key, **TEST_GENERIC_OPTIONS.merge(timeout: 11))
+        got.each { |_, client| assert_instance_of(::RedisClient, client, 'Case: scale read: is_a?') }
         assert_equal(@test_node_info.size, got.size, 'Case: scale read: size')
         got.each do |_, client|
           attrs.each { |attr| assert_equal(11, client.config.send(attr), "Case: scale read: #{attr}") }
         end
+        got.each_value(&:close)
+
+        got = @test_node.send(:build_clients, @test_config.per_node_key,
+                              pool: { timeout: 3, size: 2 },
+                              **TEST_GENERIC_OPTIONS.merge(timeout: 12))
+        got.each { |_, client| assert_instance_of(::RedisClient::Pooled, client, 'Case: connection pooling: is_a?') }
+        assert_equal(@test_node_info.count { |info| info[:role] == 'master' }, got.size, 'Case: connection pooling: size')
+        got.each do |_, client|
+          attrs.each { |attr| assert_equal(12, client.config.send(attr), "Case: connection pooling: #{attr}") }
+        end
+        got.each_value(&:close)
       end
 
       def test_try_map
