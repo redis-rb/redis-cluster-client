@@ -102,6 +102,8 @@ class RedisClient
       end
 
       def test_pipelined
+        assert_empty([], @client.pipelined { |_| 1 + 1 })
+
         want = (0..9).map { 'OK' } + (1..3).to_a + %w[PONG] + (0..9).map(&:to_s) + [%w[list 2]]
         got = @client.pipelined do |pipeline|
           (0..9).each { |i| pipeline.call('SET', "string#{i}", i) }
