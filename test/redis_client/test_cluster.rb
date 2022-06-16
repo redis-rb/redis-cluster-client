@@ -12,17 +12,17 @@ class RedisClient
       def setup
         @client = new_test_client
         @client.call('FLUSHDB')
-        wait_for_replication(@client)
+        wait_for_replication
       end
 
       def teardown
         @client.call('FLUSHDB')
-        wait_for_replication(@client)
+        wait_for_replication
         @client&.close
       end
 
-      def wait_for_replication(client)
-        client.call('WAIT', '1', '300')
+      def wait_for_replication
+        @client.call('WAIT', '1', (TEST_TIMEOUT_SEC * 1000).to_i.to_s)
       end
 
       def test_inspect
@@ -32,7 +32,7 @@ class RedisClient
       def test_call
         (0..9).each do |i|
           assert_equal('OK', @client.call('SET', "key#{i}", i), "Case: SET: key#{i}")
-          wait_for_replication(@client)
+          wait_for_replication
           assert_equal(i.to_s, @client.call('GET', "key#{i}"), "Case: GET: key#{i}")
         end
       end
@@ -40,7 +40,7 @@ class RedisClient
       def test_call_once
         (0..9).each do |i|
           assert_equal('OK', @client.call_once('SET', "key#{i}", i), "Case: SET: key#{i}")
-          wait_for_replication(@client)
+          wait_for_replication
           assert_equal(i.to_s, @client.call_once('GET', "key#{i}"), "Case: GET: key#{i}")
         end
       end
@@ -48,7 +48,7 @@ class RedisClient
       def test_blocking_call
         @client.call(*%w[RPUSH foo hello])
         @client.call(*%w[RPUSH foo world])
-        wait_for_replication(@client)
+        wait_for_replication
         client_side_timeout = 0.2
         server_side_timeout = 0.1
         assert_equal(%w[foo world], @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 1st')
@@ -61,7 +61,7 @@ class RedisClient
         assert_raises(ArgumentError) { @client.scan }
 
         (0..9).each { |i| @client.call('SET', "key#{i}", i) }
-        wait_for_replication(@client)
+        wait_for_replication
         want = (0..9).map { |i| "key#{i}" }
         got = []
         @client.scan('COUNT', '5') { |key| got << key }
@@ -71,7 +71,7 @@ class RedisClient
       def test_sscan
         (0..9).each do |i|
           (0..9).each { |j| @client.call('SADD', "key#{i}", "member#{j}") }
-          wait_for_replication(@client)
+          wait_for_replication
           want = (0..9).map { |j| "member#{j}" }
           got = []
           @client.sscan("key#{i}", 'COUNT', '5') { |member| got << member }
@@ -82,7 +82,7 @@ class RedisClient
       def test_hscan
         (0..9).each do |i|
           (0..9).each { |j| @client.call('HSET', "key#{i}", "field#{j}", j) }
-          wait_for_replication(@client)
+          wait_for_replication
           want = (0..9).map { |j| "field#{j}" }
           got = []
           @client.hscan("key#{i}", 'COUNT', '5') { |field| got << field }
@@ -93,7 +93,7 @@ class RedisClient
       def test_zscan
         (0..9).each do |i|
           (0..9).each { |j| @client.call('ZADD', "key#{i}", j, "member#{j}") }
-          wait_for_replication(@client)
+          wait_for_replication
           want = (0..9).map { |j| "member#{j}" }
           got = []
           @client.zscan("key#{i}", 'COUNT', '5') { |member| got << member }
@@ -102,11 +102,10 @@ class RedisClient
       end
 
       def test_pipelined
-        want = (0..9).map { 'OK' } + (1..3).to_a + [1] + %w[PONG] + (0..9).map(&:to_s) + [%w[list 2]]
+        want = (0..9).map { 'OK' } + (1..3).to_a + %w[PONG] + (0..9).map(&:to_s) + [%w[list 2]]
         got = @client.pipelined do |pipeline|
           (0..9).each { |i| pipeline.call('SET', "string#{i}", i) }
           (0..2).each { |i| pipeline.call('RPUSH', 'list', i) }
-          wait_for_replication(pipeline)
           pipeline.call_once('PING')
           (0..9).each { |i| pipeline.call('GET', "string#{i}") }
           pipeline.blocking_call(0.2, 'BRPOP', 'list', '0.1')
