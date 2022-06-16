@@ -8,6 +8,8 @@ require 'redis_client/cluster/node_key'
 
 class RedisClient
   class Cluster
+    ZERO_CURSOR_FOR_SCAN = '0'
+
     def initialize(config, pool: nil, **kwargs)
       @config = config.dup
       @pool = pool
@@ -34,7 +36,14 @@ class RedisClient
     end
 
     def scan(*args, **kwargs, &block)
-      _scan(:scan, *args, **kwargs, &block)
+      raise ArgumentError, 'block required' unless block
+
+      cursor = ZERO_CURSOR_FOR_SCAN
+      loop do
+        cursor, keys = _scan('SCAN', cursor, *args, **kwargs)
+        keys.each(&block)
+        break if cursor == ZERO_CURSOR_FOR_SCAN
+      end
     end
 
     def sscan(key, *args, **kwargs, &block)
@@ -83,32 +92,6 @@ class RedisClient
 
     def close
       @node.each(&:close)
-      true
-    end
-
-    # TODO: remove
-    def call_pipeline(pipeline)
-      node_keys = pipeline.commands.filter_map { |cmd| find_node_key(cmd, primary_only: true) }.uniq
-      if node_keys.size > 1
-        raise(CrossSlotPipeliningError,
-              pipeline.commands.map { |cmd| @command.extract_first_key(cmd) }.reject(&:empty?).uniq)
-      end
-
-      try_send(find_node(node_keys.first), :call_pipeline, pipeline)
-    end
-
-    # TODO: remove
-    def process(commands, &block)
-      if commands.size == 1 &&
-         %w[unsubscribe punsubscribe].include?(commands.first.first.to_s.downcase) &&
-         commands.first.size == 1
-
-        # Node is indeterminate. We do just a best-effort try here.
-        @node.process_all(commands, &block)
-      else
-        node = assign_node(commands.first)
-        try_send(node, :process, commands, &block)
-      end
     end
 
     private
@@ -131,7 +114,7 @@ class RedisClient
       when 'wait'     then @node.call_primary(method, *command, **kwargs, &block).sum
       when 'keys'     then @node.call_replica(method, *command, **kwargs, &block).flatten.sort
       when 'dbsize'   then @node.call_replica(method, *command, **kwargs, &block).sum
-      when 'scan'     then _scan(method, *command, **kwargs, &block)
+      when 'scan'     then _scan(*command, **kwargs)
       when 'lastsave' then @node.call_all(method, *command, **kwargs, &block).sort
       when 'role'     then @node.call_all(method, *command, **kwargs, &block)
       when 'config'   then send_config_command(method, *command, **kwargs, &block)
@@ -233,7 +216,8 @@ class RedisClient
       raise
     end
 
-    def _scan(method, *command, **kwargs, &block) # rubocop:disable Metrics/MethodLength
+    def _scan(*command, **kwargs) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+      command[1] = ZERO_CURSOR_FOR_SCAN if command.size == 1
       input_cursor = Integer(command[1])
 
       client_index = input_cursor % 256
@@ -242,11 +226,11 @@ class RedisClient
       clients = @node.scale_reading_clients
 
       client = clients[client_index]
-      return ['0', []] unless client
+      return [ZERO_CURSOR_FOR_SCAN, []] unless client
 
       command[1] = raw_cursor.to_s
 
-      result_cursor, result_keys = client.send(method, *command, **kwargs, &block)
+      result_cursor, result_keys = client.call(*command, **kwargs)
       result_cursor = Integer(result_cursor)
 
       client_index += 1 if result_cursor == 0
