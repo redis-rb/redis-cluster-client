@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'testing_helper'
+require 'minitest/autorun'
 require 'redis_client/cluster/errors'
 
 class RedisClient

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'uri'
-require 'testing_helper'
+require 'minitest/autorun'
 require 'redis_client/cluster/node_key'
 
 class RedisClient
