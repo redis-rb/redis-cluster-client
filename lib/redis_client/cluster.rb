@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'redis_client'
 require 'redis_client/cluster/command'
 require 'redis_client/cluster/errors'
 require 'redis_client/cluster/key_slot_converter'
@@ -8,6 +9,61 @@ require 'redis_client/cluster/node_key'
 
 class RedisClient
   class Cluster
+    class Pipeline
+      ReplySizeError = Class.new(::RedisClient::Error)
+
+      def initialize(client)
+        @client = client
+        @grouped = Hash.new([].freeze)
+        @replies = []
+        @size = 0
+      end
+
+      def call(*command, **kwargs)
+        node_key = @client.send(:find_node_key, command, primary_only: true)
+        @grouped[node_key] += [[@size, :call, command, kwargs]]
+        @size += 1
+      end
+
+      def call_once(*command, **kwargs)
+        node_key = @client.send(:find_node_key, command, primary_only: true)
+        @grouped[node_key] += [[@size, :call_once, command, kwargs]]
+        @size += 1
+      end
+
+      def blocking_call(timeout, *command, **kwargs)
+        node_key = @client.send(:find_node_key, command, primary_only: true)
+        @grouped[node_key] += [[@size, :blocking_call, timeout, command, kwargs]]
+        @size += 1
+      end
+
+      def empty?
+        @size.zero?
+      end
+
+      # TODO: use concurrency
+      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+        @grouped.each do |node_key, rows|
+          replies = @client.send(:find_node, node_key).pipelined do |pipeline|
+            rows.each do |row|
+              case row[1]
+              when :call then pipeline.call(*row[2], **row[3])
+              when :call_once then pipeline.call_once(*row[2], **row[3])
+              when :blocking_call then pipeline.blocking_call(row[2], *row[3], **row[4])
+              else raise NotImplementedError, row[1]
+              end
+            end
+          end
+
+          raise ReplySizeError, "commands: #{rows.size}, replies: #{replies.size}" if rows.size != replies.size
+
+          rows.each_with_index { |row, idx| @replies[row.first] = replies[idx] }
+        end
+
+        @replies
+      end
+    end
+
     ZERO_CURSOR_FOR_SCAN = '0'
 
     def initialize(config, pool: nil, **kwargs)
@@ -22,17 +78,17 @@ class RedisClient
       "#<#{self.class.name} #{@node.node_keys.join(', ')}>"
     end
 
-    def call(*command, **kwargs, &block)
-      send_command(:call, *command, **kwargs, &block)
+    def call(*command, **kwargs)
+      send_command(:call, *command, **kwargs)
     end
 
-    def call_once(*command, **kwargs, &block)
-      send_command(:call_once, *command, **kwargs, &block)
+    def call_once(*command, **kwargs)
+      send_command(:call_once, *command, **kwargs)
     end
 
-    def blocking_call(timeout, *command, **kwargs, &block)
+    def blocking_call(timeout, *command, **kwargs)
       node = assign_node(*command)
-      try_send(node, :blocking_call, timeout, *command, **kwargs, &block)
+      try_send(node, :blocking_call, timeout, *command, **kwargs)
     end
 
     def scan(*args, **kwargs, &block)
@@ -61,12 +117,20 @@ class RedisClient
       try_send(node, :zscan, key, *args, **kwargs, &block)
     end
 
-    def pipelined
+    def mset
       # TODO: impl
     end
 
-    def multi
+    def mget
       # TODO: impl
+    end
+
+    def pipelined
+      pipeline = ::RedisClient::Cluster::Pipeline.new(self)
+      yield pipeline
+      return [] if pipeline.empty? == 0
+
+      pipeline.execute
     end
 
     def pubsub
@@ -82,16 +146,9 @@ class RedisClient
     end
     alias then with
 
-    def id
-      @node.flat_map(&:id).sort.join(' ')
-    end
-
-    def connected?
-      @node.any?(&:connected?)
-    end
-
     def close
       @node.each(&:close)
+      nil
     end
 
     private

@@ -133,7 +133,9 @@ class RedisClient
           replica_disabled? ? primary?(node_key) : replica?(node_key)
         end
 
-        clients.values.sort_by { |client| "#{client.config.host}:#{client.config.port}" }
+        clients.values.sort_by do |client|
+          ::RedisClient::Cluster::NodeKey.build_from_host_port(client.config.host, client.config.port)
+        end
       end
 
       def slot_exists?(slot)

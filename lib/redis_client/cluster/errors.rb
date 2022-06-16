@@ -51,13 +51,5 @@ class RedisClient
         super("Cluster client doesn't know which node the #{command} command should be sent to.")
       end
     end
-
-    # Raised when commands in pipelining include cross slot keys.
-    class CrossSlotPipeliningError < ::RedisClient::Error
-      def initialize(keys)
-        super("Cluster client couldn't send pipelining to single node. "\
-              "The commands include cross slot keys: #{ERR_ARG_NORMALIZATION.call(keys).join(',')}")
-      end
-    end
   end
 end
