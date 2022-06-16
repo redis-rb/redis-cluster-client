@@ -95,6 +95,10 @@ class RedisClient
         @clients.keys.sort
       end
 
+      def primary_node_keys
+        @clients.filter_map { |k, _| primary?(k) ? k : nil }.sort
+      end
+
       def find_by(node_key)
         @clients.fetch(node_key)
       rescue KeyError

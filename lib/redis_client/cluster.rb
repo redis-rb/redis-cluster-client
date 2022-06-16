@@ -44,6 +44,7 @@ class RedisClient
       # TODO: use concurrency
       def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
         @grouped.each do |node_key, rows|
+          node_key = node_key.nil? ? @client.instance_variable_get(:@node).primary_node_keys.sample : node_key
           replies = @client.send(:find_node, node_key).pipelined do |pipeline|
             rows.each do |row|
               case row[1]
