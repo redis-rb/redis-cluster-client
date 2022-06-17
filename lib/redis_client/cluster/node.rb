@@ -12,6 +12,8 @@ class RedisClient
       SLOT_SIZE = 16_384
       MIN_SLOT = 0
       MAX_SLOT = SLOT_SIZE - 1
+      IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
+
       ReloadNeeded = Class.new(::RedisClient::Error)
 
       class Config < ::RedisClient::Config
@@ -207,7 +209,10 @@ class RedisClient
         options.filter_map do |node_key, option|
           next if replica_disabled? && replica?(node_key)
 
-          config = ::RedisClient::Cluster::Node::Config.new(scale_read: replica?(node_key), **option.merge(kwargs))
+          config = ::RedisClient::Cluster::Node::Config.new(
+            scale_read: replica?(node_key),
+            **option.merge(kwargs.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) })
+          )
           client = pool.nil? ? config.new_client : config.new_pool(**pool)
 
           [node_key, client]
