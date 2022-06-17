@@ -16,7 +16,7 @@ gem 'redis-cluster-client'
 | key | type | default | description |
 | --- | --- | --- | --- |
 | `:nodes` | String or Array<String, Hash> | `['redis://127.0.0.1:6379']` | node addresses for startup connection |
-| `:replica` | Boolean | `false` | `true` if client use scale read feature |
+| `:replica` | Boolean | `false` | `true` if client should use scale read feature |
 | `:fixed_hostname` | String | `nil` | required if client should connect to single endpoint with SSL |
 
 Also, [the other generic options](https://github.com/redis-rb/redis-client#configuration) can be passed.
