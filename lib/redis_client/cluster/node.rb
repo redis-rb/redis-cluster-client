@@ -211,7 +211,7 @@ class RedisClient
 
           config = ::RedisClient::Cluster::Node::Config.new(
             scale_read: replica?(node_key),
-            **option.merge(kwargs.except(*IGNORE_GENERIC_CONFIG_KEYS))
+            **option.merge(kwargs.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) })
           )
           client = pool.nil? ? config.new_client : config.new_pool(**pool)
 
