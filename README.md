@@ -88,6 +88,35 @@ cli.call('CLUSTER', 'KEYSLOT', 'key3')
 #=> 935
 ```
 
+## ACL
+The cluster client internally calls `COMMAND` and `CLUSTER NODES` commands to operate correctly.
+So please permit it like the followings.
+
+```ruby
+# The default user is administrator.
+cli1 = RedisClient.cluster.new_client
+
+# To create a user with permissions
+cli1.call('ACL', 'SETUSER', 'foo', 'ON', '+COMMAND', '+CLUSTER|NODES', '+PING', '>mysecret')
+
+# To initialize client with the user
+cli2 = RedisClient.cluster(username: 'foo', password: 'mysecret').new_client
+
+# The user can only call the PING command.
+cli2.call('PING')
+#=> "PONG"
+
+cli2.call('GET', 'key1')
+#=> NOPERM this user has no permissions to run the 'get' command (RedisClient::PermissionError)
+```
+
+Otherwise:
+
+```ruby
+RedisClient.cluster(username: 'foo', password: 'mysecret').new_client
+#=> Redis client could not fetch cluster information: NOPERM this user has no permissions to run the 'cluster|nodes' command (RedisClient::Cluster::InitialSetupError)
+```
+
 ## Connection pooling
 TODO
 
