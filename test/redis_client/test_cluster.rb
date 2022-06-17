@@ -22,7 +22,7 @@ class RedisClient
       end
 
       def wait_for_replication
-        @client.call('WAIT', '1', (TEST_TIMEOUT_SEC * 1000).to_i.to_s)
+        @client.call('WAIT', TEST_REPLICA_SIZE, (TEST_TIMEOUT_SEC * 1000).to_i)
       end
 
       def test_inspect
@@ -30,6 +30,7 @@ class RedisClient
       end
 
       def test_call
+        assert_raises(ArgumentError) { @client.call }
         (0..9).each do |i|
           assert_equal('OK', @client.call('SET', "key#{i}", i), "Case: SET: key#{i}")
           wait_for_replication
@@ -38,6 +39,7 @@ class RedisClient
       end
 
       def test_call_once
+        assert_raises(ArgumentError) { @client.call_once }
         (0..9).each do |i|
           assert_equal('OK', @client.call_once('SET', "key#{i}", i), "Case: SET: key#{i}")
           wait_for_replication
@@ -46,6 +48,7 @@ class RedisClient
       end
 
       def test_blocking_call
+        assert_raises(ArgumentError) { @client.blocking_call(TEST_TIMEOUT_SEC) }
         @client.call(*%w[RPUSH foo hello])
         @client.call(*%w[RPUSH foo world])
         wait_for_replication
@@ -139,6 +142,50 @@ class RedisClient
 
       def test_close
         assert_nil(@client.close)
+      end
+
+      def test_dedicated_commands
+        (0..9).each { |i| @client.call('SET', "key#{i}", i) }
+        [
+          { command: %w[ACL HELP], is_a: Array },
+          { command: %w[WAIT 1 1], want: TEST_NUMBER_OF_REPLICAS },
+          { command: %w[KEYS *], want: (0..9).map { |i| "key#{i}" } },
+          { command: %w[DBSIZE], want: (0..9).size },
+          { command: %w[SCAN], is_a: Array },
+          { command: %w[LASTSAVE], is_a: Array },
+          { command: %w[ROLE], is_a: Array },
+          { command: %w[CONFIG RESETSTAT], want: 'OK' },
+          { command: %w[CONFIG GET maxmemory], is_a: Hash },
+          { command: %w[CLIENT LIST], is_a: Array },
+          { command: %w[CLIENT PAUSE 100], want: 'OK' },
+          { command: %w[CLIENT INFO], is_a: String },
+          { command: %w[CLUSTER SET-CONFIG-EPOCH 0], error: ::RedisClient::Cluster::OrchestrationCommandNotSupported },
+          { command: %w[CLUSTER SAVECONFIG], want: 'OK' },
+          { command: %w[CLUSTER NODES], is_a: String },
+          { command: %w[READONLY], error: ::RedisClient::Cluster::OrchestrationCommandNotSupported },
+          { command: %w[MEMORY STATS], is_a: Array },
+          { command: %w[MEMORY PURGE], want: 'OK' },
+          { command: %w[MEMORY USAGE key0], is_a: Integer },
+          { command: %w[SCRIPT DEBUG NO], want: 'OK' },
+          { command: %w[SCRIPT FLUSH], want: 'OK' },
+          { command: %w[SCRIPT EXISTS b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c], want: [0] },
+          { command: %w[PUBSUB CHANNELS test-channel*], want: [] },
+          { command: %w[PUBSUB NUMSUB test-channel], want: { 'test-channel' => 0 } },
+          { command: %w[PUBSUB NUMPAT], want: 0 },
+          { command: %w[PUBSUB HELP], is_a: Array },
+          { command: %w[MULTI], error: ::RedisClient::Cluster::AmbiguousNodeError },
+          { command: %w[FLUSHDB], want: 'OK' }
+        ].each do |c|
+          msg = "Case: #{c[:command].join(' ')}"
+          got = -> { @client.call(*c[:command]) }
+          if c.key?(:error)
+            assert_raises(c[:error], msg, &got)
+          elsif c.key?(:is_a)
+            assert_instance_of(c[:is_a], got.call, msg)
+          else
+            assert_equal(c[:want], got.call, msg)
+          end
+        end
       end
     end
 
