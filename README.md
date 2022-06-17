@@ -106,7 +106,7 @@ cli.call('MGET', '{key}1', '{key}2', '{key}3')
 ```
 
 ## ACL
-The cluster client internally calls `COMMAND` and `CLUSTER NODES` commands to operate correctly.
+The cluster client internally calls [COMMAND](https://redis.io/commands/command/) and [CLUSTER NODES](https://redis.io/commands/cluster-nodes/) commands to operate correctly.
 So please permit it like the followings.
 
 ```ruby
@@ -136,7 +136,13 @@ RedisClient.cluster(username: 'foo', password: 'mysecret').new_client
 ```
 
 ## Connection pooling
-TODO
+You can use the internal connection pooling feature implemented by [redis-client](https://github.com/redis-rb/redis-client#usage) if needed.
+
+```ruby
+# example of docker on localhost
+RedisClient.cluster.new_pool(timeout: 1.0, size: 2)
+#=> #<RedisClient::Cluster 172.21.0.3:6379, 172.21.0.6:6379, 172.21.0.7:6379>
+```
 
 ## Connection drivers
 TODO
