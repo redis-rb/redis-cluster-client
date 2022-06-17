@@ -3,7 +3,7 @@
 
 Redis Cluster Client
 ===============================================================================
-This library is a client for Redis cluster.
+This library is a client for [Redis cluster](https://redis.io/docs/reference/cluster-spec/).
 It depends on [redis-client](https://github.com/redis-rb/redis-client).
 So it would be better to read `redis-client` documents first.
 
@@ -14,7 +14,7 @@ gem 'redis-cluster-client'
 
 ## Initialization
 | key | type | default | description |
-| --- | --- |
+| --- | --- | --- | --- |
 | `nodes` | `String` or `Array<String, Hash>` | `['redis://127.0.0.1:6379]` | node addresses for startup connection |
 | `replica` | Boolean | `false` | `true` if client use scale read feature |
 | `fixed_hostname` | `String` | `nil` | specify if client connects to cluster with SSL and single endpoint |
@@ -29,7 +29,7 @@ Also, [the other generic options](https://github.com/redis-rb/redis-client#confi
 RedisClient.cluster.new_client
 #=> #<RedisClient::Cluster 172.20.0.2:6379, 172.20.0.6:6379, 172.20.0.7:6379>
 
-# To connect to all nodes and to use scale reading feature
+# To connect to all nodes to use scale reading feature
 RedisClient.cluster(replica: true).new_client
 #=> #<RedisClient::Cluster 172.20.0.2:6379, 172.20.0.3:6379, 172.20.0.4:6379, 172.20.0.5:6379, 172.20.0.6:6379, 172.20.0.7:6379>
 
@@ -73,8 +73,19 @@ A part of commands can be passed multiple keys. But it has a constraint the keys
 The following error occurs because keys must be in the same hash slot and not just the same node.
 
 ```ruby
-RedisClient.cluster.new_client.call('MGET', 'key1', 'key2', 'key3')
+cli = RedisClient.cluster.new_client
+
+cli.call('MGET', 'key1', 'key2', 'key3')
 #=> CROSSSLOT Keys in request don't hash to the same slot (RedisClient::CommandError)
+
+cli.call('CLUSTER', 'KEYSLOT', 'key1')
+#=> 9189
+
+cli.call('CLUSTER', 'KEYSLOT', 'key2')
+#=> 4998
+
+cli.call('CLUSTER', 'KEYSLOT', 'key3')
+#=> 935
 ```
 
 ## Connection pooling
