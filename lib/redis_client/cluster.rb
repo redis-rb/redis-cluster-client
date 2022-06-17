@@ -20,19 +20,19 @@ class RedisClient
       end
 
       def call(*command, **kwargs)
-        node_key = @client.send(:find_node_key, command, primary_only: true)
+        node_key = @client.send(:find_node_key, *command, primary_only: true)
         @grouped[node_key] += [[@size, :call, command, kwargs]]
         @size += 1
       end
 
       def call_once(*command, **kwargs)
-        node_key = @client.send(:find_node_key, command, primary_only: true)
+        node_key = @client.send(:find_node_key, *command, primary_only: true)
         @grouped[node_key] += [[@size, :call_once, command, kwargs]]
         @size += 1
       end
 
       def blocking_call(timeout, *command, **kwargs)
-        node_key = @client.send(:find_node_key, command, primary_only: true)
+        node_key = @client.send(:find_node_key, *command, primary_only: true)
         @grouped[node_key] += [[@size, :blocking_call, timeout, command, kwargs]]
         @size += 1
       end
@@ -66,6 +66,14 @@ class RedisClient
     end
 
     ZERO_CURSOR_FOR_SCAN = '0'
+    CMD_SCAN = 'SCAN'
+    CMD_SSCAN = 'SSCAN'
+    CMD_HSCAN = 'HSCAN'
+    CMD_ZSCAN = 'ZSCAN'
+    CMD_ASKING = 'ASKING'
+    REPLY_OK = 'OK'
+    REPLY_MOVED = 'MOVED'
+    REPLY_ASK = 'ASK'
 
     def initialize(config, pool: nil, **kwargs)
       @config = config.dup
@@ -97,33 +105,25 @@ class RedisClient
 
       cursor = ZERO_CURSOR_FOR_SCAN
       loop do
-        cursor, keys = _scan('SCAN', cursor, *args, **kwargs)
+        cursor, keys = _scan(CMD_SCAN, cursor, *args, **kwargs)
         keys.each(&block)
         break if cursor == ZERO_CURSOR_FOR_SCAN
       end
     end
 
     def sscan(key, *args, **kwargs, &block)
-      node = assign_node('SSCAN', key)
+      node = assign_node(CMD_SSCAN, key)
       try_send(node, :sscan, key, *args, **kwargs, &block)
     end
 
     def hscan(key, *args, **kwargs, &block)
-      node = assign_node('HSCAN', key)
+      node = assign_node(CMD_HSCAN, key)
       try_send(node, :hscan, key, *args, **kwargs, &block)
     end
 
     def zscan(key, *args, **kwargs, &block)
-      node = assign_node('ZSCAN', key)
+      node = assign_node(CMD_ZSCAN, key)
       try_send(node, :zscan, key, *args, **kwargs, &block)
-    end
-
-    def mset
-      # TODO: impl
-    end
-
-    def mget
-      # TODO: impl
     end
 
     def pipelined
@@ -137,15 +137,6 @@ class RedisClient
     def pubsub
       # TODO: impl
     end
-
-    def size
-      # TODO: impl
-    end
-
-    def with(options = {})
-      # TODO: impl
-    end
-    alias then with
 
     def close
       @node.each(&:close)
@@ -253,17 +244,17 @@ class RedisClient
     def try_send(node, method, *args, retry_count: 3, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
       node.send(method, *args, **kwargs, &block)
     rescue ::RedisClient::CommandError => e
-      if e.message.start_with?('MOVED')
+      if e.message.start_with?(REPLY_MOVED)
         raise if retry_count <= 0
 
         node = assign_redirection_node(e.message)
         retry_count -= 1
         retry
-      elsif e.message.start_with?('ASK')
+      elsif e.message.start_with?(REPLY_ASK)
         raise if retry_count <= 0
 
         node = assign_asking_node(e.message)
-        node.call('ASKING')
+        node.call(CMD_ASKING)
         retry_count -= 1
         retry
       else
@@ -309,11 +300,11 @@ class RedisClient
     end
 
     def assign_node(*command)
-      node_key = find_node_key(command)
+      node_key = find_node_key(*command)
       find_node(node_key)
     end
 
-    def find_node_key(command, primary_only: false)
+    def find_node_key(*command, primary_only: false)
       key = @command.extract_first_key(command)
       return if key.empty?
 
