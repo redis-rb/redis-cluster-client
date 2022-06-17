@@ -127,13 +127,14 @@ class RedisClient
           channel = 'my-channel'
           pubsub = client.pubsub
           pubsub.call('SUBSCRIBE', channel)
+          assert_equal(['subscribe', channel, 1], pubsub.next_event(TEST_TIMEOUT_SEC))
           Fiber.yield(channel)
           Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
         end
 
         channel = sub.resume(@client)
         @client.call('PUBLISH', channel, 'hello world')
-        assert_equal(['subscribe', channel, 1], sub.resume)
+        assert_equal(['message', channel, 'hello world'], sub.resume)
       end
 
       def test_close
