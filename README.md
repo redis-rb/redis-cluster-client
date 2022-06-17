@@ -20,6 +20,7 @@ gem 'redis-cluster-client'
 | `:fixed_hostname` | String | `nil` | required if client should connect to single endpoint with SSL |
 
 Also, [the other generic options](https://github.com/redis-rb/redis-client#configuration) can be passed.
+But `:url`, `:host`, `:port` and `:path` are ignored because they conflict with the `:nodes` option.
 
 ```ruby
 # The following examples are Docker containers on localhost.
@@ -88,6 +89,22 @@ cli.call('CLUSTER', 'KEYSLOT', 'key3')
 #=> 935
 ```
 
+Also, you can use the hash tag to bias keys to the same slot.
+
+```ruby
+cli.call('CLUSTER', 'KEYSLOT', '{key}1')
+#=> 12539
+
+cli.call('CLUSTER', 'KEYSLOT', '{key}2')
+#=> 12539
+
+cli.call('CLUSTER', 'KEYSLOT', '{key}3')
+#=> 12539
+
+cli.call('MGET', '{key}1', '{key}2', '{key}3')
+#=> [nil, nil, nil]
+```
+
 ## ACL
 The cluster client internally calls `COMMAND` and `CLUSTER NODES` commands to operate correctly.
 So please permit it like the followings.
@@ -97,6 +114,7 @@ So please permit it like the followings.
 cli1 = RedisClient.cluster.new_client
 
 # To create a user with permissions
+# Typically, user settings are configured in the config file for the server beforehand.
 cli1.call('ACL', 'SETUSER', 'foo', 'ON', '+COMMAND', '+CLUSTER|NODES', '+PING', '>mysecret')
 
 # To initialize client with the user
