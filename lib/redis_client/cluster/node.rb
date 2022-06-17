@@ -129,11 +129,6 @@ class RedisClient
         end.values
       end
 
-      # TODO: impl
-      def process_all(commands, &block)
-        try_map { |_, client| client.process(commands, &block) }.values
-      end
-
       def scale_reading_clients
         clients = @clients.select do |node_key, _|
           replica_disabled? ? primary?(node_key) : replica?(node_key)
