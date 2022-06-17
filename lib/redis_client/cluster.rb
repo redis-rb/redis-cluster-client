@@ -15,7 +15,6 @@ class RedisClient
       def initialize(client)
         @client = client
         @grouped = Hash.new([].freeze)
-        @replies = []
         @size = 0
       end
 
@@ -41,27 +40,32 @@ class RedisClient
         @size.zero?
       end
 
-      # TODO: use concurrency
-      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
-        @grouped.each do |node_key, rows|
-          node_key = node_key.nil? ? @client.instance_variable_get(:@node).primary_node_keys.sample : node_key
-          replies = @client.send(:find_node, node_key).pipelined do |pipeline|
-            rows.each do |row|
-              case row[1]
-              when :call then pipeline.call(*row[2], **row[3])
-              when :call_once then pipeline.call_once(*row[2], **row[3])
-              when :blocking_call then pipeline.blocking_call(row[2], *row[3], **row[4])
-              else raise NotImplementedError, row[1]
+      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+        all_replies = []
+        threads = @grouped.map do |k, v|
+          Thread.new(@client, k, v) do |client, node_key, rows|
+            Thread.pass
+
+            node_key = node_key.nil? ? client.instance_variable_get(:@node).primary_node_keys.sample : node_key
+            replies = client.send(:find_node, node_key).pipelined do |pipeline|
+              rows.each do |row|
+                case row[1]
+                when :call then pipeline.call(*row[2], **row[3])
+                when :call_once then pipeline.call_once(*row[2], **row[3])
+                when :blocking_call then pipeline.blocking_call(row[2], *row[3], **row[4])
+                else raise NotImplementedError, row[1]
+                end
               end
             end
+
+            raise ReplySizeError, "commands: #{rows.size}, replies: #{replies.size}" if rows.size != replies.size
+
+            rows.each_with_index { |row, idx| all_replies[row.first] = replies[idx] }
           end
-
-          raise ReplySizeError, "commands: #{rows.size}, replies: #{replies.size}" if rows.size != replies.size
-
-          rows.each_with_index { |row, idx| @replies[row.first] = replies[idx] }
         end
 
-        @replies
+        threads.each(&:join)
+        all_replies
       end
     end
 
@@ -103,6 +107,7 @@ class RedisClient
       @client_kwargs = kwargs
       @node = fetch_cluster_info!(@config, pool: @pool, **@client_kwargs)
       @command = ::RedisClient::Cluster::Command.load(@node)
+      @mutex = Mutex.new
     end
 
     def inspect
@@ -326,9 +331,13 @@ class RedisClient
       find_node(node_key)
     end
 
-    def find_node_key(*command, primary_only: false)
+    def find_node_key(*command, primary_only: false) # rubocop:disable Metrics/MethodLength
       key = @command.extract_first_key(command)
-      return if key.empty?
+      if key.empty?
+        return @node.primary_node_keys.sample if @command.should_send_to_primary?(command) || primary_only
+
+        return @node.replica_node_keys.sample
+      end
 
       slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
       return unless @node.slot_exists?(slot)
@@ -350,13 +359,15 @@ class RedisClient
     end
 
     def update_cluster_info!(node_key = nil)
-      unless node_key.nil?
-        host, port = ::RedisClient::Cluster::NodeKey.split(node_key)
-        @config.add_node(host, port)
-      end
+      @mutex.synchronize do
+        unless node_key.nil?
+          host, port = ::RedisClient::Cluster::NodeKey.split(node_key)
+          @config.add_node(host, port)
+        end
 
-      @node.each(&:close)
-      @node = fetch_cluster_info!(@config, pool: @pool, **@client_kwargs)
+        @node.each(&:close)
+        @node = fetch_cluster_info!(@config, pool: @pool, **@client_kwargs)
+      end
     end
   end
 end

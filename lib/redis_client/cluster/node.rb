@@ -79,6 +79,7 @@ class RedisClient
         @slots = build_slot_node_mappings(node_info)
         @replications = build_replication_mappings(node_info)
         @clients = build_clients(options, pool: pool, **kwargs)
+        @mutex = Mutex.new
       end
 
       def inspect
@@ -99,6 +100,12 @@ class RedisClient
 
       def primary_node_keys
         @clients.filter_map { |k, _| primary?(k) ? k : nil }.sort
+      end
+
+      def replica_node_keys
+        return primary_node_keys if replica_disabled?
+
+        @clients.filter_map { |k, _| replica?(k) ? k : nil }.sort
       end
 
       def find_by(node_key)
@@ -163,7 +170,7 @@ class RedisClient
       end
 
       def update_slot(slot, node_key)
-        @slots[slot] = node_key
+        @mutex.synchronize { @slots[slot] = node_key }
       end
 
       private
@@ -217,15 +224,17 @@ class RedisClient
       def try_map # rubocop:disable Metrics/MethodLength
         errors = {}
         results = {}
-
-        @clients.each do |node_key, client|
-          reply = yield(node_key, client)
-          results[node_key] = reply unless reply.nil?
-        rescue ::RedisClient::CommandError => e
-          errors[node_key] = e
-          next
+        threads = @clients.map do |k, v|
+          Thread.new(k, v) do |node_key, client|
+            Thread.pass
+            reply = yield(node_key, client)
+            results[node_key] = reply unless reply.nil?
+          rescue ::RedisClient::CommandError => e
+            errors[node_key] = e
+          end
         end
 
+        threads.each(&:join)
         return results if errors.empty?
 
         raise ::RedisClient::Cluster::CommandErrorCollection, errors

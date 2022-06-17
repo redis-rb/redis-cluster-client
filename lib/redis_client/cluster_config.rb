@@ -15,6 +15,7 @@ class RedisClient
     VALID_SCHEMES = [DEFAULT_SCHEME, SECURE_SCHEME].freeze
     VALID_NODES_KEYS = %i[ssl username password host port db].freeze
     MERGE_CONFIG_KEYS = %i[ssl username password].freeze
+    IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
 
     InvalidClientConfigError = Class.new(::RedisClient::Error)
 
@@ -22,7 +23,9 @@ class RedisClient
       @replica = true & replica
       @fixed_hostname = fixed_hostname.to_s
       @node_configs = build_node_configs(nodes.dup)
+      client_config = client_config.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) }
       @client_config = merge_generic_config(client_config, @node_configs)
+      @mutex = Mutex.new
     end
 
     def inspect
@@ -51,11 +54,11 @@ class RedisClient
     end
 
     def update_node(addrs)
-      @node_configs = build_node_configs(addrs)
+      @mutex.synchronize { @node_configs = build_node_configs(addrs) }
     end
 
     def add_node(host, port)
-      @node_configs << { host: host, port: port }
+      @mutex.synchronize { @node_configs << { host: host, port: port } }
     end
 
     def dup
