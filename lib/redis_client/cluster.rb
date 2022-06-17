@@ -65,6 +65,28 @@ class RedisClient
       end
     end
 
+    class PubSub
+      def initialize(client)
+        @client = client
+        @pubsub = nil
+      end
+
+      def call(*command, **kwargs)
+        close
+        @pubsub = @client.send(:assign_node, *command).pubsub
+        @pubsub.call(*command, **kwargs)
+      end
+
+      def close
+        @pubsub&.close
+        @pubsub = nil
+      end
+
+      def next_event(timeout = nil)
+        @pubsub&.next_event(timeout)
+      end
+    end
+
     ZERO_CURSOR_FOR_SCAN = '0'
     CMD_SCAN = 'SCAN'
     CMD_SSCAN = 'SSCAN'
@@ -135,7 +157,7 @@ class RedisClient
     end
 
     def pubsub
-      # TODO: impl
+      ::RedisClient::Cluster::PubSub.new(self)
     end
 
     def close

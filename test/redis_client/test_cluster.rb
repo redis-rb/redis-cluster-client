@@ -6,7 +6,7 @@ require 'redis_client/cluster'
 
 class RedisClient
   class TestCluster
-    module Mixin
+    module Mixin # rubocop:disable Metrics/ModuleLength
       include TestingHelper
 
       def setup
@@ -114,6 +114,26 @@ class RedisClient
         end
 
         assert_equal(want, got)
+      end
+
+      def test_pubsub
+        (0..9).each do |i|
+          pubsub = @client.pubsub
+          pubsub.call('SUBSCRIBE', "channel#{i}")
+          assert_equal(['subscribe', "channel#{i}", 1], pubsub.next_event(0.1))
+        end
+
+        sub = Fiber.new do |client|
+          channel = 'my-channel'
+          pubsub = client.pubsub
+          pubsub.call('SUBSCRIBE', channel)
+          Fiber.yield(channel)
+          Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
+        end
+
+        channel = sub.resume(@client)
+        @client.call('PUBLISH', channel, 'hello world')
+        assert_equal(['subscribe', channel, 1], sub.resume)
       end
 
       def test_close
