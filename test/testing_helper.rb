@@ -23,11 +23,6 @@ module TestingHelper
   TEST_GENERIC_OPTIONS = if TEST_REDIS_SSL
                            {
                              timeout: TEST_TIMEOUT_SEC,
-                             reconnect_attempts: TEST_RECONNECT_ATTEMPTS
-                           }.freeze
-                         else
-                           {
-                             timeout: TEST_TIMEOUT_SEC,
                              reconnect_attempts: TEST_RECONNECT_ATTEMPTS,
                              ssl: true,
                              ssl_params: {
@@ -35,6 +30,11 @@ module TestingHelper
                                cert: GET_CERT_PATH.call('redis-rb-cert.crt'),
                                key: GET_CERT_PATH.call('redis-rb-cert.key')
                              }
+                           }.freeze
+                         else
+                           {
+                             timeout: TEST_TIMEOUT_SEC,
+                             reconnect_attempts: TEST_RECONNECT_ATTEMPTS
                            }.freeze
                          end
 
