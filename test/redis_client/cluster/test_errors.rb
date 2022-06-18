@@ -5,7 +5,7 @@ require 'redis_client/cluster/errors'
 
 class RedisClient
   class Cluster
-    class TestErrors < Minitest::Test
+    class TestErrors < TestingWrapper
       DummyError = Struct.new('DummyError', :message)
 
       def test_initial_setup_error

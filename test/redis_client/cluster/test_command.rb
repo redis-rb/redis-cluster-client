@@ -8,7 +8,7 @@ require 'redis_client/cluster/errors'
 
 class RedisClient
   class Cluster
-    class TestCommand < Minitest::Test
+    class TestCommand < TestingWrapper
       def setup
         @raw_clients = TEST_NODE_URIS.map { |addr| ::RedisClient.config(url: addr, **TEST_GENERIC_OPTIONS).new_client }
       end

@@ -4,7 +4,7 @@ require 'testing_helper'
 require 'redis_cluster_client'
 require 'redis_client/cluster_config'
 
-class TestRedisClient < Minitest::Test
+class TestRedisClient < TestingWrapper
   def test_cluster
     [
       { kwargs: {}, error: nil },

@@ -6,7 +6,7 @@ require 'redis_client/cluster/node_key'
 
 class RedisClient
   class Cluster
-    class TestNodeKey < Minitest::Test
+    class TestNodeKey < TestingWrapper
       def test_hashify
         [
           { node_key: '127.0.0.1:6379', want: { host: '127.0.0.1', port: '6379' } },

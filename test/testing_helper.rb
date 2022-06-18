@@ -8,3 +8,5 @@ require 'constants'
 case ENV.fetch('REDIS_CONNECTION_DRIVER', 'ruby')
 when 'hiredis' then require 'hiredis-client'
 end
+
+class TestingWrapper < Minitest::Test; end
