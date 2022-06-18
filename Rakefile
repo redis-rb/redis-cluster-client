@@ -16,6 +16,9 @@ task :wait do
   $LOAD_PATH.unshift(File.expand_path('test', __dir__))
   require 'constants'
   require 'cluster_controller'
-  ::ClusterController.new(TEST_NODE_URIS, **TEST_GENERIC_OPTIONS)
-                     .wait_for_cluster_to_be_ready
+  ::ClusterController.new(
+    TEST_NODE_URIS,
+    replica_size: TEST_REPLICA_SIZE,
+    **TEST_GENERIC_OPTIONS
+  ).wait_for_cluster_to_be_ready
 end
