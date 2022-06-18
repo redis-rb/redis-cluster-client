@@ -29,13 +29,23 @@ class RedisClient
       include TestingHelper
 
       def setup
-        @test_config = ::RedisClient::ClusterConfig.new(nodes: TEST_NODE_URIS, **TEST_GENERIC_OPTIONS)
+        @test_config = ::RedisClient::ClusterConfig.new(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        )
         @test_node_info = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key)
         node_addrs = @test_node_info.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info[:node_key]) }
         @test_config.update_node(node_addrs)
-        @test_node = ::RedisClient::Cluster::Node.new(@test_config.per_node_key, node_info: @test_node_info)
-        @test_node_with_scale_read = ::RedisClient::Cluster::Node.new(@test_config.per_node_key,
-                                                                      node_info: @test_node_info, with_replica: true)
+        @test_node = ::RedisClient::Cluster::Node.new(
+          @test_config.per_node_key,
+          node_info: @test_node_info
+        )
+        @test_node_with_scale_read = ::RedisClient::Cluster::Node.new(
+          @test_config.per_node_key,
+          node_info: @test_node_info,
+          with_replica: true
+        )
       end
 
       def teardown

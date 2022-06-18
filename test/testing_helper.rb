@@ -3,6 +3,7 @@
 # @see https://docs.ruby-lang.org/en/2.1.0/MiniTest/Assertions.html
 
 require 'redis_client'
+require 'openssl'
 
 module TestingHelper
   TEST_REDIS_SCHEME = ENV.fetch('REDIS_SCHEME', 'redis')
@@ -13,9 +14,29 @@ module TestingHelper
   TEST_RECONNECT_ATTEMPTS = 3
   TEST_REPLICA_SIZE = 1
   TEST_NUMBER_OF_REPLICAS = 3
-  TEST_GENERIC_OPTIONS = { timeout: TEST_TIMEOUT_SEC, reconnect_attempts: TEST_RECONNECT_ATTEMPTS, ssl: TEST_REDIS_SSL }.freeze
+  TEST_FIXED_HOSTNAME = TEST_REDIS_SSL ? TEST_REDIS_HOST : nil
+
   TEST_NODE_URIS = TEST_REDIS_PORTS.map { |v| "#{TEST_REDIS_SCHEME}://#{TEST_REDIS_HOST}:#{v}" }.freeze
-  TEST_NODE_OPTIONS = TEST_REDIS_PORTS.to_h { |v| ["#{TEST_REDIS_HOST}:#{v}", { host: TEST_REDIS_HOST, port: v, ssl: TEST_REDIS_SSL }] }.freeze
+  TEST_NODE_OPTIONS = TEST_REDIS_PORTS.to_h { |v| ["#{TEST_REDIS_HOST}:#{v}", { host: TEST_REDIS_HOST, port: v }] }.freeze
+
+  GET_CERT_PATH = ->(f) { File.expand_path(File.join('ssl_certs', f), __dir__) }
+  TEST_GENERIC_OPTIONS = if TEST_REDIS_SSL
+                           {
+                             timeout: TEST_TIMEOUT_SEC,
+                             reconnect_attempts: TEST_RECONNECT_ATTEMPTS
+                           }.freeze
+                         else
+                           {
+                             timeout: TEST_TIMEOUT_SEC,
+                             reconnect_attempts: TEST_RECONNECT_ATTEMPTS,
+                             ssl: true,
+                             ssl_params: {
+                               ca_file: GET_CERT_PATH.call('redis-rb-ca.crt'),
+                               cert: GET_CERT_PATH.call('redis-rb-cert.crt'),
+                               key: GET_CERT_PATH.call('redis-rb-cert.key')
+                             }
+                           }.freeze
+                         end
 
   def setup
     # TODO: for feature tests

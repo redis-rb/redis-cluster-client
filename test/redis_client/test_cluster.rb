@@ -193,7 +193,11 @@ class RedisClient
       include Mixin
 
       def new_test_client
-        config = ::RedisClient::ClusterConfig.new(nodes: TEST_NODE_URIS, **TEST_GENERIC_OPTIONS)
+        config = ::RedisClient::ClusterConfig.new(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        )
         ::RedisClient::Cluster.new(config)
       end
     end
@@ -202,7 +206,12 @@ class RedisClient
       include Mixin
 
       def new_test_client
-        config = ::RedisClient::ClusterConfig.new(nodes: TEST_NODE_URIS, replica: true, **TEST_GENERIC_OPTIONS)
+        config = ::RedisClient::ClusterConfig.new(
+          nodes: TEST_NODE_URIS,
+          replica: true,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        )
         ::RedisClient::Cluster.new(config)
       end
     end
@@ -211,7 +220,11 @@ class RedisClient
       include Mixin
 
       def new_test_client
-        config = ::RedisClient::ClusterConfig.new(nodes: TEST_NODE_URIS, **TEST_GENERIC_OPTIONS)
+        config = ::RedisClient::ClusterConfig.new(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        )
         ::RedisClient::Cluster.new(config, pool: { timeout: TEST_TIMEOUT_SEC, size: 2 })
       end
     end
