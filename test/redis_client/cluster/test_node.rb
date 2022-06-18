@@ -35,6 +35,12 @@ class RedisClient
           **TEST_GENERIC_OPTIONS
         )
         @test_node_info = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key)
+        if TEST_FIXED_HOSTNAME
+          @test_node_info.each do |info|
+            _, port = ::RedisClient::Cluster::NodeKey.split(info[:node_key])
+            info[:node_key] = ::RedisClient::Cluster::NodeKey.build_from_host_port(TEST_FIXED_HOSTNAME, port)
+          end
+        end
         node_addrs = @test_node_info.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info[:node_key]) }
         @test_config.update_node(node_addrs)
         @test_node = ::RedisClient::Cluster::Node.new(
