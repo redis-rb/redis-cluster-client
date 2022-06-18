@@ -1,5 +1,9 @@
 ---
 # @see https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
+#
+# Services feature of GitHub Actions isn't fit for our purposes for testing.
+# We cannot overwrite arguments of ENTRYPOINT.
+# @see https://docs.docker.com/engine/reference/commandline/create/#options
 name: Test
 on:
   push:
@@ -11,7 +15,7 @@ on:
 jobs:
   lint:
     name: Lint
-    timeout-minutes: 10
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -25,16 +29,18 @@ jobs:
         run: bundle exec rubocop
   main:
     name: Main
-    timeout-minutes: 30
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: ['ubuntu-latest']
         redis: ['6.2.7', '7.0.1']
         ruby: ['3.1', '3.0', '2.7']
+        docker: ['docker-compose.yaml', 'docker-compose.ssl.yaml']
+        os: ['ubuntu-latest']
     runs-on: ${{ matrix.os }}
     env:
       REDIS_VERSION: ${{ matrix.redis }}
+      DOCKER_COMPOSE_FILE: ${{ matrix.docker }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -43,18 +49,15 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
-      # Services feature of GitHub Actions isn't fit for our purposes for testing.
-      # We cannot overwrite arguments of ENTRYPOINT.
-      # @see https://docs.docker.com/engine/reference/commandline/create/#options
       - name: Pull Docker images
         run: docker pull redis:$REDIS_VERSION
       - name: Run containers
-        run: docker compose up -d
+        run: docker compose -f $DOCKER_COMPOSE_FILE up -d
       - name: Wait for Redis cluster to be ready
         run: bundle exec rake wait
       - name: Print containers
-        run: docker compose ps
+        run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Run minitest
         run: bundle exec rake test
       - name: Stop containers
-        run: docker compose down
+        run: docker compose -f $DOCKER_COMPOSE_FILE down

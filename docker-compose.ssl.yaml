@@ -1,0 +1,165 @@
+---
+# @see https://redis.io/docs/manual/security/encryption/
+services:
+  node1: &node
+    image: "redis:${REDIS_VERSION:-7}"
+    command: >
+      redis-server
+      --maxmemory            64mb
+      --maxmemory-policy     allkeys-lru
+      --appendonly           yes
+      --cluster-enabled      yes
+      --cluster-config-file  nodes.conf
+      --cluster-node-timeout 5000
+      --port                 0
+      --tls-port             6379
+      --tls-cert-file        /etc/ssl/private/redis-rb-cert.crt
+      --tls-key-file         /etc/ssl/private/redis-rb-cert.key
+      --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
+      --tls-cluster          yes
+      --tls-replication      yes
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "redis-cli"
+        - "--tls"
+        - "--cert=/etc/ssl/private/redis-rb-cert.crt"
+        - "--key=/etc/ssl/private/redis-rb-cert.key"
+        - "--cacert=/etc/ssl/private/redis-rb-ca.crt"
+        - "ping"
+      interval: "7s"
+      timeout: "5s"
+      retries: 10
+    ports:
+      - "6379:6379"
+    volumes:
+      - "./test/ssl_certs:/etc/ssl/private:ro"
+  node2:
+    <<: *node
+    command: >
+      redis-server
+      --maxmemory            64mb
+      --maxmemory-policy     allkeys-lru
+      --appendonly           yes
+      --cluster-enabled      yes
+      --cluster-config-file  nodes.conf
+      --cluster-node-timeout 5000
+      --port                 0
+      --tls-port             6380
+      --tls-cert-file        /etc/ssl/private/redis-rb-cert.crt
+      --tls-key-file         /etc/ssl/private/redis-rb-cert.key
+      --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
+      --tls-cluster          yes
+      --tls-replication      yes
+    ports:
+      - "6380:6380"
+  node3:
+    <<: *node
+    command: >
+      redis-server
+      --maxmemory            64mb
+      --maxmemory-policy     allkeys-lru
+      --appendonly           yes
+      --cluster-enabled      yes
+      --cluster-config-file  nodes.conf
+      --cluster-node-timeout 5000
+      --port                 0
+      --tls-port             6381
+      --tls-cert-file        /etc/ssl/private/redis-rb-cert.crt
+      --tls-key-file         /etc/ssl/private/redis-rb-cert.key
+      --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
+      --tls-cluster          yes
+      --tls-replication      yes
+    ports:
+      - "6381:6381"
+  node4:
+    <<: *node
+    command: >
+      redis-server
+      --maxmemory            64mb
+      --maxmemory-policy     allkeys-lru
+      --appendonly           yes
+      --cluster-enabled      yes
+      --cluster-config-file  nodes.conf
+      --cluster-node-timeout 5000
+      --port                 0
+      --tls-port             6382
+      --tls-cert-file        /etc/ssl/private/redis-rb-cert.crt
+      --tls-key-file         /etc/ssl/private/redis-rb-cert.key
+      --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
+      --tls-cluster          yes
+      --tls-replication      yes
+    ports:
+      - "6382:6382"
+  node5:
+    <<: *node
+    command: >
+      redis-server
+      --maxmemory            64mb
+      --maxmemory-policy     allkeys-lru
+      --appendonly           yes
+      --cluster-enabled      yes
+      --cluster-config-file  nodes.conf
+      --cluster-node-timeout 5000
+      --port                 0
+      --tls-port             6383
+      --tls-cert-file        /etc/ssl/private/redis-rb-cert.crt
+      --tls-key-file         /etc/ssl/private/redis-rb-cert.key
+      --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
+      --tls-cluster          yes
+      --tls-replication      yes
+    ports:
+      - "6383:6383"
+  node6:
+    <<: *node
+    command: >
+      redis-server
+      --maxmemory            64mb
+      --maxmemory-policy     allkeys-lru
+      --appendonly           yes
+      --cluster-enabled      yes
+      --cluster-config-file  nodes.conf
+      --cluster-node-timeout 5000
+      --port                 0
+      --tls-port             6384
+      --tls-cert-file        /etc/ssl/private/redis-rb-cert.crt
+      --tls-key-file         /etc/ssl/private/redis-rb-cert.key
+      --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
+      --tls-cluster          yes
+      --tls-replication      yes
+    ports:
+      - "6384:6384"
+  clustering:
+    image: "redis:${REDIS_VERSION:-7}"
+    command: >
+      bash -c "apt-get update > /dev/null
+      && apt-get install --no-install-recommends --no-install-suggests -y dnsutils > /dev/null
+      && rm -rf /var/lib/apt/lists/*
+      && yes yes | redis-cli
+      --tls
+      --cert   /etc/ssl/private/redis-rb-cert.crt
+      --key    /etc/ssl/private/redis-rb-cert.key
+      --cacert /etc/ssl/private/redis-rb-ca.crt
+      --cluster create
+      $$(dig node1 +short):6379
+      $$(dig node2 +short):6380
+      $$(dig node3 +short):6381
+      $$(dig node4 +short):6382
+      $$(dig node5 +short):6383
+      $$(dig node6 +short):6384
+      --cluster-replicas 1"
+    volumes:
+      - "./test/ssl_certs:/etc/ssl/private:ro"
+    depends_on:
+      node1:
+        condition: service_healthy
+      node2:
+        condition: service_healthy
+      node3:
+        condition: service_healthy
+      node4:
+        condition: service_healthy
+      node5:
+        condition: service_healthy
+      node6:
+        condition: service_healthy

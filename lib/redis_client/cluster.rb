@@ -40,13 +40,11 @@ class RedisClient
         @size.zero?
       end
 
-      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-        all_replies = []
+      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+        all_replies = Array.new(@size)
         threads = @grouped.map do |k, v|
           Thread.new(@client, k, v) do |client, node_key, rows|
             Thread.pass
-
-            node_key = node_key.nil? ? client.instance_variable_get(:@node).primary_node_keys.sample : node_key
             replies = client.send(:find_node, node_key).pipelined do |pipeline|
               rows.each do |row|
                 case row[1]

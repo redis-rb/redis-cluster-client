@@ -1,10 +1,16 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
+require 'testing_helper'
 require 'redis_client/cluster_config'
 
 class RedisClient
   class TestClusterConfig < Minitest::Test
+    include TestingHelper
+
+    def setup; end
+    def teardown; end
+
     def test_inspect
       want = '#<RedisClient::ClusterConfig [{:host=>"127.0.0.1", :port=>6379}]>'
       got = ::RedisClient::ClusterConfig.new.inspect
@@ -12,11 +18,25 @@ class RedisClient
     end
 
     def test_new_pool
-      assert_instance_of(::RedisClient::Cluster, ::RedisClient::ClusterConfig.new.new_pool)
+      assert_instance_of(
+        ::RedisClient::Cluster,
+        ::RedisClient::ClusterConfig.new(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        ).new_pool
+      )
     end
 
     def test_new_client
-      assert_instance_of(::RedisClient::Cluster, ::RedisClient::ClusterConfig.new.new_client)
+      assert_instance_of(
+        ::RedisClient::Cluster,
+        ::RedisClient::ClusterConfig.new(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        ).new_client
+      )
     end
 
     def test_per_node_key
