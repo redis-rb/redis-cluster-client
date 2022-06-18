@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'uri'
-require 'minitest/autorun'
 require 'testing_helper'
 require 'redis_client/pooled'
 require 'redis_client/cluster/errors'
@@ -26,8 +25,6 @@ class RedisClient
     end
 
     class TestNode < Minitest::Test
-      include TestingHelper
-
       def setup
         @test_config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,

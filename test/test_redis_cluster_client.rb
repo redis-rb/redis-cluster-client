@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'minitest/autorun'
+require 'testing_helper'
 require 'redis_cluster_client'
 require 'redis_client/cluster_config'
 

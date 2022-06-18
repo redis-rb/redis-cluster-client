@@ -49,7 +49,7 @@ RedisClient.cluster(nodes: 'redis://endpoint.example.com:6379').new_client
 ```
 
 ```ruby
-# To connect with single endpoint and SSL
+# To connect to single endpoint with SSL/TLS
 RedisClient.cluster(nodes: 'rediss://endpoint.example.com:6379', fixed_hostname: 'endpoint.example.com').new_client
 ```
 
@@ -145,4 +145,4 @@ RedisClient.cluster.new_pool(timeout: 1.0, size: 2)
 ```
 
 ## Connection drivers
-TODO
+Please see [redis-client](https://github.com/redis-rb/redis-client#drivers).

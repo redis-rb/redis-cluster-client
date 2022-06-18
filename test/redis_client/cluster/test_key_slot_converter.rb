@@ -1,14 +1,11 @@
 # frozen_string_literal: true
 
-require 'minitest/autorun'
 require 'testing_helper'
 require 'redis_client/cluster/key_slot_converter'
 
 class RedisClient
   class Cluster
     class TestKeySlotConverter < Minitest::Test
-      include TestingHelper
-
       def setup
         @raw_clients = TEST_NODE_URIS.map { |addr| ::RedisClient.config(url: addr, **TEST_GENERIC_OPTIONS).new_client }
       end
