@@ -6,12 +6,25 @@ require 'redis_client'
 require 'openssl'
 
 module TestingHelper
-  TEST_REDIS_SCHEME = ENV.fetch('REDIS_SCHEME', 'redis')
-  TEST_REDIS_SSL = TEST_REDIS_SCHEME == 'rediss'
   TEST_REDIS_HOST = '127.0.0.1'
   TEST_REDIS_PORTS = (6379..6384).freeze
   TEST_TIMEOUT_SEC = 5.0
   TEST_RECONNECT_ATTEMPTS = 3
+
+  begin
+    ::RedisClient.config(
+      host: TEST_REDIS_HOST,
+      port: TEST_REDIS_PORTS.first,
+      timeout: TEST_TIMEOUT_SEC
+    ).new_client.call('PING')
+    TEST_REDIS_SCHEME = 'redis'
+  rescue RedisClient::ConnectionError => e
+    raise e if e.message != 'Connection reset by peer'
+
+    TEST_REDIS_SCHEME = 'rediss'
+  end
+
+  TEST_REDIS_SSL = TEST_REDIS_SCHEME == 'rediss'
   TEST_REPLICA_SIZE = 1
   TEST_NUMBER_OF_REPLICAS = 3
   TEST_FIXED_HOSTNAME = TEST_REDIS_SSL ? TEST_REDIS_HOST : nil
