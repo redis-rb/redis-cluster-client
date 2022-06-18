@@ -18,7 +18,7 @@ module TestingHelper
       timeout: TEST_TIMEOUT_SEC
     ).new_client.call('PING')
     TEST_REDIS_SCHEME = 'redis'
-  rescue RedisClient::ConnectionError => e
+  rescue ::RedisClient::ConnectionError => e
     raise e if e.message != 'Connection reset by peer'
 
     TEST_REDIS_SCHEME = 'rediss'
