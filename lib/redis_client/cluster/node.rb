@@ -129,19 +129,17 @@ class RedisClient
       def call_replica(method, *command, **kwargs, &block)
         return call_primary(method, *command, **kwargs, &block) if replica_disabled?
 
+        replica_node_keys = @replications.values.map(&:sample)
         try_map do |node_key, client|
-          next if primary?(node_key)
+          next if primary?(node_key) || !replica_node_keys.include?(node_key)
 
           client.send(method, *command, **kwargs, &block)
         end.values
       end
 
       def scale_reading_clients
-        clients = @clients.select do |node_key, _|
-          replica_disabled? ? primary?(node_key) : replica?(node_key)
-        end
-
-        clients.values.sort_by do |client|
+        keys = replica_disabled? ? @replications.keys : @replications.values.map(&:first)
+        @clients.select { |k, _| keys.include?(k) }.values.sort_by do |client|
           ::RedisClient::Cluster::NodeKey.build_from_host_port(client.config.host, client.config.port)
         end
       end
@@ -184,7 +182,7 @@ class RedisClient
       end
 
       def replica?(node_key)
-        !(@replications.nil? || @replications.size.zero?) && @replications[node_key].size.zero?
+        !(@replications.nil? || @replications.size.zero?) && !@replications.key?(node_key)
       end
 
       def build_slot_node_mappings(node_info)
@@ -203,7 +201,6 @@ class RedisClient
         node_info.each_with_object(Hash.new { |h, k| h[k] = [] }) do |info, acc|
           primary_info = dict[info[:primary_id]]
           acc[primary_info[:node_key]] << info[:node_key] unless primary_info.nil?
-          acc[info[:node_key]]
         end
       end
 

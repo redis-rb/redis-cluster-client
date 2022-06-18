@@ -4,7 +4,7 @@ require 'testing_helper'
 require 'redis_client/cluster_config'
 
 class RedisClient
-  class TestClusterConfig < Minitest::Test
+  class TestClusterConfig < TestingWrapper
     def test_inspect
       want = '#<RedisClient::ClusterConfig [{:host=>"127.0.0.1", :port=>6379}]>'
       got = ::RedisClient::ClusterConfig.new.inspect

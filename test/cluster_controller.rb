@@ -2,10 +2,12 @@
 
 class ClusterController
   SLOT_SIZE = 16_384
+  SHARD_SIZE = 3
 
-  def initialize(node_addrs, timeout: 30.0, reconnect_attempts: 3, **kwargs)
-    raise 'Redis Cluster requires at least 3 master nodes.' if node_addrs.size < 3
+  def initialize(node_addrs, replica_size: 1, timeout: 30.0, reconnect_attempts: 3, **kwargs)
+    raise "Redis Cluster requires at least #{SHARD_SIZE} master nodes." if node_addrs.size < SHARD_SIZE
 
+    @replica_size = replica_size
     @timeout = kwargs[:timeout]
     @clients = node_addrs.map do |addr|
       ::RedisClient.new(
@@ -199,7 +201,7 @@ class ClusterController
   def wait_replication(clients, max_attempts: 600)
     wait_for_state(clients, max_attempts) do |client|
       flags = hashify_cluster_node_flags(client)
-      flags.values.count { |f| f == 'slave' } == 3
+      flags.values.count { |f| f == 'slave' } == @replica_size * SHARD_SIZE
     end
   end
 
@@ -266,17 +268,11 @@ class ClusterController
   end
 
   def take_masters(clients)
-    size = clients.size / 2
-    return clients if size < 3
-
-    clients.take(size)
+    clients.take(SHARD_SIZE)
   end
 
   def take_slaves(clients)
-    size = clients.size / 2
-    return [] if size < 3
-
-    clients[size..size * 2]
+    clients[SHARD_SIZE..]
   end
 
   def take_replication_pairs(clients)

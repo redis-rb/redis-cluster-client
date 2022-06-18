@@ -10,7 +10,7 @@ require 'redis_client/cluster/node_key'
 class RedisClient
   class Cluster
     class Node
-      class TestConfig < Minitest::Test
+      class TestConfig < TestingWrapper
         def test_connection_prelude
           [
             { params: { scale_read: true }, want: [%w[HELLO 3], %w[READONLY]] },
@@ -24,7 +24,7 @@ class RedisClient
       end
     end
 
-    class TestNode < Minitest::Test
+    class TestNode < TestingWrapper
       def setup
         @test_config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
@@ -232,22 +232,22 @@ class RedisClient
 
       def test_call_replica
         want = (1..(@test_node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
+
         got = @test_node.call_replica(:call, 'PING')
         assert_equal(want, got, 'Case: primary only')
 
-        want = (1..(@test_node_info.count { |info| info[:role] == 'slave' })).map { |_| 'PONG' }
         got = @test_node_with_scale_read.call_replica(:call, 'PING')
         assert_equal(want, got, 'Case: scale read')
       end
 
-      def test_scale_reading_clients
+      def test_scale_reading_clients # rubocop:disable Metrics/CyclomaticComplexity
         want = @test_node_info.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }.sort
         got = @test_node.scale_reading_clients.map { |client| "#{client.config.host}:#{client.config.port}" }
         assert_equal(want, got, 'Case: primary only')
 
-        want = @test_node_info.select { |info| info[:role] == 'slave' }.map { |info| info[:node_key] }.sort
+        want = @test_node_info.select { |info| info[:role] == 'slave' }.map { |info| info[:node_key] }
         got = @test_node_with_scale_read.scale_reading_clients.map { |client| "#{client.config.host}:#{client.config.port}" }
-        assert_equal(want, got, 'Case: scale read')
+        got.each { |e| assert_includes(want, e, 'Case: scale read') }
       end
 
       def test_slot_exists?
@@ -271,11 +271,12 @@ class RedisClient
         got = @test_node.find_node_key_of_replica(sample_slot)
         assert_equal(sample_node[:node_key], got, 'Case: primary only')
 
-        sample_replica = @test_node_info.find { |info| info[:role] == 'slave' }
-        sample_primary = @test_node_info.find { |info| info[:id] == sample_replica[:primary_id] }
+        sample_replicas = @test_node_info.select { |info| info[:role] == 'slave' }
+        sample_primary = @test_node_info.find { |info| info[:id] == sample_replicas.first[:primary_id] }
         sample_slot = sample_primary[:slots].first.first
         got = @test_node_with_scale_read.find_node_key_of_replica(sample_slot)
-        assert_equal(sample_replica[:node_key], got, 'Case: scale read')
+        want = sample_replicas.map { |info| info[:node_key] }
+        assert_includes(want, got, 'Case: scale read')
       end
 
       def test_update_slot

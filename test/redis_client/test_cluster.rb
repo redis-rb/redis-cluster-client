@@ -145,7 +145,7 @@ class RedisClient
         (0..9).each { |i| @client.call('SET', "key#{i}", i) }
         [
           { command: %w[ACL HELP], is_a: Array },
-          { command: %w[WAIT 1 1], want: TEST_NUMBER_OF_REPLICAS },
+          { command: ['WAIT', TEST_REPLICA_SIZE, '1'], want: TEST_NUMBER_OF_REPLICAS },
           { command: %w[KEYS *], want: (0..9).map { |i| "key#{i}" } },
           { command: %w[DBSIZE], want: (0..9).size },
           { command: %w[SCAN], is_a: Array },
@@ -186,7 +186,7 @@ class RedisClient
       end
     end
 
-    class PrimaryOnly < Minitest::Test
+    class PrimaryOnly < TestingWrapper
       include Mixin
 
       def new_test_client
@@ -199,7 +199,7 @@ class RedisClient
       end
     end
 
-    class ScaleRead < Minitest::Test
+    class ScaleRead < TestingWrapper
       include Mixin
 
       def new_test_client
@@ -213,7 +213,7 @@ class RedisClient
       end
     end
 
-    class Pooled < Minitest::Test
+    class Pooled < TestingWrapper
       include Mixin
 
       def new_test_client

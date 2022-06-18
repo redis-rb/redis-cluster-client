@@ -5,7 +5,7 @@ require 'redis_client/cluster/key_slot_converter'
 
 class RedisClient
   class Cluster
-    class TestKeySlotConverter < Minitest::Test
+    class TestKeySlotConverter < TestingWrapper
       def setup
         @raw_clients = TEST_NODE_URIS.map { |addr| ::RedisClient.config(url: addr, **TEST_GENERIC_OPTIONS).new_client }
       end
