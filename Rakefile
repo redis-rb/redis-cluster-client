@@ -14,9 +14,8 @@ end
 desc 'Wait for cluster to be ready'
 task :wait do
   $LOAD_PATH.unshift(File.expand_path('test', __dir__))
-  require 'testing_helper'
-  ::TestingHelper::ClusterController.new(
-    ::TestingHelper::TEST_NODE_URIS,
-    **::TestingHelper::TEST_GENERIC_OPTIONS
-  ).wait_for_cluster_to_be_ready
+  require 'constants'
+  require 'cluster_controller'
+  ::ClusterController.new(TEST_NODE_URIS, **TEST_GENERIC_OPTIONS)
+                     .wait_for_cluster_to_be_ready
 end

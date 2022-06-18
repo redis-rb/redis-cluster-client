@@ -3,6 +3,7 @@
 source 'https://rubygems.org'
 gemspec name: 'redis-cluster-client'
 
+gem 'hiredis-client'
 gem 'minitest'
 gem 'rake'
 gem 'rubocop'

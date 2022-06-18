@@ -1,14 +1,11 @@
 # frozen_string_literal: true
 
-require 'minitest/autorun'
 require 'testing_helper'
 require 'redis_client/cluster'
 
 class RedisClient
   class TestCluster
     module Mixin # rubocop:disable Metrics/ModuleLength
-      include TestingHelper
-
       def setup
         @client = new_test_client
         @client.call('FLUSHDB')
