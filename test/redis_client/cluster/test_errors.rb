@@ -40,7 +40,7 @@ class RedisClient
         end
       end
 
-      def test_command_error_collection_error
+      def test_error_collection_error
         [
           {
             errors: { '127.0.0.1:6379' => DummyError.new('foo') },
@@ -54,7 +54,7 @@ class RedisClient
           { errors: '', want: { msg: '', size: 0 } },
           { errors: nil, want: { msg: '', size: 0 } }
         ].each_with_index do |c, idx|
-          raise ::RedisClient::Cluster::CommandErrorCollection, c[:errors]
+          raise ::RedisClient::Cluster::ErrorCollection, c[:errors]
         rescue StandardError => e
           assert_equal(c[:want][:msg], e.message, "Case: #{idx}")
           assert_equal(c[:want][:size], e.errors.size, "Case: #{idx}")

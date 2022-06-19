@@ -29,7 +29,7 @@ class RedisClient
     end
 
     # Raised when error occurs on any node of cluster.
-    class CommandErrorCollection < ::RedisClient::Error
+    class ErrorCollection < ::RedisClient::Error
       attr_reader :errors
 
       def initialize(errors)
