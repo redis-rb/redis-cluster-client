@@ -7,14 +7,23 @@ task default: :test
 Rake::TestTask.new :test do |t|
   t.libs << :test
   t.libs << :lib
-  t.test_files = ARGV.size == 1 ? Dir['test/**/test_*.rb'] : ARGV[1..]
+  files = Dir['test/**/test_*.rb'].grep_v(/test_against_cluster_state/)
+  files = ARGV[1..] if ARGV.size > 1
+  t.test_files = files
+  t.options = '-v'
+end
+
+Rake::TestTask.new :test_cluster_state do |t|
+  t.libs << :test
+  t.libs << :lib
+  t.test_files = %w[test/test_against_cluster_state.rb]
   t.options = '-v'
 end
 
 desc 'Wait for cluster to be ready'
 task :wait do
   $LOAD_PATH.unshift(File.expand_path('test', __dir__))
-  require 'constants'
+  require 'testing_constants'
   require 'cluster_controller'
   ::ClusterController.new(
     TEST_NODE_URIS,
