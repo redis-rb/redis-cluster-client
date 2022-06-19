@@ -40,6 +40,7 @@ class RedisClient
         @size.zero?
       end
 
+      # TODO: https://github.com/redis-rb/redis-cluster-client/issues/37
       def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
         all_replies = Array.new(@size)
         threads = @grouped.map do |k, v|
@@ -185,7 +186,7 @@ class RedisClient
         @node.call_all(method, *command, **kwargs, &block).first
       when 'flushall', 'flushdb'
         @node.call_primary(method, *command, **kwargs, &block).first
-      when 'wait'     then @node.call_primary(method, *command, **kwargs, &block).sum
+      when 'wait'     then send_wait_command(method, *command, **kwargs, &block)
       when 'keys'     then @node.call_replica(method, *command, **kwargs, &block).flatten.sort
       when 'dbsize'   then @node.call_replica(method, *command, **kwargs, &block).sum
       when 'scan'     then _scan(*command, **kwargs)
@@ -205,6 +206,16 @@ class RedisClient
         node = assign_node(*command)
         try_send(node, method, *command, **kwargs, &block)
       end
+    end
+
+    def send_wait_command(method, *command, retry_count: 3, **kwargs, &block)
+      @node.call_primary(method, *command, **kwargs, &block).sum
+    rescue RedisClient::Cluster::CommandErrorCollection => e
+      raise if e.errors.values.map(&:message).grep(/ERR WAIT cannot be used with replica instances/).size.zero?
+
+      update_cluster_info!
+      retry_count -= 1
+      retry
     end
 
     def send_config_command(method, *command, **kwargs, &block)

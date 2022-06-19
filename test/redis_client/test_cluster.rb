@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'testing_helper'
-require 'redis_client/cluster'
 
 class RedisClient
   class TestCluster

@@ -2,9 +2,6 @@
 
 require 'set'
 require 'testing_helper'
-require 'redis_client/cluster'
-require 'redis_client/cluster/command'
-require 'redis_client/cluster/errors'
 
 class RedisClient
   class Cluster

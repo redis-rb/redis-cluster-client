@@ -2,7 +2,6 @@
 
 require 'uri'
 require 'testing_helper'
-require 'redis_client/cluster/node_key'
 
 class RedisClient
   class Cluster

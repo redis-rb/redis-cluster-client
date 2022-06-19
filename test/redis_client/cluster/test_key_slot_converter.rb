@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'testing_helper'
-require 'redis_client/cluster/key_slot_converter'
 
 class RedisClient
   class Cluster
