@@ -13,7 +13,9 @@ class TestAgainstClusterBroken < TestingWrapper
     @controller.close
   end
 
-  def test_several_nodes_are_down # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  def test_several_nodes_are_down # rubocop:disable Metrics/CyclomaticComplexity
+    skip('TODO: https://github.com/redis-rb/redis-cluster-client/issues/9')
+
     node = @client.instance_variable_get(:@node)
     primary_node_key = node.primary_node_keys.sample
     replica_node_key = node.replica_node_keys.reject { |k| node.replicated?(primary_node_key, k) }.sample
@@ -25,15 +27,10 @@ class TestAgainstClusterBroken < TestingWrapper
     node.instance_variable_get(:@clients).each do |node_key, raw_cli|
       next if node_key != primary_node_key && node_key != replica_node_key
 
-      begin
-        # @see https://github.com/redis/redis/blob/475563e2e941ebbdb83f50474bf2daa5ae276fcf/src/debug.c#L387-L493
-        raw_cli.call('SHUTDOWN')
-      rescue ::RedisClient::Error
-        # pass
-      end
+      # @see https://github.com/redis/redis/blob/475563e2e941ebbdb83f50474bf2daa5ae276fcf/src/debug.c#L387-L493
+      raw_cli.call('SHUTDOWN')
     end
 
-    skip('TODO')
     @controller.wait_for_cluster_to_be_ready
 
     errors = []

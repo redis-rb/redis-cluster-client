@@ -211,11 +211,14 @@ class RedisClient
       raise
     end
 
-    def send_wait_command(method, *command, **kwargs, &block)
+    def send_wait_command(method, *command, retry_count: 3, **kwargs, &block)
       @node.call_primary(method, *command, **kwargs, &block).sum
     rescue RedisClient::Cluster::CommandErrorCollection => e
-      update_cluster_info! unless e.errors.values.map(&:message).grep(/ERR WAIT cannot be used with replica instances/).empty?
-      raise
+      raise if retry_count <= 0 || e.errors.values.map(&:message).grep(/ERR WAIT cannot be used with replica instances/).empty?
+
+      update_cluster_info!
+      retry_count -= 1
+      retry
     end
 
     def send_config_command(method, *command, **kwargs, &block)
@@ -277,7 +280,7 @@ class RedisClient
 
     # @see https://redis.io/topics/cluster-spec#redirection-and-resharding
     #   Redirection and resharding
-    def try_send(node, method, *args, retry_count: 3, **kwargs, &block) # rubocop:disable Metrics/MethodLength
+    def try_send(node, method, *args, retry_count: 3, **kwargs, &block) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
       node.send(method, *args, **kwargs, &block)
     rescue ::RedisClient::CommandError => e
       raise if retry_count <= 0
@@ -295,8 +298,11 @@ class RedisClient
         raise
       end
     rescue ::RedisClient::ConnectionError
+      raise if retry_count <= 0
+
       update_cluster_info!
-      raise
+      retry_count -= 1
+      retry
     end
 
     def _scan(*command, **kwargs) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
