@@ -37,14 +37,15 @@ class TestAgainstClusterState < TestingWrapper
     end
 
     def test_the_state_of_cluster_resharding
-      @client.pipelined { |pipeline| 100_000.times { |i| pipeline.call('SET', "{key}#{i}", i) } }
+      @client.pipelined { |pipeline| 10_000.times { |i| pipeline.call('SET', "{key}#{i}", i) } }
+      wait_for_replication
 
       slot = SLOT_SIZE.times.max_by { |i| @client.call('CLUSTER', 'COUNTKEYSINSLOT', i) }
       src = @client.instance_variable_get(:@node).find_node_key_of_primary(slot)
       dest = @client.instance_variable_get(:@node).primary_node_keys.reject { |k| k == src }.sample
 
       @controller.start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
-      100_000.times { |i| assert_equal(i.to_s, @client.call('GET', "{key}#{i}"), "Case: GET: #{i}") }
+      10_000.times { |i| assert_equal(i.to_s, @client.call('GET', "{key}#{i}"), "Case: GET: #{i}") }
       @controller.finish_resharding(slot: slot, dest_node_key: dest)
     end
 
