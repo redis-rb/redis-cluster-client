@@ -5,7 +5,6 @@ services:
     image: "redis:${REDIS_VERSION:-7}"
     command: >
       redis-server
-      --enable-debug-command yes
       --maxmemory            64mb
       --maxmemory-policy     allkeys-lru
       --appendonly           yes
@@ -40,7 +39,6 @@ services:
     <<: *node
     command: >
       redis-server
-      --enable-debug-command yes
       --maxmemory            64mb
       --maxmemory-policy     allkeys-lru
       --appendonly           yes
@@ -60,7 +58,6 @@ services:
     <<: *node
     command: >
       redis-server
-      --enable-debug-command yes
       --maxmemory            64mb
       --maxmemory-policy     allkeys-lru
       --appendonly           yes
@@ -80,7 +77,6 @@ services:
     <<: *node
     command: >
       redis-server
-      --enable-debug-command yes
       --maxmemory            64mb
       --maxmemory-policy     allkeys-lru
       --appendonly           yes
@@ -100,7 +96,6 @@ services:
     <<: *node
     command: >
       redis-server
-      --enable-debug-command yes
       --maxmemory            64mb
       --maxmemory-policy     allkeys-lru
       --appendonly           yes
@@ -120,7 +115,6 @@ services:
     <<: *node
     command: >
       redis-server
-      --enable-debug-command yes
       --maxmemory            64mb
       --maxmemory-policy     allkeys-lru
       --appendonly           yes

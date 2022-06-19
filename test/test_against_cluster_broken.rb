@@ -27,8 +27,8 @@ class TestAgainstClusterBroken < TestingWrapper
 
       begin
         # @see https://github.com/redis/redis/blob/475563e2e941ebbdb83f50474bf2daa5ae276fcf/src/debug.c#L387-L493
-        raw_cli.call('DEBUG', 'SEGFAULT')
-      rescue ::RedisClient::ConnectionError
+        raw_cli.call('SHUTDOWN')
+      rescue ::RedisClient::Error
         # pass
       end
     end
