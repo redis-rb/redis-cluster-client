@@ -18,6 +18,7 @@ services:
       --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
       --tls-cluster          yes
       --tls-replication      yes
+    restart: "${RESTART_POLICY:-always}"
     healthcheck:
       test:
         - "CMD-SHELL"
