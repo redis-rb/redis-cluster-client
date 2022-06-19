@@ -61,7 +61,7 @@ class RedisClient
             raise ReplySizeError, "commands: #{rows.size}, replies: #{replies.size}" if rows.size != replies.size
 
             rows.each_with_index { |row, idx| all_replies[row.first] = replies[idx] }
-          rescue ::RedisClient::Error => e
+          rescue StandardError => e
             errors[node_key] = e
           end
         end

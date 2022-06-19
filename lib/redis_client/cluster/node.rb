@@ -235,7 +235,7 @@ class RedisClient
             Thread.pass
             reply = yield(node_key, client)
             results[node_key] = reply unless reply.nil?
-          rescue ::RedisClient::Error => e
+          rescue StandardError => e
             errors[node_key] = e
           end
         end
