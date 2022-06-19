@@ -182,7 +182,7 @@ class RedisClient
     def send_command(method, *command, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
       cmd = command.first.to_s.downcase
       case cmd
-      when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save'
+      when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save', 'ping'
         @node.call_all(method, *command, **kwargs, &block).first
       when 'flushall', 'flushdb'
         @node.call_primary(method, *command, **kwargs, &block).first
@@ -206,16 +206,16 @@ class RedisClient
         node = assign_node(*command)
         try_send(node, method, *command, **kwargs, &block)
       end
+    rescue RedisClient::Cluster::CommandErrorCollection => e
+      update_cluster_info! if e.errors.values.map(&:class).any?(::RedisClient::ConnectionError)
+      raise
     end
 
-    def send_wait_command(method, *command, retry_count: 3, **kwargs, &block)
+    def send_wait_command(method, *command, **kwargs, &block)
       @node.call_primary(method, *command, **kwargs, &block).sum
     rescue RedisClient::Cluster::CommandErrorCollection => e
-      raise if e.errors.values.map(&:message).grep(/ERR WAIT cannot be used with replica instances/).size.zero?
-
-      update_cluster_info!
-      retry_count -= 1
-      retry
+      update_cluster_info! unless e.errors.values.map(&:message).grep(/ERR WAIT cannot be used with replica instances/).empty?
+      raise
     end
 
     def send_config_command(method, *command, **kwargs, &block)
@@ -277,18 +277,16 @@ class RedisClient
 
     # @see https://redis.io/topics/cluster-spec#redirection-and-resharding
     #   Redirection and resharding
-    def try_send(node, method, *args, retry_count: 3, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    def try_send(node, method, *args, retry_count: 3, **kwargs, &block) # rubocop:disable Metrics/MethodLength
       node.send(method, *args, **kwargs, &block)
     rescue ::RedisClient::CommandError => e
-      if e.message.start_with?(REPLY_MOVED)
-        raise if retry_count <= 0
+      raise if retry_count <= 0
 
+      if e.message.start_with?(REPLY_MOVED)
         node = assign_redirection_node(e.message)
         retry_count -= 1
         retry
       elsif e.message.start_with?(REPLY_ASK)
-        raise if retry_count <= 0
-
         node = assign_asking_node(e.message)
         node.call(CMD_ASKING)
         retry_count -= 1
@@ -358,13 +356,16 @@ class RedisClient
       end
     end
 
-    def find_node(node_key)
+    def find_node(node_key, retry_count: 3)
       return @node.sample if node_key.nil?
 
       @node.find_by(node_key)
     rescue ::RedisClient::Cluster::Node::ReloadNeeded
+      raise(::RedisClient::ConnectionError, 'unstable cluster state') if retry_count <= 0
+
       update_cluster_info!(node_key)
-      @node.find_by(node_key)
+      retry_count -= 1
+      retry
     end
 
     def update_cluster_info!(node_key = nil)

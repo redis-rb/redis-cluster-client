@@ -2,7 +2,7 @@
 
 require 'testing_helper'
 
-class TestFailover < TestingWrapper
+class TestAgainstClusterState < TestingWrapper
   SLOT_SIZE = 16_384
 
   module Mixin

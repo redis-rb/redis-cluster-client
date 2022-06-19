@@ -140,6 +140,8 @@ class ClusterController
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       info = hashify_cluster_info(client)
       info['cluster_known_nodes'].to_s == clients.size.to_s
+    rescue ::RedisClient::ConnectionError
+      true
     end
   end
 
@@ -175,6 +177,8 @@ class ClusterController
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       info = hashify_cluster_info(client)
       info['cluster_state'] == 'ok'
+    rescue ::RedisClient::ConnectionError
+      true
     end
   end
 
@@ -182,6 +186,8 @@ class ClusterController
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       flags = hashify_cluster_node_flags(clients, client: client)
       flags.values.count { |f| f == 'slave' } == number_of_replicas
+    rescue ::RedisClient::ConnectionError
+      true
     end
   end
 
@@ -189,6 +195,8 @@ class ClusterController
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       flags = hashify_cluster_node_flags(clients, client: client)
       flags[master_key] == 'slave' && flags[slave_key] == 'master'
+    rescue ::RedisClient::ConnectionError
+      true
     end
   end
 
@@ -196,6 +204,8 @@ class ClusterController
     timeout_msec = timeout.to_i * 1000
     wait_for_state(clients, max_attempts: clients.size + 1) do |client|
       client.blocking_call(timeout, 'WAIT', @replica_size, timeout_msec - 100) if client.call('ROLE').first == 'master'
+      true
+    rescue ::RedisClient::ConnectionError
       true
     end
   end
@@ -214,6 +224,8 @@ class ClusterController
       else
         true
       end
+    rescue ::RedisClient::ConnectionError
+      true
     end
   end
 
@@ -241,9 +253,13 @@ class ClusterController
       .to_h { |arr| [id2key[arr[0]], (arr[2].split(',') & %w[master slave]).first] }
   end
 
-  def hashify_node_map(clients, client: nil)
+  def hashify_node_map(clients)
     id2key = fetch_internal_id_to_node_key_mappings(clients)
-    fetch_cluster_nodes(client || clients.first).to_h { |arr| [id2key[arr[0]], arr[0]] }
+    clients.each do |client|
+      return fetch_cluster_nodes(client).to_h { |arr| [id2key[arr[0]], arr[0]] }
+    rescue ::RedisClient::ConnectionError
+      next
+    end
   end
 
   def fetch_internal_id_by_natted_node_key(client, node_key)

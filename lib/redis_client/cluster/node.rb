@@ -171,6 +171,12 @@ class RedisClient
         @mutex.synchronize { @slots[slot] = node_key }
       end
 
+      def replicated?(primary_node_key, replica_node_key)
+        return false if @replications.nil? || @replications.size.zero?
+
+        @replications.fetch(primary_node_key).include?(replica_node_key)
+      end
+
       private
 
       def replica_disabled?
@@ -182,7 +188,9 @@ class RedisClient
       end
 
       def replica?(node_key)
-        !(@replications.nil? || @replications.size.zero?) && !@replications.key?(node_key)
+        return false if @replications.nil? || @replications.size.zero?
+
+        !@replications.key?(node_key)
       end
 
       def build_slot_node_mappings(node_info)
@@ -196,11 +204,12 @@ class RedisClient
         slots
       end
 
-      def build_replication_mappings(node_info)
+      def build_replication_mappings(node_info) # rubocop:disable Metrics/AbcSize
         dict = node_info.to_h { |info| [info[:id], info] }
         node_info.each_with_object(Hash.new { |h, k| h[k] = [] }) do |info, acc|
           primary_info = dict[info[:primary_id]]
           acc[primary_info[:node_key]] << info[:node_key] unless primary_info.nil?
+          acc[info[:node_key]] if info[:role] == 'master' # for the primary which have no replicas
         end
       end
 

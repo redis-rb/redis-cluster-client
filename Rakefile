@@ -7,7 +7,7 @@ task default: :test
 Rake::TestTask.new :test do |t|
   t.libs << :test
   t.libs << :lib
-  files = Dir['test/**/test_*.rb'].grep_v(/test_against_cluster_state/)
+  files = Dir['test/**/test_*.rb'].grep_v(/test_against_cluster_(state|broken)/)
   files = ARGV[1..] if ARGV.size > 1
   t.test_files = files
   t.options = '-v'
@@ -17,6 +17,13 @@ Rake::TestTask.new :test_cluster_state do |t|
   t.libs << :test
   t.libs << :lib
   t.test_files = %w[test/test_against_cluster_state.rb]
+  t.options = '-v'
+end
+
+Rake::TestTask.new :test_cluster_broken do |t|
+  t.libs << :test
+  t.libs << :lib
+  t.test_files = %w[test/test_against_cluster_broken.rb]
   t.options = '-v'
 end
 

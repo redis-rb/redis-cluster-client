@@ -283,6 +283,13 @@ class RedisClient
         assert_equal(another_node_key, @test_node.find_node_key_of_primary(sample_slot))
       end
 
+      def test_replicated?
+        @test_node_info.select { |info| info[:role] == 'slave' }.each do |replica_info|
+          primary_info = @test_node_info.find { |info| info[:id] == replica_info[:primary_id] }
+          assert(@test_node.replicated?(primary_info[:node_key], replica_info[:node_key]))
+        end
+      end
+
       def test_replica_disabled?
         assert(@test_node.send(:replica_disabled?))
         refute(@test_node_with_scale_read.send(:replica_disabled?))
@@ -331,6 +338,7 @@ class RedisClient
         node_key7 = '127.0.0.1:7007'
         node_key8 = '127.0.0.1:7008'
         node_key9 = '127.0.0.1:7009'
+
         node_info = [
           { id: '1', node_key: node_key1, primary_id: '-' },
           { id: '2', node_key: node_key2, primary_id: '-' },
@@ -344,12 +352,26 @@ class RedisClient
         ]
         got = @test_node.send(:build_replication_mappings, node_info)
         got.transform_values!(&:sort!)
-        assert_same(node_key4, got[node_key1][0])
-        assert_same(node_key7, got[node_key1][1])
-        assert_same(node_key5, got[node_key2][0])
-        assert_same(node_key8, got[node_key2][1])
-        assert_same(node_key6, got[node_key3][0])
-        assert_same(node_key9, got[node_key3][1])
+        assert_same(node_key4, got[node_key1][0], 'Case: regular')
+        assert_same(node_key7, got[node_key1][1], 'Case: regular')
+        assert_same(node_key5, got[node_key2][0], 'Case: regular')
+        assert_same(node_key8, got[node_key2][1], 'Case: regular')
+        assert_same(node_key6, got[node_key3][0], 'Case: regular')
+        assert_same(node_key9, got[node_key3][1], 'Case: regular')
+
+        node_info = [
+          { id: '1', role: 'master', node_key: node_key1, primary_id: '-' },
+          { id: '3', role: 'master', node_key: node_key3, primary_id: '-' },
+          { id: '4', role: 'slave', node_key: node_key4, primary_id: '1' },
+          { id: '5', role: 'master', node_key: node_key5, primary_id: '-' },
+          { id: '6', role: 'slave', node_key: node_key6, primary_id: '3' }
+        ]
+        got = @test_node.send(:build_replication_mappings, node_info)
+        got.transform_values!(&:sort!)
+        assert_equal(3, got.size, 'Case: lack of replica')
+        assert_same(node_key4, got[node_key1][0], 'Case: lack of replica')
+        assert_same(node_key6, got[node_key3][0], 'Case: lack of replica')
+        assert_empty(got[node_key5], 'Case: lack of replica')
       end
 
       def test_build_clients # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
