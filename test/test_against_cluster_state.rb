@@ -37,30 +37,29 @@ class TestAgainstClusterState < TestingWrapper
     end
 
     def test_the_state_of_cluster_resharding
-      @client.pipelined { |pipeline| 10_000.times { |i| pipeline.call('SET', "{key}#{i}", i) } }
-      wait_for_replication
-
-      slot = SLOT_SIZE.times.max_by { |i| @client.call('CLUSTER', 'COUNTKEYSINSLOT', i) }
-      src = @client.instance_variable_get(:@node).find_node_key_of_primary(slot)
-      dest = @client.instance_variable_get(:@node).primary_node_keys.reject { |k| k == src }.sample
-
-      @controller.start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
-      10_000.times { |i| assert_equal(i.to_s, @client.call('GET', "{key}#{i}"), "Case: GET: #{i}") }
-      @controller.finish_resharding(slot: slot, dest_node_key: dest)
+      do_resharding_test do |keys|
+        keys.each do |key|
+          want = key
+          got = @client.call('GET', key)
+          assert_equal(want, got, "Case: GET: #{key}")
+        end
+      end
     end
 
     def test_the_state_of_cluster_resharding_with_pipelining
       skip('TODO: https://github.com/redis-rb/redis-cluster-client/issues/37')
-      @client.pipelined { |pipeline| 100_000.times { |i| pipeline.call('SET', "{key}#{i}", i) } }
 
-      slot = SLOT_SIZE.times.max_by { |i| @client.call('CLUSTER', 'COUNTKEYSINSLOT', i) }
-      src = @client.instance_variable_get(:@node).find_node_key_of_primary(slot)
-      dest = @client.instance_variable_get(:@node).primary_node_keys.reject { |k| k == src }.sample
+      do_resharding_test do |keys|
+        values = @client.pipelined do |pipeline|
+          keys.each { |key| pipeline.call('GET', key) }
+        end
 
-      @controller.start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
-      values = @client.pipelined { |pipeline| 100_000.times { |i| pipeline.call('GET', "{key}#{i}") } }
-      100_000.times { |i| assert_equal(i.to_s, values[i], "Case: GET: #{i}") }
-      @controller.finish_resharding(slot: slot, dest_node_key: dest)
+        keys.each_with_index do |key, i|
+          want = key
+          got = values[i]
+          assert_equal(want, got, "Case: GET: #{key}")
+        end
+      end
     end
 
     private
@@ -71,6 +70,22 @@ class TestAgainstClusterState < TestingWrapper
 
     def fetch_cluster_info(key)
       @client.call('CLUSTER', 'INFO').split("\r\n").to_h { |v| v.split(':') }.fetch(key)
+    end
+
+    def do_resharding_test(number_of_keys: 1000)
+      @client.pipelined { |pipeline| number_of_keys.times { |i| pipeline.call('SET', "key#{i}", "key#{i}") } }
+      wait_for_replication
+      count, slot = @client.pipelined { |pi| SLOT_SIZE.times { |i| pi.call('CLUSTER', 'COUNTKEYSINSLOT', i) } }
+                           .each_with_index.max_by { |c, _| c }
+      refute_equal(0, count)
+      keys = @client.call('CLUSTER', 'GETKEYSINSLOT', slot, count)
+      refute_empty(keys)
+      src = @client.instance_variable_get(:@node).find_node_key_of_primary(slot)
+      dest = @client.instance_variable_get(:@node).primary_node_keys.reject { |k| k == src }.sample
+      @controller.start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+      wait_for_replication
+      yield(keys)
+      @controller.finish_resharding(slot: slot, dest_node_key: dest)
     end
   end
 

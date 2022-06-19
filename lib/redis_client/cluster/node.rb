@@ -118,7 +118,7 @@ class RedisClient
         try_map { |_, client| client.send(method, *command, **kwargs, &block) }.values
       end
 
-      def call_primary(method, *command, **kwargs, &block)
+      def call_primaries(method, *command, **kwargs, &block)
         try_map do |node_key, client|
           next if replica?(node_key)
 
@@ -126,8 +126,8 @@ class RedisClient
         end.values
       end
 
-      def call_replica(method, *command, **kwargs, &block)
-        return call_primary(method, *command, **kwargs, &block) if replica_disabled?
+      def call_replicas(method, *command, **kwargs, &block)
+        return call_primaries(method, *command, **kwargs, &block) if replica_disabled?
 
         replica_node_keys = @replications.values.map(&:sample)
         try_map do |node_key, client|
@@ -228,14 +228,14 @@ class RedisClient
       end
 
       def try_map # rubocop:disable Metrics/MethodLength
-        errors = {}
         results = {}
+        errors = {}
         threads = @clients.map do |k, v|
           Thread.new(k, v) do |node_key, client|
             Thread.pass
             reply = yield(node_key, client)
             results[node_key] = reply unless reply.nil?
-          rescue ::RedisClient::CommandError => e
+          rescue ::RedisClient::Error => e
             errors[node_key] = e
           end
         end
@@ -243,7 +243,7 @@ class RedisClient
         threads.each(&:join)
         return results if errors.empty?
 
-        raise ::RedisClient::Cluster::CommandErrorCollection, errors
+        raise ::RedisClient::Cluster::ErrorCollection, errors
       end
     end
   end

@@ -220,19 +220,19 @@ class RedisClient
         assert_equal(want, got, 'Case: scale read')
       end
 
-      def test_call_primary
+      def test_call_primaries
         want = (1..(@test_node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
-        got = @test_node.call_primary(:call, 'PING')
+        got = @test_node.call_primaries(:call, 'PING')
         assert_equal(want, got)
       end
 
-      def test_call_replica
+      def test_call_replicas
         want = (1..(@test_node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
 
-        got = @test_node.call_replica(:call, 'PING')
+        got = @test_node.call_replicas(:call, 'PING')
         assert_equal(want, got, 'Case: primary only')
 
-        got = @test_node_with_scale_read.call_replica(:call, 'PING')
+        got = @test_node_with_scale_read.call_replicas(:call, 'PING')
         assert_equal(want, got, 'Case: scale read')
       end
 
@@ -408,7 +408,7 @@ class RedisClient
         primary_node_keys = @test_node_info.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
         [
           { block: ->(_, client) { client.call('PING') }, want: primary_node_keys.to_h { |k| [k, 'PONG'] } },
-          { block: ->(_, client) { client.call('UNKNOWN') }, error: ::RedisClient::Cluster::CommandErrorCollection }
+          { block: ->(_, client) { client.call('UNKNOWN') }, error: ::RedisClient::Cluster::ErrorCollection }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
           got = -> { @test_node.send(:try_map, &c[:block]) }

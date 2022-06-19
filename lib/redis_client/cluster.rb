@@ -40,9 +40,10 @@ class RedisClient
         @size.zero?
       end
 
-      # TODO: https://github.com/redis-rb/redis-cluster-client/issues/37
-      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+      # TODO: https://github.com/redis-rb/redis-cluster-client/issues/37 handle redirections
+      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
         all_replies = Array.new(@size)
+        errors = {}
         threads = @grouped.map do |k, v|
           Thread.new(@client, k, v) do |client, node_key, rows|
             Thread.pass
@@ -60,11 +61,15 @@ class RedisClient
             raise ReplySizeError, "commands: #{rows.size}, replies: #{replies.size}" if rows.size != replies.size
 
             rows.each_with_index { |row, idx| all_replies[row.first] = replies[idx] }
+          rescue ::RedisClient::Error => e
+            errors[node_key] = e
           end
         end
 
         threads.each(&:join)
-        all_replies
+        return all_replies if errors.empty?
+
+        raise ::RedisClient::Cluster::ErrorCollection, errors
       end
     end
 
@@ -185,10 +190,10 @@ class RedisClient
       when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save', 'ping'
         @node.call_all(method, *command, **kwargs, &block).first
       when 'flushall', 'flushdb'
-        @node.call_primary(method, *command, **kwargs, &block).first
+        @node.call_primaries(method, *command, **kwargs, &block).first
       when 'wait'     then send_wait_command(method, *command, **kwargs, &block)
-      when 'keys'     then @node.call_replica(method, *command, **kwargs, &block).flatten.sort
-      when 'dbsize'   then @node.call_replica(method, *command, **kwargs, &block).sum
+      when 'keys'     then @node.call_replicas(method, *command, **kwargs, &block).flatten.sort
+      when 'dbsize'   then @node.call_replicas(method, *command, **kwargs, &block).sum
       when 'scan'     then _scan(*command, **kwargs)
       when 'lastsave' then @node.call_all(method, *command, **kwargs, &block).sort
       when 'role'     then @node.call_all(method, *command, **kwargs, &block)
@@ -206,14 +211,14 @@ class RedisClient
         node = assign_node(*command)
         try_send(node, method, *command, **kwargs, &block)
       end
-    rescue RedisClient::Cluster::CommandErrorCollection => e
+    rescue RedisClient::Cluster::ErrorCollection => e
       update_cluster_info! if e.errors.values.map(&:class).any?(::RedisClient::ConnectionError)
       raise
     end
 
     def send_wait_command(method, *command, retry_count: 3, **kwargs, &block)
-      @node.call_primary(method, *command, **kwargs, &block).sum
-    rescue RedisClient::Cluster::CommandErrorCollection => e
+      @node.call_primaries(method, *command, **kwargs, &block).sum
+    rescue RedisClient::Cluster::ErrorCollection => e
       raise if retry_count <= 0 || e.errors.values.map(&:message).grep(/ERR WAIT cannot be used with replica instances/).empty?
 
       update_cluster_info!
@@ -246,13 +251,17 @@ class RedisClient
       end
     end
 
-    def send_cluster_command(method, *command, **kwargs, &block)
+    def send_cluster_command(method, *command, **kwargs, &block) # rubocop:disable Metrics/MethodLength
       subcommand = command[1].to_s.downcase
       case subcommand
       when 'addslots', 'delslots', 'failover', 'forget', 'meet', 'replicate',
            'reset', 'set-config-epoch', 'setslot'
         raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, ['cluster', subcommand]
       when 'saveconfig' then @node.call_all(method, *command, **kwargs, &block).first
+      when 'getkeysinslot'
+        raise ArgumentError, command.join(' ') if command.size != 4
+
+        find_node(@node.find_node_key_of_replica(command[2])).send(method, *command, **kwargs, &block)
       else assign_node(*command).send(method, *command, **kwargs, &block)
       end
     end
@@ -262,7 +271,7 @@ class RedisClient
       when 'debug', 'kill'
         @node.call_all(method, *command, **kwargs, &block).first
       when 'flush', 'load'
-        @node.call_primary(method, *command, **kwargs, &block).first
+        @node.call_primaries(method, *command, **kwargs, &block).first
       else assign_node(*command).send(method, *command, **kwargs, &block)
       end
     end
