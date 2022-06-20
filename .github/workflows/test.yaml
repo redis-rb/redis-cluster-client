@@ -4,14 +4,16 @@
 # Services feature of GitHub Actions isn't fit for our purposes for testing.
 # We cannot overwrite arguments of ENTRYPOINT.
 # @see https://docs.docker.com/engine/reference/commandline/create/#options
+#
+# @see https://github.community/t/how-to-trigger-an-action-on-push-or-pull-request-but-not-both/16662
 name: Test
 on:
   push:
     branches:
-      - '*'
+      - master
   pull_request:
     branches:
-      - '*'
+      - master
 jobs:
   lint:
     name: Lint
