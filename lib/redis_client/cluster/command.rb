@@ -68,12 +68,14 @@ class RedisClient
         @details.fetch(name).fetch(key)
       end
 
-      def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity
+      def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength
         case command&.flatten&.first.to_s.downcase
-        when 'eval', 'evalsha', 'migrate', 'zinterstore', 'zunionstore' then 3
+        when 'eval', 'evalsha', 'zinterstore', 'zunionstore' then 3
         when 'object' then 2
         when 'memory'
           command[1].to_s.casecmp('usage').zero? ? 2 : 0
+        when 'migrate'
+          command[3] == '""' ? determine_optional_key_position(command, 'keys') : 3
         when 'xread', 'xreadgroup'
           determine_optional_key_position(command, 'streams')
         else

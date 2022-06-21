@@ -39,7 +39,7 @@ RedisClient.cluster(timeout: 3.0).new_client
 ```
 
 ```ruby
-# To connect with subset nodes for startup
+# To connect with a subset of nodes for startup
 RedisClient.cluster(nodes: %w[redis://node1:6379 redis://node2:6379]).new_client
 ```
 
@@ -70,7 +70,7 @@ The other methods are not implemented because the client cannot operate with clu
 `#pipelined` method splits and sends commands to each node and aggregates replies.
 
 ## Multiple keys and CROSSSLOT error
-A part of commands can be passed multiple keys. But it has a constraint the keys are in the same hash slot.
+A subset of commands can be passed multiple keys. But it has a constraint the keys are in the same hash slot.
 The following error occurs because keys must be in the same hash slot and not just the same node.
 
 ```ruby
