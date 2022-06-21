@@ -17,10 +17,6 @@ class RedisClient
         @client&.close
       end
 
-      def wait_for_replication
-        @client.call('WAIT', TEST_REPLICA_SIZE, (TEST_TIMEOUT_SEC * 1000).to_i)
-      end
-
       def test_inspect
         assert_match(/^#<RedisClient::Cluster [0-9., :]*>$/, @client.inspect)
       end
@@ -142,6 +138,7 @@ class RedisClient
 
       def test_dedicated_commands
         (0..9).each { |i| @client.call('SET', "key#{i}", i) }
+        wait_for_replication
         [
           { command: %w[ACL HELP], is_a: Array },
           { command: ['WAIT', TEST_REPLICA_SIZE, '1'], want: TEST_NUMBER_OF_REPLICAS },
@@ -157,6 +154,7 @@ class RedisClient
           { command: %w[CLIENT INFO], is_a: String },
           { command: %w[CLUSTER SET-CONFIG-EPOCH 0], error: ::RedisClient::Cluster::OrchestrationCommandNotSupported },
           { command: %w[CLUSTER SAVECONFIG], want: 'OK' },
+          { command: %w[CLUSTER GETKEYSINSLOT 13252 1], want: %w[key0] },
           { command: %w[CLUSTER NODES], is_a: String },
           { command: %w[READONLY], error: ::RedisClient::Cluster::OrchestrationCommandNotSupported },
           { command: %w[MEMORY STATS], is_a: Array },
@@ -182,6 +180,12 @@ class RedisClient
             assert_equal(c[:want], got.call, msg)
           end
         end
+      end
+
+      private
+
+      def wait_for_replication
+        @client.call('WAIT', TEST_REPLICA_SIZE, (TEST_TIMEOUT_SEC * 1000).to_i)
       end
     end
 

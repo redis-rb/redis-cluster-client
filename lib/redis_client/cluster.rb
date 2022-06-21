@@ -170,8 +170,10 @@ class RedisClient
     end
 
     def close
-      @node.each(&:close)
+      @node.call_all(:close)
       nil
+    rescue StandardError
+      # ignore
     end
 
     private
@@ -353,44 +355,30 @@ class RedisClient
       find_node(node_key)
     end
 
-    def find_node_key(*command, primary_only: false) # rubocop:disable Metrics/MethodLength
+    def find_node_key(*command, primary_only: false)
       key = @command.extract_first_key(command)
-      if key.empty?
-        return @node.primary_node_keys.sample if @command.should_send_to_primary?(command) || primary_only
-
-        return @node.replica_node_keys.sample
-      end
-
-      slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
-      return unless @node.slot_exists?(slot)
+      slot = key.empty? ? nil : ::RedisClient::Cluster::KeySlotConverter.convert(key)
 
       if @command.should_send_to_primary?(command) || primary_only
-        @node.find_node_key_of_primary(slot)
+        @node.find_node_key_of_primary(slot) || @node.primary_node_keys.sample
       else
-        @node.find_node_key_of_replica(slot)
+        @node.find_node_key_of_replica(slot) || @node.replica_node_keys.sample
       end
     end
 
     def find_node(node_key, retry_count: 3)
-      return @node.sample if node_key.nil?
-
       @node.find_by(node_key)
     rescue ::RedisClient::Cluster::Node::ReloadNeeded
       raise(::RedisClient::ConnectionError, 'unstable cluster state') if retry_count <= 0
 
-      update_cluster_info!(node_key)
+      update_cluster_info!
       retry_count -= 1
       retry
     end
 
-    def update_cluster_info!(node_key = nil)
+    def update_cluster_info!
       @mutex.synchronize do
-        unless node_key.nil?
-          host, port = ::RedisClient::Cluster::NodeKey.split(node_key)
-          @config.add_node(host, port)
-        end
-
-        @node.each(&:close)
+        close
         @node = fetch_cluster_info!(@config, pool: @pool, **@client_kwargs)
       end
     end

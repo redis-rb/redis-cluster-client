@@ -19,6 +19,13 @@ class RedisClient
           got = ::RedisClient::Cluster::KeySlotConverter.convert(key)
           assert_equal(want, got, "Case: #{idx}")
         end
+
+        assert_nil(::RedisClient::Cluster::KeySlotConverter.convert(nil), 'Case: nil')
+
+        multi_byte_key = 'あいうえお'
+        want = @raw_clients.first.call('CLUSTER', 'KEYSLOT', multi_byte_key)
+        got = ::RedisClient::Cluster::KeySlotConverter.convert(multi_byte_key)
+        assert_equal(want, got, "Case: #{multi_byte_key}")
       end
     end
   end

@@ -12,6 +12,7 @@ class RedisClient
       SLOT_SIZE = 16_384
       MIN_SLOT = 0
       MAX_SLOT = SLOT_SIZE - 1
+      MAX_STARTUP_SAMPLE = 37
       IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
 
       ReloadNeeded = Class.new(::RedisClient::Error)
@@ -32,19 +33,33 @@ class RedisClient
       end
 
       class << self
-        def load_info(options, **kwargs)
-          startup_nodes = ::RedisClient::Cluster::Node.new(options, **kwargs)
+        def load_info(options, **kwargs) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+          startup_size = options.size > MAX_STARTUP_SAMPLE ? MAX_STARTUP_SAMPLE : options.size
+          node_info_list = Array.new(startup_size)
+          errors = Array.new(startup_size)
+          startup_options = options.to_a.sample(MAX_STARTUP_SAMPLE).to_h
+          startup_nodes = ::RedisClient::Cluster::Node.new(startup_options, **kwargs)
+          threads = startup_nodes.each_with_index.map do |raw_client, idx|
+            Thread.new(raw_client, idx) do |cli, i|
+              Thread.pass
+              reply = cli.call('CLUSTER', 'NODES')
+              node_info_list[i] = parse_node_info(reply)
+            rescue StandardError => e
+              errors[i] = e
+            ensure
+              cli&.close
+            end
+          end
+          threads.each(&:join)
+          raise ::RedisClient::Cluster::InitialSetupError, errors if node_info_list.all?(&:nil?)
 
-          errors = startup_nodes.map do |n|
-            reply = n.call('CLUSTER', 'NODES')
-            return parse_node_info(reply)
-          rescue ::RedisClient::ConnectionError, ::RedisClient::CommandError => e
-            e
+          grouped = node_info_list.compact.group_by do |rows|
+            rows.sort_by { |row| row[:id] }
+                .map { |r| "#{r[:id]}#{r[:node_key]}#{r[:role]}#{r[:primary_id]}#{r[:config_epoch]}" }
+                .join
           end
 
-          raise ::RedisClient::Cluster::InitialSetupError, errors
-        ensure
-          startup_nodes&.each(&:close)
+          grouped.max_by { |_, v| v.size }[1].first
         end
 
         private
@@ -109,9 +124,9 @@ class RedisClient
       end
 
       def find_by(node_key)
+        raise ReloadNeeded if node_key.nil? || !@clients.key?(node_key)
+
         @clients.fetch(node_key)
-      rescue KeyError
-        raise ReloadNeeded
       end
 
       def call_all(method, *command, **kwargs, &block)
@@ -144,14 +159,9 @@ class RedisClient
         end
       end
 
-      def slot_exists?(slot)
-        slot = Integer(slot)
-        return false if slot < MIN_SLOT || slot > MAX_SLOT
-
-        !@slots[slot].nil?
-      end
-
       def find_node_key_of_primary(slot)
+        return if slot.nil?
+
         slot = Integer(slot)
         return if slot < MIN_SLOT || slot > MAX_SLOT
 
@@ -159,6 +169,8 @@ class RedisClient
       end
 
       def find_node_key_of_replica(slot)
+        return if slot.nil?
+
         slot = Integer(slot)
         return if slot < MIN_SLOT || slot > MAX_SLOT
 

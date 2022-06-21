@@ -43,6 +43,8 @@ class RedisClient
       module_function
 
       def convert(key)
+        return nil if key.nil?
+
         crc = 0
         key.each_byte do |b|
           crc = ((crc << 8) & 0xffff) ^ XMODEM_CRC16_LOOKUP[((crc >> 8) ^ b) & 0xff]

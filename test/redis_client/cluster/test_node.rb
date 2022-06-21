@@ -246,19 +246,12 @@ class RedisClient
         got.each { |e| assert_includes(want, e, 'Case: scale read') }
       end
 
-      def test_slot_exists?
-        refute(@test_node.slot_exists?(-1))
-        assert(@test_node.slot_exists?(0))
-        assert(@test_node.slot_exists?(16_383))
-        refute(@test_node.slot_exists?(16_384))
-        assert_raises(TypeError) { @test_node.slot_exists?(:foo) }
-      end
-
       def test_find_node_key_of_primary
         sample_node = @test_node_info.find { |info| info[:role] == 'master' }
         sample_slot = sample_node[:slots].first.first
         got = @test_node.find_node_key_of_primary(sample_slot)
-        assert_equal(sample_node[:node_key], got)
+        assert_equal(sample_node[:node_key], got, 'Case: sample slot')
+        assert_nil(@test_node.find_node_key_of_primary(nil), 'Case: nil')
       end
 
       def test_find_node_key_of_replica
@@ -273,6 +266,8 @@ class RedisClient
         got = @test_node_with_scale_read.find_node_key_of_replica(sample_slot)
         want = sample_replicas.map { |info| info[:node_key] }
         assert_includes(want, got, 'Case: scale read')
+
+        assert_nil(@test_node.find_node_key_of_replica(nil), 'Case: nil')
       end
 
       def test_update_slot
