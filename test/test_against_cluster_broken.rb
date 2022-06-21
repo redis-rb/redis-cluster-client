@@ -55,9 +55,7 @@ class TestAgainstClusterBroken < TestingWrapper
     node_key = @node_info.select { |e| e[:role] == role }.sample.fetch(:node_key)
     node = @client.send(:find_node, node_key)
     refute_nil(node, node_key)
-    node.call('SHUTDOWN', 'NOSAVE', 'NOW', 'FORCE')
-  rescue ::RedisClient::Error => e
-    p "\n#{e.class.name}: #{e.message}\n"
+    assert_raises(::RedisClient::ConnectionError) { node.call('SHUTDOWN', 'NOSAVE') }
   end
 
   def wait_for_cluster_to_be_ready(wait_attempts: 10)
