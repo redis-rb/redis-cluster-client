@@ -189,10 +189,11 @@ class RedisClient
     def send_command(method, *command, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
       cmd = command.first.to_s.downcase
       case cmd
-      when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save', 'ping'
+      when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save'
         @node.call_all(method, *command, **kwargs, &block).first
       when 'flushall', 'flushdb'
         @node.call_primaries(method, *command, **kwargs, &block).first
+      when 'ping'     then @node.send_ping(method, *command, **kwargs, &block).first
       when 'wait'     then send_wait_command(method, *command, **kwargs, &block)
       when 'keys'     then @node.call_replicas(method, *command, **kwargs, &block).flatten.sort
       when 'dbsize'   then @node.call_replicas(method, *command, **kwargs, &block).sum
@@ -213,15 +214,18 @@ class RedisClient
         node = assign_node(*command)
         try_send(node, method, *command, **kwargs, &block)
       end
-    rescue RedisClient::Cluster::ErrorCollection => e
-      update_cluster_info! if e.errors.values.map(&:class).any?(::RedisClient::ConnectionError)
-      raise
+    rescue RedisClient::Cluster::Node::ReloadNeeded
+      update_cluster_info!
+      raise ::RedisClient::Cluster::NodeMightBeDown
     end
 
     def send_wait_command(method, *command, retry_count: 3, **kwargs, &block)
       @node.call_primaries(method, *command, **kwargs, &block).sum
     rescue RedisClient::Cluster::ErrorCollection => e
-      raise if retry_count <= 0 || e.errors.values.map(&:message).grep(/WAIT cannot be used with replica instances/).empty?
+      raise if retry_count <= 0
+      raise if e.errors.values.none? do |err|
+        err.message.include?('WAIT cannot be used with replica instances')
+      end
 
       update_cluster_info!
       retry_count -= 1
@@ -369,7 +373,7 @@ class RedisClient
     def find_node(node_key, retry_count: 3)
       @node.find_by(node_key)
     rescue ::RedisClient::Cluster::Node::ReloadNeeded
-      raise(::RedisClient::ConnectionError, 'unstable cluster state') if retry_count <= 0
+      raise ::RedieClient::Cluster::NodeMightBeDown if retry_count <= 0
 
       update_cluster_info!
       retry_count -= 1

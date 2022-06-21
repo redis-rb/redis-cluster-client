@@ -402,15 +402,15 @@ class RedisClient
       def test_try_map
         primary_node_keys = @test_node_info.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
         [
-          { block: ->(_, client) { client.call('PING') }, want: primary_node_keys.to_h { |k| [k, 'PONG'] } },
-          { block: ->(_, client) { client.call('UNKNOWN') }, error: ::RedisClient::Cluster::ErrorCollection }
+          { block: ->(_, client) { client.call('PING') }, results: primary_node_keys.to_h { |k| [k, 'PONG'] } },
+          { block: ->(_, client) { client.call('UNKNOWN') }, errors: ::RedisClient::CommandError }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
-          got = -> { @test_node.send(:try_map, &c[:block]) }
-          if c.key?(:error)
-            assert_raises(c[:error], msg, &got)
+          results, errors = @test_node.send(:try_map, &c[:block])
+          if c.key?(:errors)
+            errors.each_value { |e| assert_instance_of(c[:errors], e, msg) }
           else
-            assert_equal(c[:want], got.call, msg)
+            assert_equal(c[:results], results, msg)
           end
         end
       end

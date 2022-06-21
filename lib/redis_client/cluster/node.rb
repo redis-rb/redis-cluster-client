@@ -130,26 +130,52 @@ class RedisClient
       end
 
       def call_all(method, *command, **kwargs, &block)
-        try_map { |_, client| client.send(method, *command, **kwargs, &block) }.values
+        results, errors = try_map do |_, client|
+          client.send(method, *command, **kwargs, &block)
+        end
+
+        return results.values if errors.empty?
+
+        raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
       def call_primaries(method, *command, **kwargs, &block)
-        try_map do |node_key, client|
+        results, errors = try_map do |node_key, client|
           next if replica?(node_key)
 
           client.send(method, *command, **kwargs, &block)
-        end.values
+        end
+
+        return results.values if errors.empty?
+
+        raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
       def call_replicas(method, *command, **kwargs, &block)
         return call_primaries(method, *command, **kwargs, &block) if replica_disabled?
 
         replica_node_keys = @replications.values.map(&:sample)
-        try_map do |node_key, client|
+        results, errors = try_map do |node_key, client|
           next if primary?(node_key) || !replica_node_keys.include?(node_key)
 
           client.send(method, *command, **kwargs, &block)
-        end.values
+        end
+
+        return results.values if errors.empty?
+
+        raise ::RedisClient::Cluster::ErrorCollection, errors
+      end
+
+      def send_ping(method, *command, **kwargs, &block)
+        results, errors = try_map do |_, client|
+          client.send(method, *command, **kwargs, &block)
+        end
+
+        return results.values if errors.empty?
+
+        raise ReloadNeeded if errors.values.any?(::RedisClient::ConnectionError)
+
+        raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
       def scale_reading_clients
@@ -253,9 +279,7 @@ class RedisClient
         end
 
         threads.each(&:join)
-        return results if errors.empty?
-
-        raise ::RedisClient::Cluster::ErrorCollection, errors
+        [results, errors]
       end
     end
   end

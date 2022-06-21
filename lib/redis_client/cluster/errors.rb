@@ -51,5 +51,15 @@ class RedisClient
         super("Cluster client doesn't know which node the #{command} command should be sent to.")
       end
     end
+
+    class NodeMightBeDown < ::RedisClient::Error
+      def initialize(_ = '')
+        super(
+          'The client is trying to fetch the latest cluster state '\
+          'because a subset of nodes might be down. '\
+          'It might continue to raise errors for a while.'
+        )
+      end
+    end
   end
 end
