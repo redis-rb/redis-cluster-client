@@ -219,7 +219,7 @@ class RedisClient
     def send_wait_command(method, *command, retry_count: 3, **kwargs, &block)
       @node.call_primaries(method, *command, **kwargs, &block).sum
     rescue RedisClient::Cluster::ErrorCollection => e
-      raise if retry_count <= 0 || e.errors.values.map(&:message).grep(/ERR WAIT cannot be used with replica instances/).empty?
+      raise if retry_count <= 0 || e.errors.values.map(&:message).grep(/WAIT cannot be used with replica instances/).empty?
 
       update_cluster_info!
       retry_count -= 1

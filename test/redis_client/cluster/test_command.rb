@@ -176,6 +176,7 @@ class RedisClient
           { command: [['EVAL'], '"return ARGV[1]"', 0, 'hello'], want: 3 },
           { command: %w[EVALSHA sha1 2 foo bar baz zap], want: 3 },
           { command: %w[MIGRATE host port key 0 5 COPY], want: 3 },
+          { command: %w[MIGRATE host port "" 0 5 COPY KEYS key], want: 8 },
           { command: %w[ZINTERSTORE out 2 zset1 zset2 WEIGHTS 2 3], want: 3 },
           { command: %w[ZUNIONSTORE out 2 zset1 zset2 WEIGHTS 2 3], want: 3 },
           { command: %w[OBJECT HELP], want: 2 },
