@@ -43,7 +43,7 @@ class TestAgainstClusterBroken < TestingWrapper
     number_of_keys.times { |i| @client.pipelined { |pi| pi.call('SET', "pre-pipelined-#{i}", i) } }
     wait_for_replication
 
-    kill_a_node(role)
+    kill_a_node(role, kill_attempts: 10)
     wait_for_cluster_to_be_ready(wait_attempts: 10)
 
     assert_equal('PONG', @client.call('PING'), 'Case: PING')
@@ -51,13 +51,25 @@ class TestAgainstClusterBroken < TestingWrapper
     do_assertions_with_pipelining(number_of_keys: number_of_keys)
   end
 
-  def kill_a_node(role)
+  def kill_a_node(role, kill_attempts: 10)
     node_key = @node_info.select { |e| e[:role] == role }.sample.fetch(:node_key)
     node = @client.send(:find_node, node_key)
     refute_nil(node, node_key)
-    node.call('SHUTDOWN')
-  rescue ::RedisClient::ConnectionError
-    # ignore
+
+    loop do
+      break if kill_attempts <= 0
+
+      node.call('SHUTDOWN', 'NOSAVE')
+    rescue ::RedisClient::CommandError => e
+      raise unless e.message.include?('Errors trying to SHUTDOWN')
+    rescue ::RedisClient::ConnectionError
+      break
+    ensure
+      kill_attempts -= 1
+      sleep 3
+    end
+
+    assert_raises(::RedisClient::ConnectionError) { node.call('PING') }
   end
 
   def wait_for_cluster_to_be_ready(wait_attempts: 10)
