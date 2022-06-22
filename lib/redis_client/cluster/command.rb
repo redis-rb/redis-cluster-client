@@ -7,14 +7,20 @@ class RedisClient
   class Cluster
     class Command
       class << self
-        def load(nodes)
-          errors = nodes&.map do |node|
+        def load(nodes) # rubocop:disable Metrics/MethodLength
+          errors = []
+          cmd = nil
+          nodes&.each do |node|
+            break unless cmd.nil?
+
             reply = node.call('COMMAND')
             details = parse_command_details(reply)
-            return ::RedisClient::Cluster::Command.new(details)
-          rescue ::RedisClient::ConnectionError, ::RedisClient::CommandError => e
-            e
+            cmd = ::RedisClient::Cluster::Command.new(details)
+          rescue ::RedisClient::Error => e
+            errors << e
           end
+
+          return cmd unless cmd.nil?
 
           raise ::RedisClient::Cluster::InitialSetupError, errors
         end
