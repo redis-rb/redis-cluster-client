@@ -102,7 +102,7 @@ class RedisClient
       end
 
       def each(&block)
-        @clients.values.each(&block)
+        @clients.each_value(&block)
       end
 
       def sample
