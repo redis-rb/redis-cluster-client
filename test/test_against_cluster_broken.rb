@@ -3,9 +3,16 @@
 require 'testing_helper'
 
 class TestAgainstClusterBroken < TestingWrapper
+  WAIT_SEC = 3
+
   def setup
-    config = new_test_config
-    @node_info = ::RedisClient::Cluster::Node.load_info(config.per_node_key)
+    config = ::RedisClient::ClusterConfig.new(
+      nodes: TEST_NODE_URIS,
+      replica: true,
+      fixed_hostname: TEST_FIXED_HOSTNAME,
+      **TEST_GENERIC_OPTIONS
+    )
+
     @client = ::RedisClient::Cluster.new(config)
   end
 
@@ -14,36 +21,42 @@ class TestAgainstClusterBroken < TestingWrapper
   end
 
   def test_a_replica_is_down
-    do_test_a_node_is_down('slave', number_of_keys: 10)
+    node_key = @client.instance_variable_get(:@node)
+                      .replica_node_keys
+                      .sample
+
+    node = @client.instance_variable_get(:@node)
+                  .instance_variable_get(:@clients)
+                  .fetch(node_key)
+
+    do_test_a_node_is_down(node, number_of_keys: 10)
   end
 
   def test_a_primary_is_down
-    skip('TODO: kill a node which has replicas at least one')
+    node_key = @client.instance_variable_get(:@node)
+                      .instance_variable_get(:@replications)
+                      .reject { |_, v| v.size.zero? }
+                      .keys.sample
 
-    # do_test_a_node_is_down('master', number_of_keys: 10)
+    node = @client.instance_variable_get(:@node)
+                  .instance_variable_get(:@clients)
+                  .fetch(node_key)
+
+    do_test_a_node_is_down(node, number_of_keys: 10)
   end
 
   private
 
-  def new_test_config
-    ::RedisClient::ClusterConfig.new(
-      nodes: TEST_NODE_URIS,
-      replica: true,
-      fixed_hostname: TEST_FIXED_HOSTNAME,
-      **TEST_GENERIC_OPTIONS
-    )
-  end
-
   def wait_for_replication
-    @client.call('WAIT', TEST_REPLICA_SIZE, (TEST_TIMEOUT_SEC * 1000).to_i)
+    client_side_timeout = TEST_TIMEOUT_SEC + 1.0
+    server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
+    @client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
   end
 
-  def do_test_a_node_is_down(role, number_of_keys:)
-    number_of_keys.times { |i| @client.call('SET', "pre-#{i}", i) }
-    number_of_keys.times { |i| @client.pipelined { |pi| pi.call('SET', "pre-pipelined-#{i}", i) } }
-    wait_for_replication
+  def do_test_a_node_is_down(sacrifice, number_of_keys:)
+    prepare_test_data(number_of_keys: number_of_keys)
 
-    kill_a_node(role, kill_attempts: 10)
+    kill_a_node(sacrifice, kill_attempts: 10)
     wait_for_cluster_to_be_ready(wait_attempts: 10)
 
     assert_equal('PONG', @client.call('PING'), 'Case: PING')
@@ -51,35 +64,39 @@ class TestAgainstClusterBroken < TestingWrapper
     do_assertions_with_pipelining(number_of_keys: number_of_keys)
   end
 
-  def kill_a_node(role, kill_attempts: 10)
-    node_key = @node_info.select { |e| e[:role] == role }.sample.fetch(:node_key)
-    node = @client.send(:find_node, node_key)
-    refute_nil(node, node_key)
+  def prepare_test_data(number_of_keys:)
+    number_of_keys.times { |i| @client.call('SET', "pre-#{i}", i) }
+    number_of_keys.times { |i| @client.pipelined { |pi| pi.call('SET', "pre-pipelined-#{i}", i) } }
+    wait_for_replication
+  end
+
+  def kill_a_node(sacrifice, kill_attempts:)
+    refute_nil(sacrifice, "#{sacrifice.config.host}:#{sacrifice.config.port}")
 
     loop do
       break if kill_attempts <= 0
 
-      node.call('SHUTDOWN', 'NOSAVE')
+      sacrifice.call('SHUTDOWN', 'NOSAVE')
     rescue ::RedisClient::CommandError => e
       raise unless e.message.include?('Errors trying to SHUTDOWN')
     rescue ::RedisClient::ConnectionError
       break
     ensure
       kill_attempts -= 1
-      sleep 3
+      sleep WAIT_SEC
     end
 
-    assert_raises(::RedisClient::ConnectionError) { node.call('PING') }
+    assert_raises(::RedisClient::ConnectionError) { sacrifice.call('PING') }
   end
 
-  def wait_for_cluster_to_be_ready(wait_attempts: 10)
+  def wait_for_cluster_to_be_ready(wait_attempts:)
     loop do
       break if wait_attempts <= 0 || @client.call('PING') == 'PONG'
     rescue ::RedisClient::Cluster::NodeMightBeDown
       # ignore
     ensure
       wait_attempts -= 1
-      sleep 3
+      sleep WAIT_SEC
     end
   end
 

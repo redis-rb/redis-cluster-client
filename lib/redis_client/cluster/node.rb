@@ -129,9 +129,9 @@ class RedisClient
         @clients.fetch(node_key)
       end
 
-      def call_all(method, *command, **kwargs, &block)
+      def call_all(method, *args, **kwargs, &block)
         results, errors = try_map do |_, client|
-          client.send(method, *command, **kwargs, &block)
+          client.send(method, *args, **kwargs, &block)
         end
 
         return results.values if errors.empty?
@@ -139,11 +139,11 @@ class RedisClient
         raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
-      def call_primaries(method, *command, **kwargs, &block)
+      def call_primaries(method, *args, **kwargs, &block)
         results, errors = try_map do |node_key, client|
           next if replica?(node_key)
 
-          client.send(method, *command, **kwargs, &block)
+          client.send(method, *args, **kwargs, &block)
         end
 
         return results.values if errors.empty?
@@ -151,14 +151,14 @@ class RedisClient
         raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
-      def call_replicas(method, *command, **kwargs, &block)
-        return call_primaries(method, *command, **kwargs, &block) if replica_disabled?
+      def call_replicas(method, *args, **kwargs, &block)
+        return call_primaries(method, *args, **kwargs, &block) if replica_disabled?
 
         replica_node_keys = @replications.values.map(&:sample)
         results, errors = try_map do |node_key, client|
           next if primary?(node_key) || !replica_node_keys.include?(node_key)
 
-          client.send(method, *command, **kwargs, &block)
+          client.send(method, *args, **kwargs, &block)
         end
 
         return results.values if errors.empty?
@@ -166,9 +166,9 @@ class RedisClient
         raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
-      def send_ping(method, *command, **kwargs, &block)
+      def send_ping(method, *args, **kwargs, &block)
         results, errors = try_map do |_, client|
-          client.send(method, *command, **kwargs, &block)
+          client.send(method, *args, **kwargs, &block)
         end
 
         return results.values if errors.empty?
