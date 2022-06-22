@@ -7,8 +7,6 @@ require 'redis_client/cluster/errors'
 class RedisClient
   class Cluster
     class Node
-      include Enumerable
-
       SLOT_SIZE = 16_384
       MIN_SLOT = 0
       MAX_SLOT = SLOT_SIZE - 1
@@ -102,7 +100,7 @@ class RedisClient
       end
 
       def each(&block)
-        @clients.values.each(&block)
+        @clients.each_value(&block)
       end
 
       def sample
