@@ -65,7 +65,9 @@ class TestAgainstClusterState < TestingWrapper
     private
 
     def wait_for_replication
-      @client.call('WAIT', TEST_REPLICA_SIZE, (TEST_TIMEOUT_SEC * 1000).to_i)
+      client_side_timeout = TEST_TIMEOUT_SEC + 1.0
+      server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
+      @client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
     end
 
     def fetch_cluster_info(key)

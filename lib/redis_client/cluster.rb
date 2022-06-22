@@ -127,8 +127,7 @@ class RedisClient
     end
 
     def blocking_call(timeout, *command, **kwargs)
-      node = assign_node(*command)
-      try_send(node, :blocking_call, timeout, *command, **kwargs)
+      send_command(:blocking_call, timeout, *command, **kwargs)
     end
 
     def scan(*args, **kwargs, &block)
@@ -186,41 +185,43 @@ class RedisClient
                                        node_info: node_info, pool: pool, with_replica: config.use_replica?, **kwargs)
     end
 
-    def send_command(method, *command, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+    def send_command(method, *args, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+      command = method == :blocking_call && args.size > 1 ? args[1..] : args
+
       cmd = command.first.to_s.downcase
       case cmd
       when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save'
-        @node.call_all(method, *command, **kwargs, &block).first
+        @node.call_all(method, *args, **kwargs, &block).first
       when 'flushall', 'flushdb'
-        @node.call_primaries(method, *command, **kwargs, &block).first
-      when 'ping'     then @node.send_ping(method, *command, **kwargs, &block).first
-      when 'wait'     then send_wait_command(method, *command, **kwargs, &block)
-      when 'keys'     then @node.call_replicas(method, *command, **kwargs, &block).flatten.sort
-      when 'dbsize'   then @node.call_replicas(method, *command, **kwargs, &block).sum
+        @node.call_primaries(method, *args, **kwargs, &block).first
+      when 'ping'     then @node.send_ping(method, *args, **kwargs, &block).first
+      when 'wait'     then send_wait_command(method, *args, **kwargs, &block)
+      when 'keys'     then @node.call_replicas(method, *args, **kwargs, &block).flatten.sort
+      when 'dbsize'   then @node.call_replicas(method, *args, **kwargs, &block).sum
       when 'scan'     then _scan(*command, **kwargs)
-      when 'lastsave' then @node.call_all(method, *command, **kwargs, &block).sort
-      when 'role'     then @node.call_all(method, *command, **kwargs, &block)
-      when 'config'   then send_config_command(method, *command, **kwargs, &block)
-      when 'client'   then send_client_command(method, *command, **kwargs, &block)
-      when 'cluster'  then send_cluster_command(method, *command, **kwargs, &block)
+      when 'lastsave' then @node.call_all(method, *args, **kwargs, &block).sort
+      when 'role'     then @node.call_all(method, *args, **kwargs, &block)
+      when 'config'   then send_config_command(method, *args, **kwargs, &block)
+      when 'client'   then send_client_command(method, *args, **kwargs, &block)
+      when 'cluster'  then send_cluster_command(method, *args, **kwargs, &block)
       when 'readonly', 'readwrite', 'shutdown'
         raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, cmd
-      when 'memory'   then send_memory_command(method, *command, **kwargs, &block)
-      when 'script'   then send_script_command(method, *command, **kwargs, &block)
-      when 'pubsub'   then send_pubsub_command(method, *command, **kwargs, &block)
+      when 'memory'   then send_memory_command(method, *args, **kwargs, &block)
+      when 'script'   then send_script_command(method, *args, **kwargs, &block)
+      when 'pubsub'   then send_pubsub_command(method, *args, **kwargs, &block)
       when 'discard', 'exec', 'multi', 'unwatch'
         raise ::RedisClient::Cluster::AmbiguousNodeError, cmd
       else
         node = assign_node(*command)
-        try_send(node, method, *command, **kwargs, &block)
+        try_send(node, method, *args, **kwargs, &block)
       end
     rescue RedisClient::Cluster::Node::ReloadNeeded
       update_cluster_info!
       raise ::RedisClient::Cluster::NodeMightBeDown
     end
 
-    def send_wait_command(method, *command, retry_count: 3, **kwargs, &block)
-      @node.call_primaries(method, *command, **kwargs, &block).sum
+    def send_wait_command(method, *args, retry_count: 3, **kwargs, &block)
+      @node.call_primaries(method, *args, **kwargs, &block).sum
     rescue RedisClient::Cluster::ErrorCollection => e
       raise if retry_count <= 0
       raise if e.errors.values.none? do |err|
@@ -232,64 +233,76 @@ class RedisClient
       retry
     end
 
-    def send_config_command(method, *command, **kwargs, &block)
+    def send_config_command(method, *args, **kwargs, &block)
+      command = method == :blocking_call && args.size > 1 ? args[1..] : args
+
       case command[1].to_s.downcase
       when 'resetstat', 'rewrite', 'set'
-        @node.call_all(method, *command, **kwargs, &block).first
-      else assign_node(*command).send(method, *command, **kwargs, &block)
+        @node.call_all(method, *args, **kwargs, &block).first
+      else assign_node(*command).send(method, *args, **kwargs, &block)
       end
     end
 
-    def send_memory_command(method, *command, **kwargs, &block)
+    def send_memory_command(method, *args, **kwargs, &block)
+      command = method == :blocking_call && args.size > 1 ? args[1..] : args
+
       case command[1].to_s.downcase
-      when 'stats' then @node.call_all(method, *command, **kwargs, &block)
-      when 'purge' then @node.call_all(method, *command, **kwargs, &block).first
-      else assign_node(*command).send(method, *command, **kwargs, &block)
+      when 'stats' then @node.call_all(method, *args, **kwargs, &block)
+      when 'purge' then @node.call_all(method, *args, **kwargs, &block).first
+      else assign_node(*command).send(method, *args, **kwargs, &block)
       end
     end
 
-    def send_client_command(method, *command, **kwargs, &block)
+    def send_client_command(method, *args, **kwargs, &block)
+      command = method == :blocking_call && args.size > 1 ? args[1..] : args
+
       case command[1].to_s.downcase
-      when 'list' then @node.call_all(method, *command, **kwargs, &block).flatten
+      when 'list' then @node.call_all(method, *args, **kwargs, &block).flatten
       when 'pause', 'reply', 'setname'
-        @node.call_all(method, *command, **kwargs, &block).first
-      else assign_node(*command).send(method, *command, **kwargs, &block)
+        @node.call_all(method, *args, **kwargs, &block).first
+      else assign_node(*command).send(method, *args, **kwargs, &block)
       end
     end
 
-    def send_cluster_command(method, *command, **kwargs, &block) # rubocop:disable Metrics/MethodLength
+    def send_cluster_command(method, *args, **kwargs, &block) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+      command = method == :blocking_call && args.size > 1 ? args[1..] : args
       subcommand = command[1].to_s.downcase
+
       case subcommand
       when 'addslots', 'delslots', 'failover', 'forget', 'meet', 'replicate',
            'reset', 'set-config-epoch', 'setslot'
         raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, ['cluster', subcommand]
-      when 'saveconfig' then @node.call_all(method, *command, **kwargs, &block).first
+      when 'saveconfig' then @node.call_all(method, *args, **kwargs, &block).first
       when 'getkeysinslot'
         raise ArgumentError, command.join(' ') if command.size != 4
 
-        find_node(@node.find_node_key_of_replica(command[2])).send(method, *command, **kwargs, &block)
-      else assign_node(*command).send(method, *command, **kwargs, &block)
+        find_node(@node.find_node_key_of_replica(command[2])).send(method, *args, **kwargs, &block)
+      else assign_node(*command).send(method, *args, **kwargs, &block)
       end
     end
 
-    def send_script_command(method, *command, **kwargs, &block)
+    def send_script_command(method, *args, **kwargs, &block)
+      command = method == :blocking_call && args.size > 1 ? args[1..] : args
+
       case command[1].to_s.downcase
       when 'debug', 'kill'
-        @node.call_all(method, *command, **kwargs, &block).first
+        @node.call_all(method, *args, **kwargs, &block).first
       when 'flush', 'load'
-        @node.call_primaries(method, *command, **kwargs, &block).first
-      else assign_node(*command).send(method, *command, **kwargs, &block)
+        @node.call_primaries(method, *args, **kwargs, &block).first
+      else assign_node(*command).send(method, *args, **kwargs, &block)
       end
     end
 
-    def send_pubsub_command(method, *command, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+    def send_pubsub_command(method, *args, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      command = method == :blocking_call && args.size > 1 ? args[1..] : args
+
       case command[1].to_s.downcase
-      when 'channels' then @node.call_all(method, *command, **kwargs, &block).flatten.uniq.sort
+      when 'channels' then @node.call_all(method, *args, **kwargs, &block).flatten.uniq.sort
       when 'numsub'
-        @node.call_all(method, *command, **kwargs, &block).reject(&:empty?).map { |e| Hash[*e] }
+        @node.call_all(method, *args, **kwargs, &block).reject(&:empty?).map { |e| Hash[*e] }
              .reduce({}) { |a, e| a.merge(e) { |_, v1, v2| v1 + v2 } }
-      when 'numpat' then @node.call_all(method, *command, **kwargs, &block).sum
-      else assign_node(*command).send(method, *command, **kwargs, &block)
+      when 'numpat' then @node.call_all(method, *args, **kwargs, &block).sum
+      else assign_node(*command).send(method, *args, **kwargs, &block)
       end
     end
 
