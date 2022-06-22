@@ -96,7 +96,7 @@ jobs:
         run: docker compose -f $DOCKER_COMPOSE_FILE down
   cluster-state:
     name: Cluster State
-    timeout-minutes: 30
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -128,7 +128,7 @@ jobs:
         run: docker compose -f $DOCKER_COMPOSE_FILE down
   cluster-broken:
     name: Cluster Broken
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
