@@ -140,7 +140,7 @@ class RedisClient
       private
 
       def send_wait_command(method, *args, retry_count: 3, **kwargs, &block)
-        @node.call_primaries(method, *args, **kwargs, &block).sum
+        @node.call_primaries(method, *args, **kwargs, &block).select { |r| r.is_a?(Integer) }.sum
       rescue RedisClient::Cluster::ErrorCollection => e
         raise if retry_count <= 0
         raise if e.errors.values.none? do |err|
