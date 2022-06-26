@@ -11,10 +11,6 @@ class RedisClient
   class Cluster
     class Router
       ZERO_CURSOR_FOR_SCAN = '0'
-      CMD_ASKING = 'ASKING'
-      REPLY_OK = 'OK'
-      REPLY_MOVED = 'MOVED'
-      REPLY_ASK = 'ASK'
 
       attr_reader :node
 
@@ -69,13 +65,13 @@ class RedisClient
       rescue ::RedisClient::CommandError => e
         raise if retry_count <= 0
 
-        if e.message.start_with?(REPLY_MOVED)
+        if e.message.start_with?('MOVED')
           node = assign_redirection_node(e.message)
           retry_count -= 1
           retry
-        elsif e.message.start_with?(REPLY_ASK)
+        elsif e.message.start_with?('ASK')
           node = assign_asking_node(e.message)
-          node.call(CMD_ASKING)
+          node.call('ASKING')
           retry_count -= 1
           retry
         else
