@@ -88,7 +88,7 @@ classDiagram
     +find_node()
   }
 
-  RedisClient_ClusterConfig ..> RedisClient::Cluster : new
+  RedisClient_ClusterConfig ..> RedisClient_Cluster : new
 
   RedisClient_Cluster ..> RedisClient_Cluster_Pipeline : new
   RedisClient_Cluster ..> RedisClient_Cluster_PubSub : new
