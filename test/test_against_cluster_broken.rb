@@ -21,26 +21,19 @@ class TestAgainstClusterBroken < TestingWrapper
   end
 
   def test_a_replica_is_down
-    node_key = @client.instance_variable_get(:@node)
-                      .replica_node_keys
-                      .sample
-
-    node = @client.instance_variable_get(:@node)
-                  .instance_variable_get(:@clients)
-                  .fetch(node_key)
+    node_key = @client.instance_variable_get(:@router).node.replica_node_keys.sample
+    node = @client.instance_variable_get(:@router).node
+                  .instance_variable_get(:@clients).fetch(node_key)
 
     do_test_a_node_is_down(node, number_of_keys: 10)
   end
 
   def test_a_primary_is_down
-    node_key = @client.instance_variable_get(:@node)
-                      .instance_variable_get(:@replications)
-                      .reject { |_, v| v.size.zero? }
-                      .keys.sample
+    node_key = @client.instance_variable_get(:@router).node
+                      .instance_variable_get(:@replications).reject { |_, v| v.size.zero? }.keys.sample
 
-    node = @client.instance_variable_get(:@node)
-                  .instance_variable_get(:@clients)
-                  .fetch(node_key)
+    node = @client.instance_variable_get(:@router).node
+                  .instance_variable_get(:@clients).fetch(node_key)
 
     do_test_a_node_is_down(node, number_of_keys: 10)
   end
