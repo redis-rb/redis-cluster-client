@@ -181,7 +181,7 @@ class RedisClient
       def scale_reading_clients
         keys = replica_disabled? ? @replications.keys : @replications.values.map(&:first)
         @clients.select { |k, _| keys.include?(k) }.values.sort_by do |client|
-          ::RedisClient::Cluster::NodeKey.build_from_host_port(client.config.host, client.config.port)
+          "#{client.config.host}-#{client.config.port}"
         end
       end
 
