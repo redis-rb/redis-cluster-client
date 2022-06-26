@@ -2,16 +2,12 @@
 
 require 'redis_client'
 require 'redis_client/cluster/pipeline'
-require 'redis_client/cluster/pubsub'
+require 'redis_client/cluster/pub_sub'
 require 'redis_client/cluster/router'
 
 class RedisClient
   class Cluster
     ZERO_CURSOR_FOR_SCAN = '0'
-    CMD_SCAN = 'SCAN'
-    CMD_SSCAN = 'SSCAN'
-    CMD_HSCAN = 'HSCAN'
-    CMD_ZSCAN = 'ZSCAN'
 
     def initialize(config, pool: nil, **kwargs)
       @router = ::RedisClient::Cluster::Router.new(config, pool: pool, **kwargs)
@@ -38,24 +34,24 @@ class RedisClient
 
       cursor = ZERO_CURSOR_FOR_SCAN
       loop do
-        cursor, keys = @router.scan(CMD_SCAN, cursor, *args, **kwargs)
+        cursor, keys = @router.scan('SCAN', cursor, *args, **kwargs)
         keys.each(&block)
         break if cursor == ZERO_CURSOR_FOR_SCAN
       end
     end
 
     def sscan(key, *args, **kwargs, &block)
-      node = @router.assign_node(CMD_SSCAN, key)
+      node = @router.assign_node('SSCAN', key)
       @router.try_send(node, :sscan, key, *args, **kwargs, &block)
     end
 
     def hscan(key, *args, **kwargs, &block)
-      node = @router.assign_node(CMD_HSCAN, key)
+      node = @router.assign_node('HSCAN', key)
       @router.try_send(node, :hscan, key, *args, **kwargs, &block)
     end
 
     def zscan(key, *args, **kwargs, &block)
-      node = @router.assign_node(CMD_ZSCAN, key)
+      node = @router.assign_node('ZSCAN', key)
       @router.try_send(node, :zscan, key, *args, **kwargs, &block)
     end
 
