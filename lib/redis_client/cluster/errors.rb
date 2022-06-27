@@ -16,9 +16,9 @@ class RedisClient
     class OrchestrationCommandNotSupported < ::RedisClient::Error
       def initialize(command)
         str = ERR_ARG_NORMALIZATION.call(command).map(&:to_s).join(' ').upcase
-        msg = "#{str} command should be used with care "\
-              'only by applications orchestrating Redis Cluster, like redis-cli, '\
-              'and the command if used out of the right context can leave the cluster '\
+        msg = "#{str} command should be used with care " \
+              'only by applications orchestrating Redis Cluster, like redis-cli, ' \
+              'and the command if used out of the right context can leave the cluster ' \
               'in a wrong state or cause data loss.'
         super(msg)
       end
@@ -49,8 +49,8 @@ class RedisClient
     class NodeMightBeDown < ::RedisClient::Error
       def initialize(_ = '')
         super(
-          'The client is trying to fetch the latest cluster state '\
-          'because a subset of nodes might be down. '\
+          'The client is trying to fetch the latest cluster state ' \
+          'because a subset of nodes might be down. ' \
           'It might continue to raise errors for a while.'
         )
       end
