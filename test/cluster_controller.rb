@@ -86,6 +86,8 @@ class ClusterController
       # retry once
       src_client.call('MIGRATE', dest_host, dest_port, '', db_idx, timeout_msec, 'REPLACE', 'KEYS', *keys)
     end
+
+    wait_replication_delay(@clients, replica_size: @replica_size, timeout: @timeout)
   end
 
   def finish_resharding(slot:, dest_node_key:)
