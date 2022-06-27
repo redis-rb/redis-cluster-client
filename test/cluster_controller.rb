@@ -343,10 +343,8 @@ class ClusterController
         arr[8] = []
         next
       end
-
-      arr[8] = arr[8..].map { |r| r.split('-').map { |s| Integer(s) } }
-                       .map { |a| a.size == 1 ? a << a.first : a }
-                       .map(&:sort)
+      arr[8] = arr[8..].filter_map { |str| str.start_with?('[') ? nil : str.split('-').map { |s| Integer(s) } }
+                       .map { |a| a.size == 1 ? a << a.first : a }.map(&:sort)
     end
 
     rows.map do |arr|
