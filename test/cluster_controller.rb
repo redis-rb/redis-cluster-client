@@ -319,7 +319,11 @@ class ClusterController
   end
 
   def fetch_internal_id_to_node_key_mappings(clients)
-    clients.to_h { |c| [c.call('CLUSTER', 'MYID'), to_node_key(c)] }
+    fetch_internal_id_to_client_mappings(clients).transform_values { |c| to_node_key(c) }
+  end
+
+  def fetch_internal_id_to_client_mappings(clients)
+    clients.to_h { |c| [c.call('CLUSTER', 'MYID'), c] }
   end
 
   def fetch_and_parse_cluster_nodes(clients) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
@@ -357,7 +361,7 @@ class ClusterController
     rows = fetch_and_parse_cluster_nodes(clients)
     primary = rows.find { |row| row[:role] == 'master' }
     replica = rows.find { |row| row[:primary_id] == primary[:id] }
-    id2cli = fetch_internal_id_to_node_key_mappings(clients)
+    id2cli = fetch_internal_id_to_client_mappings(clients)
     [id2cli[primary[:id]], id2cli[replica[:id]]]
   end
 
