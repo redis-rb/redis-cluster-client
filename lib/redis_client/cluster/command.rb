@@ -81,7 +81,7 @@ class RedisClient
         when 'memory'
           command[1].to_s.casecmp('usage').zero? ? 2 : 0
         when 'migrate'
-          command[3] == '""' ? determine_optional_key_position(command, 'keys') : 3
+          command[3].empty? ? determine_optional_key_position(command, 'keys') : 3
         when 'xread', 'xreadgroup'
           determine_optional_key_position(command, 'streams')
         else
