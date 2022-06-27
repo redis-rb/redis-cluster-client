@@ -79,12 +79,12 @@ class ClusterController
     return if keys.empty?
 
     begin
-      src_client.call('MIGRATE', dest_host, dest_port, '""', db_idx, timeout_msec, 'KEYS', *keys)
+      src_client.call('MIGRATE', dest_host, dest_port, '', db_idx, timeout_msec, 'KEYS', *keys)
     rescue ::RedisClient::CommandError => e
       raise unless e.message.start_with?('IOERR')
 
       # retry once
-      src_client.call('MIGRATE', dest_host, dest_port, '""', db_idx, timeout_msec, 'REPLACE', 'KEYS', *keys)
+      src_client.call('MIGRATE', dest_host, dest_port, '', db_idx, timeout_msec, 'REPLACE', 'KEYS', *keys)
     end
   end
 
