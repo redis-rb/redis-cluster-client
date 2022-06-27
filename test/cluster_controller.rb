@@ -68,8 +68,9 @@ class ClusterController
     dest_client = find_client_by_natted_node_key(@clients, dest_node_key)
     dest_host, dest_port = dest_node_key.split(':')
 
-    src_client.call('CLUSTER', 'SETSLOT', slot, 'MIGRATING', dest_node_id)
+    # @see https://redis.io/commands/cluster-setslot/#redis-cluster-live-resharding-explained
     dest_client.call('CLUSTER', 'SETSLOT', slot, 'IMPORTING', src_node_id)
+    src_client.call('CLUSTER', 'SETSLOT', slot, 'MIGRATING', dest_node_id)
 
     db_idx = '0'
     timeout_msec = @timeout.to_i * 1000
@@ -90,10 +91,12 @@ class ClusterController
     wait_replication_delay(@clients, replica_size: @replica_size, timeout: @timeout)
   end
 
-  def finish_resharding(slot:, dest_node_key:)
+  def finish_resharding(slot:, src_node_key:, dest_node_key:)
     id = fetch_internal_id_by_natted_node_key(@clients.first, dest_node_key)
-    client = find_client_by_natted_node_key(@clients, dest_node_key)
-    client.call('CLUSTER', 'SETSLOT', slot, 'NODE', id)
+    dest = find_client_by_natted_node_key(@clients, dest_node_key)
+    src = find_client_by_natted_node_key(@clients, src_node_key)
+    rest = take_masters(@clients, shard_size: @shard_size).reject { |c| c.equal?(dest) || c.equal?(src) }
+    ([dest, src] + rest).each { |cli| cli.call('CLUSTER', 'SETSLOT', slot, 'NODE', id) }
   end
 
   def scale_out(primary_url:, replica_url:) # rubocop:disable Metrics/CyclomaticComplexity
@@ -116,7 +119,7 @@ class ClusterController
     primary_id = primary.call('CLUSTER', 'MYID')
     replica.call('CLUSTER', 'REPLICATE', primary_id)
     save_config(@clients)
-    wait_replication(@clients, number_of_replicas: @number_of_replicas, max_attempts: @max_attempts)
+    wait_for_cluster_to_be_ready
 
     rows = fetch_and_parse_cluster_nodes(@clients)
 
@@ -128,7 +131,7 @@ class ClusterController
       end.fetch(:node_key)
       dest = rows.find { |row| row[:id] == primary_id }.fetch(:node_key)
       start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
-      finish_resharding(slot: slot, dest_node_key: dest)
+      finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
     end
   end
 
