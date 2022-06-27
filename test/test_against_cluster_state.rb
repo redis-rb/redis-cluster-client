@@ -103,20 +103,19 @@ class TestAgainstClusterState < TestingWrapper
     end
   end
 
-  # TODO: https://github.com/redis-rb/redis-cluster-client/issues/42
-  # class ScaleRead < TestingWrapper
-  #   include Mixin
-  #
-  #   def new_test_client
-  #     config = ::RedisClient::ClusterConfig.new(
-  #       nodes: TEST_NODE_URIS,
-  #       replica: true,
-  #       fixed_hostname: TEST_FIXED_HOSTNAME,
-  #       **TEST_GENERIC_OPTIONS
-  #     )
-  #     ::RedisClient::Cluster.new(config)
-  #   end
-  # end
+  class ScaleRead < TestingWrapper
+    include Mixin
+
+    def new_test_client
+      config = ::RedisClient::ClusterConfig.new(
+        nodes: TEST_NODE_URIS,
+        replica: true,
+        fixed_hostname: TEST_FIXED_HOSTNAME,
+        **TEST_GENERIC_OPTIONS
+      )
+      ::RedisClient::Cluster.new(config)
+    end
+  end
 
   class Pooled < TestingWrapper
     include Mixin
