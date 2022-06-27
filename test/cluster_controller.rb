@@ -68,8 +68,8 @@ class ClusterController
     dest_client = find_client_by_natted_node_key(@clients, dest_node_key)
     dest_host, dest_port = dest_node_key.split(':')
 
-    dest_client.call('CLUSTER', 'SETSLOT', slot, 'IMPORTING', src_node_id)
     src_client.call('CLUSTER', 'SETSLOT', slot, 'MIGRATING', dest_node_id)
+    dest_client.call('CLUSTER', 'SETSLOT', slot, 'IMPORTING', src_node_id)
 
     db_idx = '0'
     timeout_msec = @timeout.to_i * 1000
@@ -92,7 +92,8 @@ class ClusterController
 
   def finish_resharding(slot:, dest_node_key:)
     id = fetch_internal_id_by_natted_node_key(@clients.first, dest_node_key)
-    @clients.first.call('CLUSTER', 'SETSLOT', slot, 'NODE', id)
+    client = find_client_by_natted_node_key(@clients, dest_node_key)
+    client.call('CLUSTER', 'SETSLOT', slot, 'NODE', id)
   end
 
   def scale_out(primary_url:, replica_url:) # rubocop:disable Metrics/CyclomaticComplexity
@@ -340,8 +341,9 @@ class ClusterController
         next
       end
 
-      arr[8] = arr[8].split(',').map { |r| r.split('-').map { |s| Integer(s) } }
-      arr[8] = arr[8].map { |a| a.size == 1 ? a << a.first : a }.map(&:sort)
+      arr[8] = arr[8..].map { |r| r.split('-').map { |s| Integer(s) } }
+                       .map { |a| a.size == 1 ? a << a.first : a }
+                       .map(&:sort)
     end
 
     rows.map do |arr|
