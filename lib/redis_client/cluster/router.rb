@@ -53,7 +53,7 @@ class RedisClient
           node = assign_node(*command)
           try_send(node, method, *args, **kwargs, &block)
         end
-      rescue RedisClient::Cluster::Node::ReloadNeeded
+      rescue ::RedisClient::Cluster::Node::ReloadNeeded
         update_cluster_info!
         raise ::RedisClient::Cluster::NodeMightBeDown
       end
@@ -137,7 +137,7 @@ class RedisClient
 
       def send_wait_command(method, *args, retry_count: 3, **kwargs, &block)
         @node.call_primaries(method, *args, **kwargs, &block).select { |r| r.is_a?(Integer) }.sum
-      rescue RedisClient::Cluster::ErrorCollection => e
+      rescue ::RedisClient::Cluster::ErrorCollection => e
         raise if retry_count <= 0
         raise if e.errors.values.none? do |err|
           err.message.include?('WAIT cannot be used with replica instances')
@@ -245,7 +245,7 @@ class RedisClient
         @mutex.synchronize do
           begin
             @node.call_all(:close)
-          rescue StandardError
+          rescue ::RedisClient::Cluster::ErrorCollection
             # ignore
           end
 
