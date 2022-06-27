@@ -2,7 +2,7 @@
 
 require 'rake/testtask'
 
-FREAKY_TEST_TYPES = %w[broken scale state].freeze
+SLUGGISH_TEST_TYPES = %w[broken scale state].freeze
 
 task default: :test
 
@@ -13,11 +13,11 @@ Rake::TestTask.new(:test) do |t|
   t.test_files = if ARGV.size > 1
                    ARGV[1..]
                  else
-                   Dir['test/**/test_*.rb'].grep_v(/test_against_cluster_(#{FREAKY_TEST_TYPES.join('|')})/)
+                   Dir['test/**/test_*.rb'].grep_v(/test_against_cluster_(#{SLUGGISH_TEST_TYPES.join('|')})/)
                  end
 end
 
-FREAKY_TEST_TYPES.each do |type|
+SLUGGISH_TEST_TYPES.each do |type|
   Rake::TestTask.new("test_cluster_#{type}".to_sym) do |t|
     t.libs << :lib
     t.libs << :test
