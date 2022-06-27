@@ -2,29 +2,28 @@
 
 require 'rake/testtask'
 
+FREAKY_TEST_TYPES = %w[broken scale state].freeze
+
 task default: :test
 
-Rake::TestTask.new :test do |t|
-  t.libs << :test
+Rake::TestTask.new(:test) do |t|
   t.libs << :lib
-  files = Dir['test/**/test_*.rb'].grep_v(/test_against_cluster_(state|broken)/)
-  files = ARGV[1..] if ARGV.size > 1
-  t.test_files = files
+  t.libs << :test
   t.options = '-v'
+  t.test_files = if ARGV.size > 1
+                   ARGV[1..]
+                 else
+                   Dir['test/**/test_*.rb'].grep_v(/test_against_cluster_(#{FREAKY_TEST_TYPES.join('|')})/)
+                 end
 end
 
-Rake::TestTask.new :test_cluster_state do |t|
-  t.libs << :test
-  t.libs << :lib
-  t.test_files = %w[test/test_against_cluster_state.rb]
-  t.options = '-v'
-end
-
-Rake::TestTask.new :test_cluster_broken do |t|
-  t.libs << :test
-  t.libs << :lib
-  t.test_files = %w[test/test_against_cluster_broken.rb]
-  t.options = '-v'
+FREAKY_TEST_TYPES.each do |type|
+  Rake::TestTask.new("test_cluster_#{type}".to_sym) do |t|
+    t.libs << :lib
+    t.libs << :test
+    t.options = '-v'
+    t.test_files = ["test/test_against_cluster_#{type}.rb"]
+  end
 end
 
 desc 'Wait for cluster to be ready'
