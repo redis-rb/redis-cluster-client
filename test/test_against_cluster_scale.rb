@@ -37,7 +37,7 @@ class TestAgainstClusterScale < TestingWrapper
     replica_url = "#{TEST_REDIS_SCHEME}://#{TEST_REDIS_HOST}:#{TEST_REDIS_PORTS.max + 2}"
     @controller.scale_out(primary_url: primary_url, replica_url: replica_url)
 
-    NUMBER_OF_KEYS.times { |i| assert_equal(i, @client.call('GET', "key#{i}"), "Case: key#{i}") }
+    NUMBER_OF_KEYS.times { |i| assert_equal(i.to_s, @client.call('GET', "key#{i}"), "Case: key#{i}") }
   end
 
   def test_02_scale_in
