@@ -4,12 +4,9 @@
 
 require 'minitest/autorun'
 require 'redis_client'
+require 'redis_cluster_client'
 require 'testing_constants'
 require 'cluster_controller'
-
-Dir["#{File.expand_path('../lib', __dir__)}/**/*.rb"].each do |s|
-  require s[s.rindex('redis_client')..]
-end
 
 case ENV.fetch('REDIS_CONNECTION_DRIVER', 'ruby')
 when 'hiredis' then require 'hiredis-client'
