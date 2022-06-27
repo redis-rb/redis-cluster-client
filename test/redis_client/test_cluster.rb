@@ -141,7 +141,7 @@ class RedisClient
         wait_for_replication
         [
           { command: %w[ACL HELP], is_a: Array },
-          { command: ['WAIT', TEST_REPLICA_SIZE, '1'], want: TEST_NUMBER_OF_REPLICAS },
+          { command: ['WAIT', TEST_REPLICA_SIZE, '1'], is_a: Integer },
           { command: %w[KEYS *], want: (0..9).map { |i| "key#{i}" } },
           { command: %w[DBSIZE], want: (0..9).size },
           { command: %w[SCAN], is_a: Array },
