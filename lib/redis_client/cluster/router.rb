@@ -243,7 +243,12 @@ class RedisClient
 
       def update_cluster_info!
         @mutex.synchronize do
-          @node.call_all(:close)
+          begin
+            @node.call_all(:close)
+          rescue StandardError
+            # ignore
+          end
+
           @node = fetch_cluster_info(@config, pool: @pool, **@client_kwargs)
         end
       end
