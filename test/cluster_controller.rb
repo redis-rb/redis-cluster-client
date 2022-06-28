@@ -177,6 +177,11 @@ class ClusterController
     @number_of_replicas = @replica_size * @shard_size
 
     wait_for_cluster_to_be_ready
+    wait_for_state(clients, max_attempts: @max_attempts) do |client|
+      fetch_cluster_nodes(client).size == @shard_size + @number_of_replicas
+    rescue ::RedisClient::ConnectionError
+      true
+    end
   end
 
   def close
