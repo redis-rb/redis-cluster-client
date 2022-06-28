@@ -23,7 +23,7 @@ class RedisClient
         @mutex = Mutex.new
       end
 
-      def send_command(method, *args, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+      def send_command(method, *args, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
         command = method == :blocking_call && args.size > 1 ? args[1..] : args
 
         cmd = command.first.to_s.downcase
@@ -56,6 +56,11 @@ class RedisClient
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
         update_cluster_info!
         raise ::RedisClient::Cluster::NodeMightBeDown
+      rescue ::RedisClient::Cluster::ErrorCollection => e
+        update_cluster_info! if e.errors.values.any? do |err|
+          err.message.start_with?('CLUSTERDOWN Hash slot not served')
+        end
+        raise
       end
 
       # @see https://redis.io/topics/cluster-spec#redirection-and-resharding
@@ -72,6 +77,10 @@ class RedisClient
         elsif e.message.start_with?('ASK')
           node = assign_asking_node(e.message)
           node.call('ASKING')
+          retry_count -= 1
+          retry
+        elsif e.message.start_with?('CLUSTERDOWN Hash slot not served')
+          update_cluster_info!
           retry_count -= 1
           retry
         else
