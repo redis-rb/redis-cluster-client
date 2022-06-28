@@ -96,7 +96,12 @@ class ClusterController
     dest = find_client_by_natted_node_key(@clients, dest_node_key)
     src = find_client_by_natted_node_key(@clients, src_node_key)
     rest = take_masters(@clients, shard_size: @shard_size).reject { |c| c.equal?(dest) || c.equal?(src) }
-    ([dest, src] + rest).each { |cli| cli.call('CLUSTER', 'SETSLOT', slot, 'NODE', id) }
+    ([dest, src] + rest).each do |cli|
+      cli.call('CLUSTER', 'SETSLOT', slot, 'NODE', id)
+    rescue ::RedisClient::CommandError => e
+      raise if e.message != 'ERR Please use SETSLOT only with masters.'
+      # how weird, ignore
+    end
   end
 
   def scale_out(primary_url:, replica_url:) # rubocop:disable Metrics/CyclomaticComplexity
@@ -123,7 +128,7 @@ class ClusterController
 
     rows = fetch_and_parse_cluster_nodes(@clients)
 
-    SLOT_SIZE.times.to_a.sample(SLOT_SIZE / @shard_size).each do |slot|
+    SLOT_SIZE.times.to_a.sample(100).sort.each do |slot|
       src = rows.find do |row|
         next if row[:slots].empty?
 
@@ -132,6 +137,50 @@ class ClusterController
       dest = rows.find { |row| row[:id] == primary_id }.fetch(:node_key)
       start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
       finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+    end
+  end
+
+  def scale_in # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    rows = fetch_and_parse_cluster_nodes(@clients)
+    primary_info = rows.reject { |r| r[:slots].empty? }.min_by { |r| r[:slots].flat_map { |start, last| (start..last).to_a }.size }
+    replica_info = rows.find { |r| r[:primary_id] == primary_info[:id] }
+    rest_primary_node_keys = rows.reject { |r| r[:id] == primary_info[:id] || r[:role] == 'slave' }.map { |r| r[:node_key] }
+
+    primary_info[:slots].each do |start, last|
+      (start..last).each do |slot|
+        src = primary_info.fetch(:node_key)
+        dest = rest_primary_node_keys.sample
+        start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+        finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+      end
+    end
+
+    id2cli = fetch_internal_id_to_client_mappings(@clients)
+    replica = id2cli.fetch(replica_info[:id])
+    primary = id2cli.fetch(primary_info[:id])
+    threads = @clients.map do |cli|
+      Thread.new(cli) do |c|
+        Thread.pass
+        c.pipelined do |pi|
+          pi.call('CLUSTER', 'FORGET', replica_info[:id])
+          pi.call('CLUSTER', 'FORGET', primary_info[:id])
+        end
+      rescue ::RedisClient::Error
+        # ignore
+      end
+    end
+    threads.each(&:join)
+    replica.call('CLUSTER', 'RESET', 'SOFT')
+    primary.call('CLUSTER', 'RESET', 'SOFT')
+    @clients.reject! { |c| c.equal?(primary) || c.equal?(replica) }
+    @shard_size -= 1
+    @number_of_replicas = @replica_size * @shard_size
+
+    wait_for_cluster_to_be_ready
+    wait_for_state(@clients, max_attempts: @max_attempts) do |client|
+      fetch_cluster_nodes(client).size == @shard_size + @number_of_replicas
+    rescue ::RedisClient::ConnectionError
+      true
     end
   end
 
