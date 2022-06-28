@@ -135,6 +135,28 @@ class ClusterController
     end
   end
 
+  def scale_in
+    rows = fetch_and_parse_cluster_nodes(@clients)
+
+    primary, replica = take_a_replication_pair(@clients)
+    primary_id = primary.call('CLUSTER', 'MYID')
+    primary_info = rows.find { |row| row[:id] == primary_id }
+    rest_primary_node_keys = rows.reject { |row| row[:id] == primary_id || row[:role] == 'slave' }.map { |row| row[:node_key] }
+
+    primary_info[:slots].each do |start, last|
+      (start..last).each do |slot|
+        src = primary_info.fetch(:node_key)
+        dest = rest_primary_node_keys.sample
+        start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+        finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+      end
+    end
+
+    replica.call('CLUSTER', 'RESET', 'SOFT')
+    primary.call('CLUSTER', 'RESET', 'SOFT')
+    wait_for_cluster_to_be_ready
+  end
+
   def close
     @clients.each(&:close)
   end

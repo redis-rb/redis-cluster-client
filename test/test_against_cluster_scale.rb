@@ -41,7 +41,8 @@ class TestAgainstClusterScale < TestingWrapper
   end
 
   def test_02_scale_in
-    skip('TODO: scale in')
+    @controller.scale_in
+    NUMBER_OF_KEYS.times { |i| assert_equal(i.to_s, @client.call('GET', "key#{i}"), "Case: key#{i}") }
   end
 
   private
