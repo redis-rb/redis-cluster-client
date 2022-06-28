@@ -158,11 +158,18 @@ class ClusterController
     id2cli = fetch_internal_id_to_client_mappings(@clients)
     replica = id2cli.fetch(replica_info[:id])
     primary = id2cli.fetch(primary_info[:id])
-    rest = take_masters(@clients, shard_size: @shard_size).reject { |c| c.equal?(primary) || c.equal?(replica) }
-    rest.each do |c|
-      c.call('CLUSTER', 'FORGET', replica_info[:id])
-      c.call('CLUSTER', 'FORGET', primary_info[:id])
+    threads = @clients.map do |cli|
+      Thread.new(cli) do |c|
+        Thread.pass
+        c.pipelined do |pi|
+          pi.call('CLUSTER', 'FORGET', replica_info[:id])
+          pi.call('CLUSTER', 'FORGET', primary_info[:id])
+        end
+      rescue ::RedisClient::Error
+        # ignore
+      end
     end
+    threads.each(&:join)
     replica.call('CLUSTER', 'RESET', 'SOFT')
     primary.call('CLUSTER', 'RESET', 'SOFT')
     @clients.reject! { |c| c.equal?(primary) || c.equal?(replica) }
