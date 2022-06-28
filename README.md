@@ -146,3 +146,8 @@ RedisClient.cluster.new_pool(timeout: 1.0, size: 2)
 
 ## Connection drivers
 Please see [redis-client](https://github.com/redis-rb/redis-client#drivers).
+
+## See also
+* https://github.com/redis/redis-rb/issues/1070
+* https://github.com/redis/redis/issues/8948
+* https://github.com/antirez/redis-rb-cluster
