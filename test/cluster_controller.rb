@@ -182,6 +182,7 @@ class ClusterController
     rescue ::RedisClient::ConnectionError
       true
     end
+    sleep 15
   end
 
   def close
