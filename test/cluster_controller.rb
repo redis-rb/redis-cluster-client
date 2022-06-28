@@ -123,7 +123,7 @@ class ClusterController
 
     rows = fetch_and_parse_cluster_nodes(@clients)
 
-    SLOT_SIZE.times.to_a.sample(SLOT_SIZE / @shard_size).each do |slot|
+    SLOT_SIZE.times.to_a.sample(100).each do |slot|
       src = rows.find do |row|
         next if row[:slots].empty?
 

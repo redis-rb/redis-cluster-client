@@ -9,14 +9,23 @@ class TestAgainstClusterScale < TestingWrapper
     :alpha
   end
 
+  def setup
+    config = ::RedisClient::ClusterConfig.new(
+      nodes: TEST_NODE_URIS,
+      replica: true,
+      fixed_hostname: TEST_FIXED_HOSTNAME,
+      **TEST_GENERIC_OPTIONS
+    )
+    @client = ::RedisClient::Cluster.new(config)
+  end
+
   def teardown
     @client&.close
     @controller&.close
   end
 
   def test_01_scale_out
-    @client = build_testee_client(TEST_NODE_URIS)
-    @controller = build_cluster_controller(TEST_NODE_URIS)
+    @controller = build_cluster_controller(TEST_NODE_URIS, shard_size: 3)
 
     @client.pipelined { |pi| NUMBER_OF_KEYS.times { |i| pi.call('SET', "key#{i}", i) } }
     wait_for_replication
@@ -28,8 +37,8 @@ class TestAgainstClusterScale < TestingWrapper
   end
 
   def test_02_scale_in
-    @client = build_testee_client(TEST_NODE_URIS + build_additional_node_urls)
-    @controller = build_cluster_controller(TEST_NODE_URIS + build_additional_node_urls)
+    node_urls = TEST_NODE_URIS + build_additional_node_urls
+    @controller = build_cluster_controller(node_urls, shard_size: 4)
 
     @controller.scale_in
     NUMBER_OF_KEYS.times { |i| assert_equal(i.to_s, @client.call('GET', "key#{i}"), "Case: key#{i}") }
@@ -43,19 +52,10 @@ class TestAgainstClusterScale < TestingWrapper
     @client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
   end
 
-  def build_testee_client(nodes)
-    config = ::RedisClient::ClusterConfig.new(
-      nodes: nodes,
-      replica: true,
-      fixed_hostname: TEST_FIXED_HOSTNAME,
-      **TEST_GENERIC_OPTIONS
-    )
-    ::RedisClient::Cluster.new(config)
-  end
-
-  def build_cluster_controller(nodes)
+  def build_cluster_controller(nodes, shard_size:)
     ClusterController.new(
       nodes,
+      shard_size: shard_size,
       replica_size: TEST_REPLICA_SIZE,
       **TEST_GENERIC_OPTIONS.merge(timeout: 30.0)
     )
