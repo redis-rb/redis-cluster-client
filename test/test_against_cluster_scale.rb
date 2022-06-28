@@ -62,8 +62,7 @@ class TestAgainstClusterScale < TestingWrapper
   end
 
   def build_additional_node_urls
-    primary_url = "#{TEST_REDIS_SCHEME}://#{TEST_REDIS_HOST}:#{TEST_REDIS_PORTS.max + 1}"
-    replica_url = "#{TEST_REDIS_SCHEME}://#{TEST_REDIS_HOST}:#{TEST_REDIS_PORTS.max + 2}"
-    [primary_url, replica_url]
+    max = TEST_REDIS_PORTS.max
+    (max + 1..max + 2).map { |port| "#{TEST_REDIS_SCHEME}://#{TEST_REDIS_HOST}:#{port}" }
   end
 end

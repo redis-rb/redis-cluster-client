@@ -123,7 +123,7 @@ class ClusterController
 
     rows = fetch_and_parse_cluster_nodes(@clients)
 
-    SLOT_SIZE.times.to_a.sample(100).each do |slot|
+    SLOT_SIZE.times.to_a.sample(20).sort.each do |slot|
       src = rows.find do |row|
         next if row[:slots].empty?
 
@@ -135,7 +135,7 @@ class ClusterController
     end
   end
 
-  def scale_in
+  def scale_in # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     rows = fetch_and_parse_cluster_nodes(@clients)
 
     primary, replica = take_a_replication_pair(@clients)
@@ -154,6 +154,9 @@ class ClusterController
 
     replica.call('CLUSTER', 'RESET', 'SOFT')
     primary.call('CLUSTER', 'RESET', 'SOFT')
+    @clients.reject! { |c| c.equal?(primary) || c.equal?(replica) }
+    @shard_size -= 1
+    @number_of_replicas = @replica_size * @shard_size
     wait_for_cluster_to_be_ready
   end
 
