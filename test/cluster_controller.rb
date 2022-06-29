@@ -197,8 +197,8 @@ class ClusterController
 
   def select_resharding_target(slot)
     rows = associate_with_clients_and_nodes(@clients)
-    src = rows.find { |r| r[:slots].include?(slot) }
-    dest = rows.reject { |r| r[:id] == src[:id] }.sample
+    src = rows.find { |r| r[:role] == 'master' && r[:slots].include?(slot) }
+    dest = rows.reject { |r| r[:role] == 'slave' || r[:id] == src[:id] }.sample
     [src.fetch(:node_key), dest.fetch(:node_key)]
   end
 
