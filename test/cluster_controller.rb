@@ -55,7 +55,7 @@ class ClusterController
   def failover
     rows = associate_with_clients_and_nodes(@clients)
     primary_info = rows.find { |row| row[:role] == 'master' }
-    replica_info = rows.find { |row| row[:primary_id] == primary[:id] }
+    replica_info = rows.find { |row| row[:primary_id] == primary_info[:id] }
 
     wait_replication_delay(@clients, replica_size: @replica_size, timeout: @timeout)
     replica_info.fetch(:client).call('CLUSTER', 'FAILOVER', 'TAKEOVER')
