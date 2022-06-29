@@ -386,7 +386,7 @@ class ClusterController
   end
 
   def associate_with_clients_and_nodes(clients)
-    clients.flat_map do |client|
+    clients.filter_map do |client|
       rows = fetch_cluster_nodes(client)
       rows = parse_cluster_nodes(rows)
       row = rows.find { |r| r[:flags].include?('myself') }
