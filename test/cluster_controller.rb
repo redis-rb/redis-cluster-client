@@ -195,6 +195,28 @@ class ClusterController
     end
   end
 
+  def select_resharding_target(slot)
+    rows = fetch_cluster_nodes(@clients)
+    rows = parse_cluster_nodes(rows)
+    src = rows.find { |r| r[:slots].include?(slot) }
+    dest = rows.reject { |r| r[:id] == src[:id] }.sample
+    [src.fetch(:node_key), dest.fetch(:node_key)]
+  end
+
+  def select_sacrifice_of_primary
+    rows = fetch_cluster_nodes(@clients)
+    rows = parse_cluster_nodes(rows)
+    rows.select { |r| r[:role] == 'master' }
+        .reject { |primary| rows.none? { |r| r[:primary_id] == primary[:id] } }
+        .sample.fetch(:client)
+  end
+
+  def select_sacrifice_of_replica
+    rows = fetch_cluster_nodes(@clients)
+    rows = parse_cluster_nodes(rows)
+    rows.select { |r| r[:role] == 'slave' }.sample.fetch(:client)
+  end
+
   def close
     @clients.each(&:close)
   end

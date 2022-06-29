@@ -82,8 +82,7 @@ class TestAgainstClusterState < TestingWrapper
       refute_equal(0, count)
       keys = @client.call('CLUSTER', 'GETKEYSINSLOT', slot, count)
       refute_empty(keys)
-      src = @client.instance_variable_get(:@router).node.find_node_key_of_primary(slot)
-      dest = @client.instance_variable_get(:@router).node.primary_node_keys.reject { |k| k == src }.sample
+      src, dest = @controller.select_resharding_target(slot)
       @controller.start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
       yield(keys)
       @controller.finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
