@@ -12,12 +12,17 @@ class TestAgainstClusterBroken < TestingWrapper
       fixed_hostname: TEST_FIXED_HOSTNAME,
       **TEST_GENERIC_OPTIONS
     )
-
     @client = ::RedisClient::Cluster.new(config)
+    @controller = ClusterController.new(
+      TEST_NODE_URIS,
+      replica_size: TEST_REPLICA_SIZE,
+      **TEST_GENERIC_OPTIONS.merge(timeout: 30.0)
+    )
   end
 
   def teardown
     @client.close
+    @controller.close
   end
 
   def test_a_replica_is_down

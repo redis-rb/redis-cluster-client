@@ -218,7 +218,11 @@ class ClusterController
   end
 
   def close
-    @clients.each(&:close)
+    @clients.each do |client|
+      client.close
+    rescue ::RedisClient::ConnectionError
+      # ignore
+    end
   end
 
   private
