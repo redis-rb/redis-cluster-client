@@ -143,7 +143,7 @@ class ClusterController
     save_config(@clients)
     wait_for_cluster_to_be_ready
 
-    rows = fetch_and_parse_cluster_nodes(@clients)
+    rows = associate_with_clients_and_nodes(@clients)
 
     SLOT_SIZE.times.to_a.sample(100).sort.each do |slot|
       src = rows.find { |row| row[:slots].include?(slot) }.fetch(:node_key)
