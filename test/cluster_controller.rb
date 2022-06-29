@@ -53,7 +53,7 @@ class ClusterController
   end
 
   def failover
-    rows = associate_with_clients_and_nodes(clients)
+    rows = associate_with_clients_and_nodes(@clients)
     primary_info = rows.find { |row| row[:role] == 'master' }
     replica_info = rows.find { |row| row[:primary_id] == primary[:id] }
 
@@ -111,7 +111,7 @@ class ClusterController
     src = src_info.fetch(:client)
     dest = dest_info.fetch(:client)
     id = dest_info.fetch(:id)
-    rest = take_primaries(@clients, shard_size: @shard_size).reject { |c| c.equal?(src) || c.equal?(dest) }
+    rest = rows.reject { |r| r[:role] == 'slave' || r[:client].equal?(src) || r[:client].equal?(dest) }.map { |r| r[:client] }
 
     ([dest, src] + rest).each do |cli|
       cli.call('CLUSTER', 'SETSLOT', slot, 'NODE', id)
@@ -255,19 +255,19 @@ class ClusterController
   end
 
   def replicate(clients, shard_size:, replica_size:)
-    rows = associate_with_clients_and_nodes(clients)
     primaries = take_primaries(clients, shard_size: shard_size)
     replicas = take_replicas(clients, shard_size: shard_size)
 
     replicas.each_slice(replica_size).each_with_index do |subset, i|
+      primary_id = primaries[i].call('CLUSTER', 'MYID')
+
       loop do
         begin
-          primary = rows.find { |r| r[:client].equal?(primaries[i]) }
-          subset.each { |replica| replica.call('CLUSTER', 'REPLICATE', primary.fetch(:id)) }
+          subset.each { |replica| replica.call('CLUSTER', 'REPLICATE', primary_id) }
         rescue ::RedisClient::CommandError
           # ERR Unknown node [key]
           sleep 0.1
-          rows = associate_with_clients_and_nodes(clients)
+          primary_id = primaries[i].call('CLUSTER', 'MYID')
           next
         end
 
