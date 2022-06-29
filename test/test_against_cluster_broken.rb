@@ -12,30 +12,27 @@ class TestAgainstClusterBroken < TestingWrapper
       fixed_hostname: TEST_FIXED_HOSTNAME,
       **TEST_GENERIC_OPTIONS
     )
-
     @client = ::RedisClient::Cluster.new(config)
+    @controller = ClusterController.new(
+      TEST_NODE_URIS,
+      replica_size: TEST_REPLICA_SIZE,
+      **TEST_GENERIC_OPTIONS.merge(timeout: 30.0)
+    )
   end
 
   def teardown
     @client.close
+    @controller.close
   end
 
   def test_a_replica_is_down
-    node_key = @client.instance_variable_get(:@router).node.replica_node_keys.sample
-    node = @client.instance_variable_get(:@router).node
-                  .instance_variable_get(:@clients).fetch(node_key)
-
-    do_test_a_node_is_down(node, number_of_keys: 10)
+    sacrifice = @controller.select_sacrifice_of_replica
+    do_test_a_node_is_down(sacrifice, number_of_keys: 10)
   end
 
   def test_a_primary_is_down
-    node_key = @client.instance_variable_get(:@router).node
-                      .instance_variable_get(:@replications).reject { |_, v| v.size.zero? }.keys.sample
-
-    node = @client.instance_variable_get(:@router).node
-                  .instance_variable_get(:@clients).fetch(node_key)
-
-    do_test_a_node_is_down(node, number_of_keys: 10)
+    sacrifice = @controller.select_sacrifice_of_primary
+    do_test_a_node_is_down(sacrifice, number_of_keys: 10)
   end
 
   private
