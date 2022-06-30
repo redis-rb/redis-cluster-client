@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'uri'
 require 'testing_helper'
 
 class RedisClient
@@ -98,7 +99,10 @@ class RedisClient
         { addrs: %w[redis://127.0.0.1:6379 redis://127.0.0.2:6380], want: [{ host: '127.0.0.1', port: 6379 }, { host: '127.0.0.2', port: 6380 }] },
         { addrs: %w[rediss://foo:bar@127.0.0.1:6379], want: [{ ssl: true, username: 'foo', password: 'bar', host: '127.0.0.1', port: 6379 }] },
         { addrs: %w[redis://foo@127.0.0.1:6379], want: [{ host: '127.0.0.1', port: 6379, username: 'foo' }] },
+        { addrs: %w[redis://foo:@127.0.0.1:6379], want: [{ host: '127.0.0.1', port: 6379, username: 'foo' }] },
         { addrs: %w[redis://:bar@127.0.0.1:6379], want: [{ host: '127.0.0.1', port: 6379, password: 'bar' }] },
+        { addrs: %W[redis://#{URI.encode_www_form_component('!&<123-abc>')}:@127.0.0.1:6379], want: [{ host: '127.0.0.1', port: 6379, username: '!&<123-abc>' }] },
+        { addrs: %W[redis://:#{URI.encode_www_form_component('!&<123-abc>')}@127.0.0.1:6379], want: [{ host: '127.0.0.1', port: 6379, password: '!&<123-abc>' }] },
         { addrs: [{ host: '127.0.0.1', port: 6379 }], want: [{ host: '127.0.0.1', port: 6379 }] },
         { addrs: [{ host: '127.0.0.1', port: 6379 }, { host: '127.0.0.2', port: '6380' }], want: [{ host: '127.0.0.1', port: 6379 }, { host: '127.0.0.2', port: 6380 }] },
         { addrs: [{ host: '127.0.0.1', port: 6379, username: 'foo', password: 'bar', ssl: true }], want: [{ ssl: true, username: 'foo', password: 'bar', host: '127.0.0.1', port: 6379 }] },
