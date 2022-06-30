@@ -42,8 +42,8 @@ class BenchCommand
 
     def bench_pipeline_set
       assert_performance_linear do |n|
-        n.times do |i|
-          @client.pipelined do |pi|
+        @client.pipelined do |pi|
+          n.times do |i|
             pi.call('SET', "key#{i}", i)
           end
         end
@@ -52,8 +52,8 @@ class BenchCommand
 
     def bench_pipeline_get
       assert_performance_linear do |n|
-        n.times do |i|
-          @client.pipelined do |pi|
+        @client.pipelined do |pi|
+          n.times do |i|
             pi.call('GET', "key#{i}")
           end
         end
