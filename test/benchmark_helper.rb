@@ -4,7 +4,6 @@
 
 require 'minitest/benchmark'
 require 'minitest/autorun'
-require 'redis_client'
 require 'redis_cluster_client'
 require 'testing_constants'
 
