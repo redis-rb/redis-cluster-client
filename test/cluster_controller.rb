@@ -15,8 +15,6 @@ class ClusterController
                  state_check_attempts: DEFAULT_MAX_ATTEMPTS,
                  **kwargs)
 
-    raise "Redis Cluster requires at least #{shard_size} master nodes." if node_addrs.size < shard_size
-
     @shard_size = shard_size
     @replica_size = replica_size
     @number_of_replicas = @replica_size * @shard_size
