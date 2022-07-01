@@ -3,7 +3,6 @@
 # @see https://docs.ruby-lang.org/en/2.1.0/MiniTest/Assertions.html
 
 require 'minitest/autorun'
-require 'redis_client'
 require 'redis_cluster_client'
 require 'testing_constants'
 require 'cluster_controller'

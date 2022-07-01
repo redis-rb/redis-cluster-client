@@ -23,6 +23,8 @@ Also, [the other generic options](https://github.com/redis-rb/redis-client#confi
 But `:url`, `:host`, `:port` and `:path` are ignored because they conflict with the `:nodes` option.
 
 ```ruby
+require 'redis_cluster_client'
+
 # The following examples are Docker containers on localhost.
 # The client first attempts to connect to redis://127.0.0.1:6379 internally.
 
