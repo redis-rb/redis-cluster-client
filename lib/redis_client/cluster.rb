@@ -17,16 +17,16 @@ class RedisClient
       "#<#{self.class.name} #{@router.node.node_keys.join(', ')}>"
     end
 
-    def call(*command, **kwargs)
-      @router.send_command(:call, *command, **kwargs)
+    def call(*command, **kwargs, &block)
+      @router.send_command(:call, *command, **kwargs, &block)
     end
 
-    def call_once(*command, **kwargs)
-      @router.send_command(:call_once, *command, **kwargs)
+    def call_once(*command, **kwargs, &block)
+      @router.send_command(:call_once, *command, **kwargs, &block)
     end
 
-    def blocking_call(timeout, *command, **kwargs)
-      @router.send_command(:blocking_call, timeout, *command, **kwargs)
+    def blocking_call(timeout, *command, **kwargs, &block)
+      @router.send_command(:blocking_call, timeout, *command, **kwargs, &block)
     end
 
     def scan(*args, **kwargs, &block)
@@ -74,10 +74,10 @@ class RedisClient
 
     private
 
-    def method_missing(name, *args, **kwargs)
+    def method_missing(name, *args, **kwargs, &block)
       if @router.command_exists?(name)
         args.unshift(name)
-        return @router.send_command(:call, *args)
+        return @router.send_command(:call, *args, **kwargs, &block)
       end
 
       super

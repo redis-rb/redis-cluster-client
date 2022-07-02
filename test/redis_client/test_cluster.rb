@@ -28,6 +28,9 @@ class RedisClient
           wait_for_replication
           assert_equal(i.to_s, @client.call('GET', "key#{i}"), "Case: GET: key#{i}")
         end
+        assert(@client.call('PING') { |r| r == 'PONG' })
+        assert_equal(2, @client.call('HSET', 'hash', { foo: 1, bar: 2 }))
+        assert_equal(%w[1 2], @client.call('HMGET', 'hash', %w[foo bar]))
       end
 
       def test_call_once
@@ -37,6 +40,9 @@ class RedisClient
           wait_for_replication
           assert_equal(i.to_s, @client.call_once('GET', "key#{i}"), "Case: GET: key#{i}")
         end
+        assert(@client.call_once('PING') { |r| r == 'PONG' })
+        assert_equal(2, @client.call('HSET', 'hash', { foo: 1, bar: 2 }))
+        assert_equal(%w[1 2], @client.call('HMGET', 'hash', %w[foo bar]))
       end
 
       def test_blocking_call
