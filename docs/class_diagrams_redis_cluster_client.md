@@ -94,6 +94,9 @@ classDiagram
   RedisClient_Cluster ..> RedisClient_Cluster_PubSub : new
   RedisClient_Cluster ..> RedisClient_Cluster_Router : new
 
+  RedisClient_Cluster_Pipeline ..> RedisClient_Cluster_Router : use
+  RedisClient_Cluster_PubSub ..> RedisClient_Cluster_Router : use
+
   RedisClient_Cluster_Router ..> RedisClient_Cluster_Node : new
   RedisClient_Cluster_Router ..> RedisClient_Cluster_Command : new
   RedisClient_Cluster_Router ..> module_RedisClient_Cluster_KeySlotConverter : call

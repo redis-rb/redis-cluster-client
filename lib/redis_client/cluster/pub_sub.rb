@@ -10,7 +10,7 @@ class RedisClient
 
       def call(*command, **kwargs)
         close
-        @pubsub = @router.assign_node(*command).pubsub
+        @pubsub = @router.assign_node(*command, **kwargs).pubsub
         @pubsub.call(*command, **kwargs)
       end
 
