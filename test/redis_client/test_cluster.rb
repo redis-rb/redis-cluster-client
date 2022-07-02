@@ -23,20 +23,32 @@ class RedisClient
 
       def test_call
         assert_raises(ArgumentError) { @client.call }
+
         (0..9).each do |i|
           assert_equal('OK', @client.call('SET', "key#{i}", i), "Case: SET: key#{i}")
           wait_for_replication
           assert_equal(i.to_s, @client.call('GET', "key#{i}"), "Case: GET: key#{i}")
         end
+
+        assert(@client.call('PING') { |r| r == 'PONG' })
+
+        assert_equal(2, @client.call('HSET', 'hash', { foo: 1, bar: 2 }))
+        assert_equal(%w[1 2], @client.call('HMGET', 'hash', %w[foo bar]))
       end
 
       def test_call_once
         assert_raises(ArgumentError) { @client.call_once }
+
         (0..9).each do |i|
           assert_equal('OK', @client.call_once('SET', "key#{i}", i), "Case: SET: key#{i}")
           wait_for_replication
           assert_equal(i.to_s, @client.call_once('GET', "key#{i}"), "Case: GET: key#{i}")
         end
+
+        assert(@client.call_once('PING') { |r| r == 'PONG' })
+
+        assert_equal(2, @client.call_once('HSET', 'hash', { foo: 1, bar: 2 }))
+        assert_equal(%w[1 2], @client.call_once('HMGET', 'hash', %w[foo bar]))
       end
 
       def test_blocking_call
