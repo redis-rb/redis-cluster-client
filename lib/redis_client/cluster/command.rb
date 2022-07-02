@@ -55,6 +55,10 @@ class RedisClient
         dig_details(command, :readonly)
       end
 
+      def exists?(name)
+        @details.key?(name.to_s.downcase)
+      end
+
       private
 
       def pick_details(details)

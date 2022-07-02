@@ -4,6 +4,7 @@ require 'uri'
 require 'redis_client'
 require 'redis_client/cluster'
 require 'redis_client/cluster/node_key'
+require 'redis_client/command_builder'
 
 class RedisClient
   class ClusterConfig
@@ -19,11 +20,14 @@ class RedisClient
 
     InvalidClientConfigError = Class.new(::RedisClient::Error)
 
+    attr_reader :command_builder
+
     def initialize(nodes: DEFAULT_NODES, replica: false, fixed_hostname: '', **client_config)
       @replica = true & replica
       @fixed_hostname = fixed_hostname.to_s
       @node_configs = build_node_configs(nodes.dup)
       client_config = client_config.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) }
+      @command_builder = client_config.fetch(:command_builder, ::RedisClient::CommandBuilder)
       @client_config = merge_generic_config(client_config, @node_configs)
       @mutex = Mutex.new
     end

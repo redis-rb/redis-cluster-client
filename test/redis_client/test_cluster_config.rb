@@ -90,6 +90,10 @@ class RedisClient
       refute_equal(orig.object_id, copy.object_id)
     end
 
+    def test_command_builder
+      assert_equal(::RedisClient::CommandBuilder, ::RedisClient::ClusterConfig.new.command_builder)
+    end
+
     def test_build_node_configs
       config = ::RedisClient::ClusterConfig.new
       [
