@@ -142,6 +142,10 @@ class RedisClient
         retry
       end
 
+      def command_exists?(name)
+        @command.exists?(name)
+      end
+
       private
 
       def send_wait_command(method, *args, retry_count: 3, **kwargs, &block)

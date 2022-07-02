@@ -115,6 +115,25 @@ class RedisClient
         end
       end
 
+      def test_exists?
+        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
+        [
+          { name: 'ping', want: true },
+          { name: :ping, want: true },
+          { name: 'PING', want: true },
+          { name: 'densaugeo', want: false },
+          { name: :densaugeo, want: false },
+          { name: 'DENSAUGEO', want: false },
+          { name: '', want: false },
+          { name: 0, want: false },
+          { name: nil, want: false }
+        ].each_with_index do |c, idx|
+          msg = "Case: #{idx}"
+          got = cmd.exists?(c[:name])
+          assert_equal(c[:want], got, msg)
+        end
+      end
+
       def test_pick_details
         keys = %i[first_key_position write readonly].freeze
         [
