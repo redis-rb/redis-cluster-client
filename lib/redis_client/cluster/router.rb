@@ -34,10 +34,10 @@ class RedisClient
           @node.call_primaries(method, *args, **kwargs, &block).first
         when 'ping'     then @node.send_ping(method, *args, **kwargs, &block).first
         when 'wait'     then send_wait_command(method, *args, **kwargs, &block)
-        when 'keys'     then @node.call_replicas(method, *args, **kwargs, &block).flatten.sort
-        when 'dbsize'   then @node.call_replicas(method, *args, **kwargs, &block).sum
+        when 'keys'     then @node.call_replicas(method, *args, **kwargs, &block).flatten.sort_by(&:to_s)
+        when 'dbsize'   then @node.call_replicas(method, *args, **kwargs, &block).select { |e| e.is_a?(Integer) }.sum
         when 'scan'     then scan(*command, **kwargs)
-        when 'lastsave' then @node.call_all(method, *args, **kwargs, &block).sort
+        when 'lastsave' then @node.call_all(method, *args, **kwargs, &block).sort_by(&:to_i)
         when 'role'     then @node.call_all(method, *args, **kwargs, &block)
         when 'config'   then send_config_command(method, *args, **kwargs, &block)
         when 'client'   then send_client_command(method, *args, **kwargs, &block)
@@ -221,11 +221,11 @@ class RedisClient
         command = method == :blocking_call && args.size > 1 ? args[1..] : args
 
         case command[1].to_s.downcase
-        when 'channels' then @node.call_all(method, *args, **kwargs, &block).flatten.uniq.sort
+        when 'channels' then @node.call_all(method, *args, **kwargs, &block).flatten.uniq.sort_by(&:to_s)
         when 'numsub'
           @node.call_all(method, *args, **kwargs, &block).reject(&:empty?).map { |e| Hash[*e] }
                .reduce({}) { |a, e| a.merge(e) { |_, v1, v2| v1 + v2 } }
-        when 'numpat' then @node.call_all(method, *args, **kwargs, &block).sum
+        when 'numpat' then @node.call_all(method, *args, **kwargs, &block).select { |e| e.is_a?(Integer) }.sum
         else assign_node(*command).send(method, *args, **kwargs, &block)
         end
       end
