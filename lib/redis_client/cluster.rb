@@ -11,7 +11,6 @@ class RedisClient
 
     def initialize(config, pool: nil, **kwargs)
       @router = ::RedisClient::Cluster::Router.new(config, pool: pool, **kwargs)
-      @command_builder = config.command_builder
     end
 
     def inspect
@@ -78,19 +77,16 @@ class RedisClient
     def method_missing(name, *args, **kwargs)
       if @router.command_exists?(name)
         args.unshift(name)
-        args = @command_builder.generate!(args, kwargs)
-        @router.send_command(:call, *args)
-      else
-        super
+        return @router.send_command(:call, *args)
       end
+
+      super
     end
 
     def respond_to_missing?(name, include_private = false)
-      if @router.command_exists?(name)
-        true
-      else
-        super
-      end
+      return true if @router.command_exists?(name)
+
+      super
     end
   end
 end

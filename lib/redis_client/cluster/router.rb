@@ -20,11 +20,13 @@ class RedisClient
         @client_kwargs = kwargs
         @node = fetch_cluster_info(@config, pool: @pool, **@client_kwargs)
         @command = ::RedisClient::Cluster::Command.load(@node)
+        @command_builder = @config.command_builder
         @mutex = Mutex.new
       end
 
       def send_command(method, *args, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
         command = method == :blocking_call && args.size > 1 ? args[1..] : args
+        command = @command_builder.generate!(command, kwargs)
 
         cmd = command.first.to_s.downcase
         case cmd
@@ -95,6 +97,8 @@ class RedisClient
       end
 
       def scan(*command, **kwargs) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+        command = @command_builder.generate!(command, kwargs)
+
         command[1] = ZERO_CURSOR_FOR_SCAN if command.size == 1
         input_cursor = Integer(command[1])
 
@@ -116,12 +120,14 @@ class RedisClient
         [((result_cursor << 8) + client_index).to_s, result_keys]
       end
 
-      def assign_node(*command)
-        node_key = find_node_key(*command)
+      def assign_node(*command, **kwargs)
+        node_key = find_node_key(*command, **kwargs)
         find_node(node_key)
       end
 
-      def find_node_key(*command, primary_only: false)
+      def find_node_key(*command, primary_only: false, **kwargs)
+        command = @command_builder.generate!(command, kwargs)
+
         key = @command.extract_first_key(command)
         slot = key.empty? ? nil : ::RedisClient::Cluster::KeySlotConverter.convert(key)
 
@@ -163,6 +169,7 @@ class RedisClient
 
       def send_config_command(method, *args, **kwargs, &block)
         command = method == :blocking_call && args.size > 1 ? args[1..] : args
+        command = @command_builder.generate!(command, kwargs)
 
         case command[1].to_s.downcase
         when 'resetstat', 'rewrite', 'set'
@@ -173,6 +180,7 @@ class RedisClient
 
       def send_memory_command(method, *args, **kwargs, &block)
         command = method == :blocking_call && args.size > 1 ? args[1..] : args
+        command = @command_builder.generate!(command, kwargs)
 
         case command[1].to_s.downcase
         when 'stats' then @node.call_all(method, *args, **kwargs, &block)
@@ -183,6 +191,7 @@ class RedisClient
 
       def send_client_command(method, *args, **kwargs, &block)
         command = method == :blocking_call && args.size > 1 ? args[1..] : args
+        command = @command_builder.generate!(command, kwargs)
 
         case command[1].to_s.downcase
         when 'list' then @node.call_all(method, *args, **kwargs, &block).flatten
@@ -194,6 +203,7 @@ class RedisClient
 
       def send_cluster_command(method, *args, **kwargs, &block) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         command = method == :blocking_call && args.size > 1 ? args[1..] : args
+        command = @command_builder.generate!(command, kwargs)
         subcommand = command[1].to_s.downcase
 
         case subcommand
@@ -211,6 +221,7 @@ class RedisClient
 
       def send_script_command(method, *args, **kwargs, &block)
         command = method == :blocking_call && args.size > 1 ? args[1..] : args
+        command = @command_builder.generate!(command, kwargs)
 
         case command[1].to_s.downcase
         when 'debug', 'kill'
@@ -223,6 +234,7 @@ class RedisClient
 
       def send_pubsub_command(method, *args, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         command = method == :blocking_call && args.size > 1 ? args[1..] : args
+        command = @command_builder.generate!(command, kwargs)
 
         case command[1].to_s.downcase
         when 'channels' then @node.call_all(method, *args, **kwargs, &block).flatten.uniq.sort_by(&:to_s)

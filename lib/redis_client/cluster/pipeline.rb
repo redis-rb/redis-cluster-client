@@ -15,19 +15,19 @@ class RedisClient
       end
 
       def call(*command, **kwargs)
-        node_key = @router.find_node_key(*command, primary_only: true)
+        node_key = @router.find_node_key(*command, primary_only: true, **kwargs)
         @grouped[node_key] += [[@size, :call, command, kwargs]]
         @size += 1
       end
 
       def call_once(*command, **kwargs)
-        node_key = @router.find_node_key(*command, primary_only: true)
+        node_key = @router.find_node_key(*command, primary_only: true, **kwargs)
         @grouped[node_key] += [[@size, :call_once, command, kwargs]]
         @size += 1
       end
 
       def blocking_call(timeout, *command, **kwargs)
-        node_key = @router.find_node_key(*command, primary_only: true)
+        node_key = @router.find_node_key(*command, primary_only: true, **kwargs)
         @grouped[node_key] += [[@size, :blocking_call, timeout, command, kwargs]]
         @size += 1
       end
