@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'redis_client'
 require 'redis_client/cluster/pipeline'
 require 'redis_client/cluster/pub_sub'
 require 'redis_client/cluster/router'
