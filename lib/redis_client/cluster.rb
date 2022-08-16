@@ -10,22 +10,41 @@ class RedisClient
 
     def initialize(config, pool: nil, **kwargs)
       @router = ::RedisClient::Cluster::Router.new(config, pool: pool, **kwargs)
+      @command_builder = config.command_builder
     end
 
     def inspect
       "#<#{self.class.name} #{@router.node.node_keys.join(', ')}>"
     end
 
-    def call(*command, **kwargs, &block)
-      @router.send_command(:call, *command, **kwargs, &block)
+    def call(*args, **kwargs, &block)
+      command = @command_builder.generate(args, kwargs)
+      @router.send_command(:call_v, command, &block)
     end
 
-    def call_once(*command, **kwargs, &block)
-      @router.send_command(:call_once, *command, **kwargs, &block)
+    def call_v(command, &block)
+      command = @command_builder.generate(command)
+      @router.send_command(:call_v, command, &block)
     end
 
-    def blocking_call(timeout, *command, **kwargs, &block)
-      @router.send_command(:blocking_call, timeout, *command, **kwargs, &block)
+    def call_once(*args, **kwargs, &block)
+      command = @command_builder.generate(args, kwargs)
+      @router.send_command(:call_once_v, command, &block)
+    end
+
+    def call_once_v(command, &block)
+      command = @command_builder.generate(command)
+      @router.send_command(:call_once_v, command, &block)
+    end
+
+    def blocking_call(timeout, *args, **kwargs, &block)
+      command = @command_builder.generate(args, kwargs)
+      @router.send_command(:blocking_call_v, command, timeout, &block)
+    end
+
+    def blocking_call_v(timeout, command, &block)
+      command = @command_builder.generate(command)
+      @router.send_command(:blocking_call_v, command, timeout, &block)
     end
 
     def scan(*args, **kwargs, &block)
@@ -40,22 +59,22 @@ class RedisClient
     end
 
     def sscan(key, *args, **kwargs, &block)
-      node = @router.assign_node('SSCAN', key)
-      @router.try_send(node, :sscan, key, *args, **kwargs, &block)
+      node = @router.assign_node(['SSCAN', key])
+      @router.try_delegate(node, :sscan, key, *args, **kwargs, &block)
     end
 
     def hscan(key, *args, **kwargs, &block)
-      node = @router.assign_node('HSCAN', key)
-      @router.try_send(node, :hscan, key, *args, **kwargs, &block)
+      node = @router.assign_node(['HSCAN', key])
+      @router.try_delegate(node, :hscan, key, *args, **kwargs, &block)
     end
 
     def zscan(key, *args, **kwargs, &block)
-      node = @router.assign_node('ZSCAN', key)
-      @router.try_send(node, :zscan, key, *args, **kwargs, &block)
+      node = @router.assign_node(['ZSCAN', key])
+      @router.try_delegate(node, :zscan, key, *args, **kwargs, &block)
     end
 
     def pipelined
-      pipeline = ::RedisClient::Cluster::Pipeline.new(@router)
+      pipeline = ::RedisClient::Cluster::Pipeline.new(@router, @command_builder)
       yield pipeline
       return [] if pipeline.empty? == 0
 
@@ -63,11 +82,11 @@ class RedisClient
     end
 
     def pubsub
-      ::RedisClient::Cluster::PubSub.new(@router)
+      ::RedisClient::Cluster::PubSub.new(@router, @command_builder)
     end
 
     def close
-      @router.node.call_all(:close)
+      @router.node.each(&:close)
       nil
     end
 
@@ -76,7 +95,8 @@ class RedisClient
     def method_missing(name, *args, **kwargs, &block)
       if @router.command_exists?(name)
         args.unshift(name)
-        return @router.send_command(:call, *args, **kwargs, &block)
+        command = @command_builder.generate(args, kwargs)
+        return @router.send_command(:call_v, command, &block)
       end
 
       super

@@ -128,9 +128,9 @@ class RedisClient
         @clients.fetch(node_key)
       end
 
-      def call_all(method, *args, **kwargs, &block)
+      def call_all(method, command, args, &block)
         results, errors = try_map do |_, client|
-          client.send(method, *args, **kwargs, &block)
+          client.send(method, *args, command, &block)
         end
 
         return results.values if errors.empty?
@@ -138,11 +138,11 @@ class RedisClient
         raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
-      def call_primaries(method, *args, **kwargs, &block)
+      def call_primaries(method, command, args, &block)
         results, errors = try_map do |node_key, client|
           next if replica?(node_key)
 
-          client.send(method, *args, **kwargs, &block)
+          client.send(method, *args, command, &block)
         end
 
         return results.values if errors.empty?
@@ -150,14 +150,14 @@ class RedisClient
         raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
-      def call_replicas(method, *args, **kwargs, &block)
-        return call_primaries(method, *args, **kwargs, &block) if replica_disabled?
+      def call_replicas(method, command, args, &block)
+        return call_primaries(method, command, args, &block) if replica_disabled?
 
         replica_node_keys = @replications.values.map(&:sample)
         results, errors = try_map do |node_key, client|
           next if primary?(node_key) || !replica_node_keys.include?(node_key)
 
-          client.send(method, *args, **kwargs, &block)
+          client.send(method, *args, command, &block)
         end
 
         return results.values if errors.empty?
@@ -165,9 +165,9 @@ class RedisClient
         raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
-      def send_ping(method, *args, **kwargs, &block)
+      def send_ping(method, command, args, &block)
         results, errors = try_map do |_, client|
-          client.send(method, *args, **kwargs, &block)
+          client.send(method, *args, command, &block)
         end
 
         return results.values if errors.empty?

@@ -12,7 +12,7 @@ class RedisClient
       end
 
       def teardown
-        @client.call('FLUSHDB')
+        @client&.call('FLUSHDB')
         wait_for_replication
         @client&.close
       end
