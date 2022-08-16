@@ -22,13 +22,14 @@ class RedisClient
 
     attr_reader :command_builder
 
-    def initialize(nodes: DEFAULT_NODES, replica: false, fixed_hostname: '', **client_config)
+    def initialize(nodes: DEFAULT_NODES, replica: false, client_implementation: Cluster, fixed_hostname: '', **client_config)
       @replica = true & replica
       @fixed_hostname = fixed_hostname.to_s
       @node_configs = build_node_configs(nodes.dup)
       client_config = client_config.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) }
       @command_builder = client_config.fetch(:command_builder, ::RedisClient::CommandBuilder)
       @client_config = merge_generic_config(client_config, @node_configs)
+      @client_implementation = client_implementation
       @mutex = Mutex.new
     end
 
@@ -37,11 +38,11 @@ class RedisClient
     end
 
     def new_pool(size: 5, timeout: 5, **kwargs)
-      ::RedisClient::Cluster.new(self, pool: { size: size, timeout: timeout }, **kwargs)
+      @client_implementation.new(self, pool: { size: size, timeout: timeout }, **kwargs)
     end
 
     def new_client(**kwargs)
-      ::RedisClient::Cluster.new(self, **kwargs)
+      @client_implementation.new(self, **kwargs)
     end
 
     def per_node_key

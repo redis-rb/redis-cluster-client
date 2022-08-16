@@ -8,27 +8,52 @@ class RedisClient
     class Pipeline
       ReplySizeError = Class.new(::RedisClient::Error)
 
-      def initialize(router)
+      def initialize(router, command_builder)
         @router = router
+        @command_builder = command_builder
         @grouped = Hash.new([].freeze)
         @size = 0
       end
 
-      def call(*command, **kwargs)
-        node_key = @router.find_node_key(*command, primary_only: true, **kwargs)
-        @grouped[node_key] += [[@size, :call, command, kwargs]]
+      def call(*args, **kwargs, &block)
+        command = @command_builder.generate(args, kwargs)
+        node_key = @router.find_node_key(command, primary_only: true)
+        @grouped[node_key] += [[@size, :call_v, command, block]]
         @size += 1
       end
 
-      def call_once(*command, **kwargs)
-        node_key = @router.find_node_key(*command, primary_only: true, **kwargs)
-        @grouped[node_key] += [[@size, :call_once, command, kwargs]]
+      def call_v(args, &block)
+        command = @command_builder.generate(args)
+        node_key = @router.find_node_key(command, primary_only: true)
+        @grouped[node_key] += [[@size, :call_v, command, block]]
         @size += 1
       end
 
-      def blocking_call(timeout, *command, **kwargs)
-        node_key = @router.find_node_key(*command, primary_only: true, **kwargs)
-        @grouped[node_key] += [[@size, :blocking_call, timeout, command, kwargs]]
+      def call_once(*args, **kwargs, &block)
+        command = @command_builder.generate(args, kwargs)
+        node_key = @router.find_node_key(command, primary_only: true)
+        @grouped[node_key] += [[@size, :call_once_v, command, block]]
+        @size += 1
+      end
+
+      def call_once_v(args, &block)
+        command = @command_builder.generate(args)
+        node_key = @router.find_node_key(command, primary_only: true)
+        @grouped[node_key] += [[@size, :call_once_v, command, block]]
+        @size += 1
+      end
+
+      def blocking_call(timeout, *args, **kwargs, &block)
+        command = @command_builder.generate(args, kwargs)
+        node_key = @router.find_node_key(command, primary_only: true)
+        @grouped[node_key] += [[@size, :blocking_call_v, timeout, command, block]]
+        @size += 1
+      end
+
+      def blocking_call_v(timeout, args, &block)
+        command = @command_builder.generate(args)
+        node_key = @router.find_node_key(command, primary_only: true)
+        @grouped[node_key] += [[@size, :blocking_call_v, timeout, command, block]]
         @size += 1
       end
 
@@ -37,20 +62,15 @@ class RedisClient
       end
 
       # TODO: https://github.com/redis-rb/redis-cluster-client/issues/37 handle redirections
-      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
         all_replies = Array.new(@size)
         errors = {}
         threads = @grouped.map do |k, v|
           Thread.new(@router, k, v) do |router, node_key, rows|
             Thread.pass
             replies = router.find_node(node_key).pipelined do |pipeline|
-              rows.each do |row|
-                case row[1]
-                when :call then pipeline.call(*row[2], **row[3])
-                when :call_once then pipeline.call_once(*row[2], **row[3])
-                when :blocking_call then pipeline.blocking_call(row[2], *row[3], **row[4])
-                else raise NotImplementedError, row[1]
-                end
+              rows.each do |(_size, *row, block)|
+                pipeline.send(*row, &block)
               end
             end
 

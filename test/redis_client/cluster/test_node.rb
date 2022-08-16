@@ -243,27 +243,27 @@ class RedisClient
 
       def test_call_all
         want = (1..(@test_node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
-        got = @test_node.call_all(:call, 'PING')
+        got = @test_node.call_all(:call_v, ['PING'], [])
         assert_equal(want, got, 'Case: primary only')
 
         want = (1..(@test_node_info.count)).map { |_| 'PONG' }
-        got = @test_node_with_scale_read.call_all(:call, 'PING')
+        got = @test_node_with_scale_read.call_all(:call_v, ['PING'], [])
         assert_equal(want, got, 'Case: scale read')
       end
 
       def test_call_primaries
         want = (1..(@test_node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
-        got = @test_node.call_primaries(:call, 'PING')
+        got = @test_node.call_primaries(:call_v, ['PING'], [])
         assert_equal(want, got)
       end
 
       def test_call_replicas
         want = (1..(@test_node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
 
-        got = @test_node.call_replicas(:call, 'PING')
+        got = @test_node.call_replicas(:call_v, ['PING'], [])
         assert_equal(want, got, 'Case: primary only')
 
-        got = @test_node_with_scale_read.call_replicas(:call, 'PING')
+        got = @test_node_with_scale_read.call_replicas(:call_v, ['PING'], [])
         assert_equal(want, got, 'Case: scale read')
       end
 
