@@ -15,45 +15,45 @@ class RedisClient
         @size = 0
       end
 
-      def call(*args, **kwargs)
+      def call(*args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, primary_only: true)
-        @grouped[node_key] += [[@size, :call_v, command]]
+        @grouped[node_key] += [[@size, :call_v, command, block]]
         @size += 1
       end
 
-      def call_v(args)
+      def call_v(args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, primary_only: true)
-        @grouped[node_key] += [[@size, :call_v, command]]
+        @grouped[node_key] += [[@size, :call_v, command, block]]
         @size += 1
       end
 
-      def call_once(*args, **kwargs)
+      def call_once(*args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, primary_only: true)
-        @grouped[node_key] += [[@size, :call_once_v, command]]
+        @grouped[node_key] += [[@size, :call_once_v, command, block]]
         @size += 1
       end
 
-      def call_once_v(args)
+      def call_once_v(args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, primary_only: true)
-        @grouped[node_key] += [[@size, :call_once_v, command]]
+        @grouped[node_key] += [[@size, :call_once_v, command, block]]
         @size += 1
       end
 
-      def blocking_call(timeout, *args, **kwargs)
+      def blocking_call(timeout, *args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, primary_only: true)
-        @grouped[node_key] += [[@size, :blocking_call_v, timeout, command]]
+        @grouped[node_key] += [[@size, :blocking_call_v, timeout, command, block]]
         @size += 1
       end
 
-      def blocking_call_v(timeout, args)
+      def blocking_call_v(timeout, args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, primary_only: true)
-        @grouped[node_key] += [[@size, :blocking_call_v, timeout, command]]
+        @grouped[node_key] += [[@size, :blocking_call_v, timeout, command, block]]
         @size += 1
       end
 
@@ -69,8 +69,8 @@ class RedisClient
           Thread.new(@router, k, v) do |router, node_key, rows|
             Thread.pass
             replies = router.find_node(node_key).pipelined do |pipeline|
-              rows.each do |(_size, *row)|
-                pipeline.send(*row)
+              rows.each do |(_size, *row, block)|
+                pipeline.send(*row, &block)
               end
             end
 
