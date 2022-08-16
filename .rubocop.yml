@@ -35,3 +35,7 @@ Style/Documentation:
 
 Gemspec/RequiredRubyVersion:
   Enabled: false
+
+Naming/FileName:
+  Exclude:
+    - 'lib/redis-cluster-client.rb'
