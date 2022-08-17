@@ -20,7 +20,7 @@ class RedisClient
 
     InvalidClientConfigError = Class.new(::RedisClient::Error)
 
-    attr_reader :command_builder
+    attr_reader :command_builder, :client_config
 
     def initialize(nodes: DEFAULT_NODES, replica: false, client_implementation: Cluster, fixed_hostname: '', **client_config)
       @replica = true & replica
@@ -35,6 +35,10 @@ class RedisClient
 
     def inspect
       "#<#{self.class.name} #{per_node_key.values}>"
+    end
+
+    def read_timeout
+      @client_config[:read_timeout] || @client_config[:timeout] || RedisClient::Config::DEFAULT_TIMEOUT
     end
 
     def new_pool(size: 5, timeout: 5, **kwargs)

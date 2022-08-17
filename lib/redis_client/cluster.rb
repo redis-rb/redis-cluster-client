@@ -8,7 +8,10 @@ class RedisClient
   class Cluster
     ZERO_CURSOR_FOR_SCAN = '0'
 
+    attr_reader :config
+
     def initialize(config, pool: nil, **kwargs)
+      @config = config
       @router = ::RedisClient::Cluster::Router.new(config, pool: pool, **kwargs)
       @command_builder = config.command_builder
     end

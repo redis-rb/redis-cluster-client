@@ -17,6 +17,11 @@ class RedisClient
         @client&.close
       end
 
+      def test_config
+        refute_nil @client.config
+        refute_nil @client.config.read_timeout
+      end
+
       def test_inspect
         assert_match(/^#<RedisClient::Cluster [0-9., :]*>$/, @client.inspect)
       end
