@@ -64,7 +64,7 @@ class RedisClient
 
       # @see https://redis.io/topics/cluster-spec#redirection-and-resharding
       #   Redirection and resharding
-      def try_send(node, method, command, args, retry_count: 3, &block) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+      def try_send(node, method, command, args, retry_count: 3, &block) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         node.send(method, *args, command, &block)
       rescue ::RedisClient::CommandError => e
         raise if retry_count <= 0
@@ -85,7 +85,8 @@ class RedisClient
         else
           raise
         end
-      rescue ::RedisClient::ConnectionError
+      rescue ::RedisClient::ConnectionError => e
+        raise if method == :blocking_call_v || (method == :blocking_call && e.is_a?(RedisClient::ReadTimeoutError))
         raise if retry_count <= 0
 
         update_cluster_info!
