@@ -132,7 +132,7 @@ class RedisClient
         client_index = input_cursor % 256
         raw_cursor = input_cursor >> 8
 
-        clients = @node.scale_reading_clients
+        clients = @node.clients_for_scanning
 
         client = clients[client_index]
         return [ZERO_CURSOR_FOR_SCAN, []] unless client
@@ -266,12 +266,18 @@ class RedisClient
         find_node(node_key)
       end
 
-      def fetch_cluster_info(config, pool: nil, **kwargs)
+      def fetch_cluster_info(config, pool: nil, **kwargs) # rubocop:disable Metrics/MethodLength
         node_info = ::RedisClient::Cluster::Node.load_info(config.per_node_key, **kwargs)
         node_addrs = node_info.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info[:node_key]) }
         config.update_node(node_addrs)
-        ::RedisClient::Cluster::Node.new(config.per_node_key,
-                                         node_info: node_info, pool: pool, with_replica: config.use_replica?, **kwargs)
+        ::RedisClient::Cluster::Node.new(
+          config.per_node_key,
+          node_info: node_info,
+          pool: pool,
+          with_replica: config.use_replica?,
+          replica_affinity: config.replica_affinity,
+          **kwargs
+        )
       end
 
       def update_cluster_info!

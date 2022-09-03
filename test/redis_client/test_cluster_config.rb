@@ -70,6 +70,22 @@ class RedisClient
       refute_predicate(::RedisClient::ClusterConfig.new, :use_replica?)
     end
 
+    def test_replica_affinity
+      [
+        { value: :random, want: :random },
+        { value: 'random', want: :random },
+        { value: :nearest, want: :nearest },
+        { value: 'nearest', want: :nearest },
+        { value: :unknown, want: :unknown },
+        { value: 'unknown', want: :unknown },
+        { value: 0, want: :'0' },
+        { value: nil, want: :'' }
+      ].each do |c|
+        cfg = ::RedisClient::ClusterConfig.new(replica_affinity: c[:value])
+        assert_equal(c[:want], cfg.replica_affinity)
+      end
+    end
+
     def test_update_node
       config = ::RedisClient::ClusterConfig.new(nodes: %w[redis://127.0.0.1:6379])
       assert_equal([{ host: '127.0.0.1', port: 6379 }], config.instance_variable_get(:@node_configs))

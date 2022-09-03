@@ -51,11 +51,39 @@ classDiagram
     +call_primaries()
     +call_replicas()
     +send_ping()
-    +scale_reading_clients()
+    +clients_for_scanning()
     +find_node_key_of_primary()
     +find_node_key_of_replica()
     +update_slot()
     +replicated?()
+  }
+
+  class RedisClient_Cluster_Node_PrimaryOnly {
+    +clients()
+    +primary_node_keys()
+    +replica_node_keys()
+    +fixed_clients()
+    +primary_clients()
+    +replica_clients()
+    +find_node_key_of_replica()
+  }
+
+  class RedisClient_Cluster_Node_RandomReplica {
+    +replica_clients()
+    +find_node_key_of_replica()
+  }
+
+  class RedisClient_Cluster_Node_NearestReplica {
+    +replica_clients()
+    +find_node_key_of_replica()
+  }
+
+  class module_RedisClient_Cluster_Node_ReplicaMixin {
+    +clients()
+    +primary_node_keys()
+    +replica_node_keys()
+    +fixed_clients()
+    +primary_clients()
   }
 
   class module_RedisClient_Cluster_NodeKey {
@@ -101,4 +129,10 @@ classDiagram
   RedisClient_Cluster_Router ..> RedisClient_Cluster_Command : new
   RedisClient_Cluster_Router ..> module_RedisClient_Cluster_KeySlotConverter : call
   RedisClient_Cluster_Router ..> module_RedisClient_Cluster_NodeKey : call
+
+  RedisClient_Cluster_Node_RandomReplica ..|> module_RedisClient_Cluster_Node_ReplicaMixin : include
+  RedisClient_Cluster_Node_NearestReplica ..|> module_RedisClient_Cluster_Node_ReplicaMixin : include
+  RedisClient_Cluster_Node ..> RedisClient_Cluster_Node_PrimaryOnly : new
+  RedisClient_Cluster_Node ..> RedisClient_Cluster_Node_RandomReplica : new
+  RedisClient_Cluster_Node ..> RedisClient_Cluster_Node_NearestReplica : new
 ```
