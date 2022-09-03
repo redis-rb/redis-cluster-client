@@ -7,6 +7,7 @@ class RedisClient
   class Cluster
     class Pipeline
       ReplySizeError = Class.new(::RedisClient::Error)
+      MAX_THREADS = Integer(ENV.fetch('MAX_THREADS', 5))
 
       def initialize(router, command_builder)
         @router = router
@@ -62,27 +63,30 @@ class RedisClient
       end
 
       # TODO: https://github.com/redis-rb/redis-cluster-client/issues/37 handle redirections
-      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
         all_replies = Array.new(@size)
         errors = {}
-        threads = @grouped.map do |k, v|
-          Thread.new(@router, k, v) do |router, node_key, rows|
-            Thread.pass
-            replies = router.find_node(node_key).pipelined do |pipeline|
-              rows.each do |(_size, *row, block)|
-                pipeline.send(*row, &block)
+        @grouped.each_slice(MAX_THREADS * 2) do |chuncked_grouped|
+          threads = chuncked_grouped.map do |k, v|
+            Thread.new(@router, k, v) do |router, node_key, rows|
+              Thread.pass
+              replies = router.find_node(node_key).pipelined do |pipeline|
+                rows.each do |(_size, *row, block)|
+                  pipeline.send(*row, &block)
+                end
               end
+
+              raise ReplySizeError, "commands: #{rows.size}, replies: #{replies.size}" if rows.size != replies.size
+
+              rows.each_with_index { |row, idx| all_replies[row.first] = replies[idx] }
+            rescue StandardError => e
+              errors[node_key] = e
             end
-
-            raise ReplySizeError, "commands: #{rows.size}, replies: #{replies.size}" if rows.size != replies.size
-
-            rows.each_with_index { |row, idx| all_replies[row.first] = replies[idx] }
-          rescue StandardError => e
-            errors[node_key] = e
           end
+
+          threads.each(&:join)
         end
 
-        threads.each(&:join)
         return all_replies if errors.empty?
 
         raise ::RedisClient::Cluster::ErrorCollection, errors

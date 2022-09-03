@@ -13,6 +13,7 @@ class RedisClient
       MIN_SLOT = 0
       MAX_SLOT = SLOT_SIZE - 1
       MAX_STARTUP_SAMPLE = 37
+      MAX_THREADS = Integer(ENV.fetch('MAX_THREADS', 5))
       IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
 
       ReloadNeeded = Class.new(::RedisClient::Error)
@@ -39,18 +40,21 @@ class RedisClient
           errors = Array.new(startup_size)
           startup_options = options.to_a.sample(MAX_STARTUP_SAMPLE).to_h
           startup_nodes = ::RedisClient::Cluster::Node.new(startup_options, **kwargs)
-          threads = startup_nodes.each_with_index.map do |raw_client, idx|
-            Thread.new(raw_client, idx) do |cli, i|
-              Thread.pass
-              reply = cli.call('CLUSTER', 'NODES')
-              node_info_list[i] = parse_node_info(reply)
-            rescue StandardError => e
-              errors[i] = e
-            ensure
-              cli&.close
+          startup_nodes.each_slice(MAX_THREADS * 2).with_index do |chuncked_startup_nodes, chuncked_idx|
+            threads = chuncked_startup_nodes.each_with_index.map do |raw_client, idx|
+              Thread.new(raw_client, (MAX_THREADS * 2 * chuncked_idx) + idx) do |cli, i|
+                Thread.pass
+                reply = cli.call('CLUSTER', 'NODES')
+                node_info_list[i] = parse_node_info(reply)
+              rescue StandardError => e
+                errors[i] = e
+              ensure
+                cli&.close
+              end
             end
+            threads.each(&:join)
           end
-          threads.each(&:join)
+
           raise ::RedisClient::Cluster::InitialSetupError, errors if node_info_list.all?(&:nil?)
 
           grouped = node_info_list.compact.group_by do |rows|
@@ -267,17 +271,20 @@ class RedisClient
       def try_map # rubocop:disable Metrics/MethodLength
         results = {}
         errors = {}
-        threads = @clients.map do |k, v|
-          Thread.new(k, v) do |node_key, client|
-            Thread.pass
-            reply = yield(node_key, client)
-            results[node_key] = reply unless reply.nil?
-          rescue StandardError => e
-            errors[node_key] = e
+        @clients.each_slice(MAX_THREADS * 2) do |chuncked_clients|
+          threads = chuncked_clients.map do |k, v|
+            Thread.new(k, v) do |node_key, client|
+              Thread.pass
+              reply = yield(node_key, client)
+              results[node_key] = reply unless reply.nil?
+            rescue StandardError => e
+              errors[node_key] = e
+            end
           end
+
+          threads.each(&:join)
         end
 
-        threads.each(&:join)
         [results, errors]
       end
     end
