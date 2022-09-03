@@ -22,7 +22,7 @@ class RedisClient
           options.filter_map do |node_key, option|
             config = ::RedisClient::Cluster::Node::Config.new(
               scale_read: replica?(node_key),
-              **option.merge(kwargs.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) })
+              **option.merge(kwargs.reject { |k, _| ::RedisClient::Cluster::Node::IGNORE_GENERIC_CONFIG_KEYS.include?(k) })
             )
             client = pool.nil? ? config.new_client : config.new_pool(**pool)
 

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'redis_client/cluster/node/replica_mixin'
+
 class RedisClient
   class Cluster
     class Node

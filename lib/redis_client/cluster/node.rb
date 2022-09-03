@@ -3,6 +3,9 @@
 require 'redis_client'
 require 'redis_client/config'
 require 'redis_client/cluster/errors'
+require 'redis_client/cluster/node/primary_only'
+require 'redis_client/cluster/node/random_replica'
+require 'redis_client/cluster/node/nearest_replica'
 
 class RedisClient
   class Cluster
