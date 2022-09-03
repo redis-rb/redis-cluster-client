@@ -29,7 +29,7 @@ class RedisClient
       def test_call
         assert_raises(ArgumentError) { @client.call }
 
-        (0..9).each do |i|
+        10.times do |i|
           assert_equal('OK', @client.call('SET', "key#{i}", i), "Case: SET: key#{i}")
           wait_for_replication
           assert_equal(i.to_s, @client.call('GET', "key#{i}"), "Case: GET: key#{i}")
@@ -44,7 +44,7 @@ class RedisClient
       def test_call_once
         assert_raises(ArgumentError) { @client.call_once }
 
-        (0..9).each do |i|
+        10.times do |i|
           assert_equal('OK', @client.call_once('SET', "key#{i}", i), "Case: SET: key#{i}")
           wait_for_replication
           assert_equal(i.to_s, @client.call_once('GET', "key#{i}"), "Case: GET: key#{i}")
@@ -72,7 +72,7 @@ class RedisClient
       def test_scan
         assert_raises(ArgumentError) { @client.scan }
 
-        (0..9).each { |i| @client.call('SET', "key#{i}", i) }
+        10.times { |i| @client.call('SET', "key#{i}", i) }
         wait_for_replication
         want = (0..9).map { |i| "key#{i}" }
         got = []
@@ -81,8 +81,8 @@ class RedisClient
       end
 
       def test_sscan
-        (0..9).each do |i|
-          (0..9).each { |j| @client.call('SADD', "key#{i}", "member#{j}") }
+        10.times do |i|
+          10.times { |j| @client.call('SADD', "key#{i}", "member#{j}") }
           wait_for_replication
           want = (0..9).map { |j| "member#{j}" }
           got = []
@@ -92,8 +92,8 @@ class RedisClient
       end
 
       def test_hscan
-        (0..9).each do |i|
-          (0..9).each { |j| @client.call('HSET', "key#{i}", "field#{j}", j) }
+        10.times do |i|
+          10.times { |j| @client.call('HSET', "key#{i}", "field#{j}", j) }
           wait_for_replication
           want = (0..9).map { |j| "field#{j}" }
           got = []
@@ -103,8 +103,8 @@ class RedisClient
       end
 
       def test_zscan
-        (0..9).each do |i|
-          (0..9).each { |j| @client.call('ZADD', "key#{i}", j, "member#{j}") }
+        10.times do |i|
+          10.times { |j| @client.call('ZADD', "key#{i}", j, "member#{j}") }
           wait_for_replication
           want = (0..9).map { |j| "member#{j}" }
           got = []
@@ -118,10 +118,10 @@ class RedisClient
 
         want = (0..9).map { 'OK' } + (1..3).to_a + %w[PONG] + (0..9).map(&:to_s) + [%w[list 2]]
         got = @client.pipelined do |pipeline|
-          (0..9).each { |i| pipeline.call('SET', "string#{i}", i) }
-          (0..2).each { |i| pipeline.call('RPUSH', 'list', i) }
+          10.times { |i| pipeline.call('SET', "string#{i}", i) }
+          3.times { |i| pipeline.call('RPUSH', 'list', i) }
           pipeline.call_once('PING')
-          (0..9).each { |i| pipeline.call('GET', "string#{i}") }
+          10.times { |i| pipeline.call('GET', "string#{i}") }
           pipeline.blocking_call(0.2, 'BRPOP', 'list', '0.1')
         end
 
@@ -129,7 +129,7 @@ class RedisClient
       end
 
       def test_pubsub
-        (0..9).each do |i|
+        10.times do |i|
           pubsub = @client.pubsub
           pubsub.call('SUBSCRIBE', "channel#{i}")
           assert_equal(['subscribe', "channel#{i}", 1], pubsub.next_event(0.1))
@@ -154,7 +154,7 @@ class RedisClient
       end
 
       def test_dedicated_commands
-        (0..9).each { |i| @client.call('SET', "key#{i}", i) }
+        10.times { |i| @client.call('SET', "key#{i}", i) }
         wait_for_replication
         [
           { command: %w[ACL HELP], is_a: Array },
