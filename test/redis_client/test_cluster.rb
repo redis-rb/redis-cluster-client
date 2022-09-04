@@ -116,15 +116,22 @@ class RedisClient
       def test_pipelined
         assert_empty([], @client.pipelined { |_| 1 + 1 })
 
-        want = (0..9).map { 'OK' } + (1..3).to_a + %w[PONG] + (0..9).map(&:to_s) + [%w[list 2]]
+        want = (0..9).map { 'OK' } + (1..3).to_a + %w[PONG]
         got = @client.pipelined do |pipeline|
           10.times { |i| pipeline.call('SET', "string#{i}", i) }
           3.times { |i| pipeline.call('RPUSH', 'list', i) }
           pipeline.call_once('PING')
+        end
+        assert_equal(want, got)
+
+        wait_for_replication
+
+        want = %w[PONG] + (0..9).map(&:to_s) + [%w[list 2]]
+        got = @client.pipelined do |pipeline|
+          pipeline.call_once('PING')
           10.times { |i| pipeline.call('GET', "string#{i}") }
           pipeline.blocking_call(0.2, 'BRPOP', 'list', '0.1')
         end
-
         assert_equal(want, got)
       end
 

@@ -168,7 +168,8 @@ class RedisClient
       end
 
       def find_node_key_of_replica(slot, seed: nil)
-        @topology.find_node_key_of_replica(find_node_key_of_primary(slot), seed: seed)
+        primary_node_key = find_node_key_of_primary(slot)
+        @topology.find_node_key_of_replica(primary_node_key, seed: seed)
       end
 
       def any_primary_node_key(seed: nil)
