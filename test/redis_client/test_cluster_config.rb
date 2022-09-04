@@ -74,8 +74,8 @@ class RedisClient
       [
         { value: :random, want: :random },
         { value: 'random', want: :random },
-        { value: :nearest, want: :nearest },
-        { value: 'nearest', want: :nearest },
+        { value: :latency, want: :latency },
+        { value: 'latency', want: :latency },
         { value: :unknown, want: :unknown },
         { value: 'unknown', want: :unknown },
         { value: 0, want: :'0' },

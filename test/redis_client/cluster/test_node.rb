@@ -314,7 +314,7 @@ class RedisClient
           { with_replica: false, replica_affinity: :foo, want: ::RedisClient::Cluster::Node::PrimaryOnly },
           { with_replica: true, replica_affinity: :foo, want: ::RedisClient::Cluster::Node::PrimaryOnly },
           { with_replica: true, replica_affinity: :random, want: ::RedisClient::Cluster::Node::RandomReplica },
-          { with_replica: true, replica_affinity: :nearest, want: ::RedisClient::Cluster::Node::NearestReplica }
+          { with_replica: true, replica_affinity: :latency, want: ::RedisClient::Cluster::Node::LatencyReplica }
         ].each_with_index do |c, i|
           got = @test_node.send(:make_topology_class, c[:with_replica], c[:replica_affinity])
           assert_equal(c[:want], got, "Case: #{i}")

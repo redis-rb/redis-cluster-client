@@ -5,7 +5,7 @@ require 'redis_client/cluster/node/replica_mixin'
 class RedisClient
   class Cluster
     class Node
-      class NearestReplica
+      class LatencyReplica
         include ::RedisClient::Cluster::Node::ReplicaMixin
 
         attr_reader :replica_clients, :clients_for_scanning

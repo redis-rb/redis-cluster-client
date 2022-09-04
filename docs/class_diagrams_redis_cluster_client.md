@@ -73,7 +73,7 @@ classDiagram
     +find_node_key_of_replica()
   }
 
-  class RedisClient_Cluster_Node_NearestReplica {
+  class RedisClient_Cluster_Node_LatencyReplica {
     +replica_clients()
     +find_node_key_of_replica()
   }
@@ -131,8 +131,8 @@ classDiagram
   RedisClient_Cluster_Router ..> module_RedisClient_Cluster_NodeKey : call
 
   RedisClient_Cluster_Node_RandomReplica ..|> module_RedisClient_Cluster_Node_ReplicaMixin : include
-  RedisClient_Cluster_Node_NearestReplica ..|> module_RedisClient_Cluster_Node_ReplicaMixin : include
+  RedisClient_Cluster_Node_LatencyReplica ..|> module_RedisClient_Cluster_Node_ReplicaMixin : include
   RedisClient_Cluster_Node ..> RedisClient_Cluster_Node_PrimaryOnly : new
   RedisClient_Cluster_Node ..> RedisClient_Cluster_Node_RandomReplica : new
-  RedisClient_Cluster_Node ..> RedisClient_Cluster_Node_NearestReplica : new
+  RedisClient_Cluster_Node ..> RedisClient_Cluster_Node_LatencyReplica : new
 ```
