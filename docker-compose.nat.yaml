@@ -5,14 +5,15 @@ services:
     image: "redis:${REDIS_VERSION:-7}"
     command: >
       redis-server
-      --maxmemory             64mb
-      --maxmemory-policy      allkeys-lru
-      --appendonly            yes
-      --cluster-enabled       yes
-      --cluster-config-file   nodes.conf
-      --cluster-node-timeout  5000
-      --cluster-announce-ip   "${REDIS_HOST:-127.0.0.1}"
-      --cluster-announce-port 6379
+      --maxmemory                 64mb
+      --maxmemory-policy          allkeys-lru
+      --appendonly                yes
+      --cluster-enabled           yes
+      --cluster-config-file       nodes.conf
+      --cluster-node-timeout      5000
+      --cluster-announce-ip       "${REDIS_HOST:-127.0.0.1}"
+      --cluster-announce-port     6379
+      --cluster-announce-bus-port 16379
     restart: "${RESTART_POLICY:-always}"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -21,73 +22,84 @@ services:
       retries: 10
     ports:
       - "6379:6379"
+      - "16379:16379"
   node2:
     <<: *node
     command: >
       redis-server
-      --maxmemory             64mb
-      --maxmemory-policy      allkeys-lru
-      --appendonly            yes
-      --cluster-enabled       yes
-      --cluster-config-file   nodes.conf
-      --cluster-node-timeout  5000
-      --cluster-announce-ip   "${REDIS_HOST:-127.0.0.1}"
-      --cluster-announce-port 6380
+      --maxmemory                 64mb
+      --maxmemory-policy          allkeys-lru
+      --appendonly                yes
+      --cluster-enabled           yes
+      --cluster-config-file       nodes.conf
+      --cluster-node-timeout      5000
+      --cluster-announce-ip       "${REDIS_HOST:-127.0.0.1}"
+      --cluster-announce-port     6380
+      --cluster-announce-bus-port 16380
     ports:
       - "6380:6379"
+      - "16380:16379"
   node3:
     <<: *node
     command: >
       redis-server
-      --maxmemory             64mb
-      --maxmemory-policy      allkeys-lru
-      --appendonly            yes
-      --cluster-enabled       yes
-      --cluster-config-file   nodes.conf
-      --cluster-node-timeout  5000
-      --cluster-announce-ip   "${REDIS_HOST:-127.0.0.1}"
-      --cluster-announce-port 6381
+      --maxmemory                 64mb
+      --maxmemory-policy          allkeys-lru
+      --appendonly                yes
+      --cluster-enabled           yes
+      --cluster-config-file       nodes.conf
+      --cluster-node-timeout      5000
+      --cluster-announce-ip       "${REDIS_HOST:-127.0.0.1}"
+      --cluster-announce-port     6381
+      --cluster-announce-bus-port 16381
     ports:
       - "6381:6379"
+      - "16381:16379"
   node4:
     <<: *node
     command: >
       redis-server
-      --maxmemory             64mb
-      --maxmemory-policy      allkeys-lru
-      --appendonly            yes
-      --cluster-enabled       yes
-      --cluster-config-file   nodes.conf
-      --cluster-node-timeout  5000
-      --cluster-announce-ip   "${REDIS_HOST:-127.0.0.1}"
-      --cluster-announce-port 6382
+      --maxmemory                 64mb
+      --maxmemory-policy          allkeys-lru
+      --appendonly                yes
+      --cluster-enabled           yes
+      --cluster-config-file       nodes.conf
+      --cluster-node-timeout      5000
+      --cluster-announce-ip       "${REDIS_HOST:-127.0.0.1}"
+      --cluster-announce-port     6382
+      --cluster-announce-bus-port 16382
     ports:
       - "6382:6379"
+      - "16382:16379"
   node5:
     <<: *node
     command: >
       redis-server
-      --maxmemory             64mb
-      --maxmemory-policy      allkeys-lru
-      --appendonly            yes
-      --cluster-enabled       yes
-      --cluster-config-file   nodes.conf
-      --cluster-node-timeout  5000
-      --cluster-announce-ip   "${REDIS_HOST:-127.0.0.1}"
-      --cluster-announce-port 6383
+      --maxmemory                 64mb
+      --maxmemory-policy          allkeys-lru
+      --appendonly                yes
+      --cluster-enabled           yes
+      --cluster-config-file       nodes.conf
+      --cluster-node-timeout      5000
+      --cluster-announce-ip       "${REDIS_HOST:-127.0.0.1}"
+      --cluster-announce-port     6383
+      --cluster-announce-bus-port 16383
     ports:
       - "6383:6379"
+      - "16383:16379"
   node6:
     <<: *node
     command: >
       redis-server
-      --maxmemory             64mb
-      --maxmemory-policy      allkeys-lru
-      --appendonly            yes
-      --cluster-enabled       yes
-      --cluster-config-file   nodes.conf
-      --cluster-node-timeout  5000
-      --cluster-announce-ip   "${REDIS_HOST:-127.0.0.1}"
-      --cluster-announce-port 6384
+      --maxmemory                 64mb
+      --maxmemory-policy          allkeys-lru
+      --appendonly                yes
+      --cluster-enabled           yes
+      --cluster-config-file       nodes.conf
+      --cluster-node-timeout      5000
+      --cluster-announce-ip       "${REDIS_HOST:-127.0.0.1}"
+      --cluster-announce-port     6384
+      --cluster-announce-bus-port 16384
     ports:
       - "6384:6379"
+      - "16384:16379"
