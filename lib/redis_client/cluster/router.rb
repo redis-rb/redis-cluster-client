@@ -123,7 +123,7 @@ class RedisClient
         retry
       end
 
-      def scan(*command, **kwargs) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+      def scan(*command, random: Random, **kwargs) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         command = @command_builder.generate(command, kwargs)
 
         command[1] = ZERO_CURSOR_FOR_SCAN if command.size == 1
@@ -132,7 +132,7 @@ class RedisClient
         client_index = input_cursor % 256
         raw_cursor = input_cursor >> 8
 
-        clients = @node.clients_for_scanning
+        clients = @node.clients_for_scanning(random: random)
 
         client = clients[client_index]
         return [ZERO_CURSOR_FOR_SCAN, []] unless client
@@ -147,19 +147,19 @@ class RedisClient
         [((result_cursor << 8) + client_index).to_s, result_keys]
       end
 
-      def assign_node(command, primary_only: false)
-        node_key = find_node_key(command, primary_only: primary_only)
+      def assign_node(command)
+        node_key = find_node_key(command)
         find_node(node_key)
       end
 
-      def find_node_key(command, primary_only: false)
+      def find_node_key(command, random: Random)
         key = @command.extract_first_key(command)
         slot = key.empty? ? nil : ::RedisClient::Cluster::KeySlotConverter.convert(key)
 
-        if @command.should_send_to_primary?(command) || primary_only
-          @node.find_node_key_of_primary(slot) || @node.primary_node_keys.sample
+        if @command.should_send_to_primary?(command)
+          @node.find_node_key_of_primary(slot) || @node.any_primary_node_key(random: random)
         else
-          @node.find_node_key_of_replica(slot) || @node.replica_node_keys.sample
+          @node.find_node_key_of_replica(slot, random: random) || @node.any_replica_node_key(random: random)
         end
       end
 

@@ -4,23 +4,29 @@ class RedisClient
   class Cluster
     class Node
       class PrimaryOnly
-        attr_reader :clients, :primary_node_keys
+        attr_reader :clients
 
         def initialize(replications, options, pool, **kwargs)
-          @replications = replications
-          @primary_node_keys = @replications.keys.sort
-
+          @primary_node_keys = replications.keys.sort
           @clients = build_clients(@primary_node_keys, options, pool, **kwargs)
         end
 
-        alias replica_node_keys primary_node_keys
-        alias clients_for_scanning clients
         alias primary_clients clients
         alias replica_clients clients
 
-        def find_node_key_of_replica(primary_node_key)
+        def clients_for_scanning(random: Random) # rubocop:disable Lint/UnusedMethodArgument
+          @clients
+        end
+
+        def find_node_key_of_replica(primary_node_key, random: Random) # rubocop:disable Lint/UnusedMethodArgument
           primary_node_key
         end
+
+        def any_primary_node_key(random: Random)
+          @primary_node_keys.sample(random: random)
+        end
+
+        alias any_replica_node_key any_primary_node_key
 
         private
 

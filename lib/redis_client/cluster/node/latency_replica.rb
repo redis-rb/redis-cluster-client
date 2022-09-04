@@ -8,7 +8,7 @@ class RedisClient
       class LatencyReplica
         include ::RedisClient::Cluster::Node::ReplicaMixin
 
-        attr_reader :replica_clients, :clients_for_scanning
+        attr_reader :replica_clients
 
         DUMMY_LATENCY_SEC = 100.0
 
@@ -18,11 +18,20 @@ class RedisClient
           all_replica_clients = @clients.select { |k, _| @replica_node_keys.include?(k) }
           latencies = measure_latencies(all_replica_clients)
           @replications.each_value { |keys| keys.sort_by! { |k| latencies.fetch(k) } }
-          @clients_for_scanning = @replica_clients = select_first_clients(@replications, @clients)
+          @replica_clients = select_replica_clients(@replications, @clients)
+          @clients_for_scanning = select_clients_for_scanning(@replications, @clients)
         end
 
-        def find_node_key_of_replica(primary_node_key)
-          @replications.fetch(primary_node_key, EMPTY_ARRAY).first
+        def clients_for_scanning(random: Random) # rubocop:disable Lint/UnusedMethodArgument
+          @clients_for_scanning
+        end
+
+        def find_node_key_of_replica(primary_node_key, random: Random) # rubocop:disable Lint/UnusedMethodArgument
+          @replications.fetch(primary_node_key, EMPTY_ARRAY).first || primary_node_key
+        end
+
+        def any_replica_node_key(random: Random)
+          @replications.reject { |_, v| v.empty? }.values.sample(random: random).first
         end
 
         private
@@ -47,6 +56,19 @@ class RedisClient
           end
 
           latencies
+        end
+
+        def select_replica_clients(replications, clients)
+          keys = replications.values.filter_map(&:first)
+          clients.select { |k, _| keys.include?(k) }
+        end
+
+        def select_clients_for_scanning(replications, clients)
+          keys = replications.map do |primary_node_key, replica_node_keys|
+            replica_node_keys.empty? ? primary_node_key : replica_node_keys.first
+          end
+
+          clients.select { |k, _| keys.include?(k) }
         end
       end
     end

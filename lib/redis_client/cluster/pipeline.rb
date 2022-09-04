@@ -14,46 +14,47 @@ class RedisClient
         @command_builder = command_builder
         @grouped = Hash.new([].freeze)
         @size = 0
+        @random = Random.new
       end
 
       def call(*args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
-        node_key = @router.find_node_key(command, primary_only: true)
+        node_key = @router.find_node_key(command, random: @random)
         @grouped[node_key] += [[@size, :call_v, command, block]]
         @size += 1
       end
 
       def call_v(args, &block)
         command = @command_builder.generate(args)
-        node_key = @router.find_node_key(command, primary_only: true)
+        node_key = @router.find_node_key(command, random: @random)
         @grouped[node_key] += [[@size, :call_v, command, block]]
         @size += 1
       end
 
       def call_once(*args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
-        node_key = @router.find_node_key(command, primary_only: true)
+        node_key = @router.find_node_key(command, random: @random)
         @grouped[node_key] += [[@size, :call_once_v, command, block]]
         @size += 1
       end
 
       def call_once_v(args, &block)
         command = @command_builder.generate(args)
-        node_key = @router.find_node_key(command, primary_only: true)
+        node_key = @router.find_node_key(command, random: @random)
         @grouped[node_key] += [[@size, :call_once_v, command, block]]
         @size += 1
       end
 
       def blocking_call(timeout, *args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
-        node_key = @router.find_node_key(command, primary_only: true)
+        node_key = @router.find_node_key(command, random: @random)
         @grouped[node_key] += [[@size, :blocking_call_v, timeout, command, block]]
         @size += 1
       end
 
       def blocking_call_v(timeout, args, &block)
         command = @command_builder.generate(args)
-        node_key = @router.find_node_key(command, primary_only: true)
+        node_key = @router.find_node_key(command, random: @random)
         @grouped[node_key] += [[@size, :blocking_call_v, timeout, command, block]]
         @size += 1
       end

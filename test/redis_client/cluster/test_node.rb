@@ -209,22 +209,6 @@ class RedisClient
         end
       end
 
-      def test_primary_node_keys
-        want = @test_node_info.filter_map { |info| info[:role] == 'master' ? info[:node_key] : nil }.sort
-        got = @test_node.primary_node_keys
-        assert_equal(want, got)
-      end
-
-      def test_replica_node_keys
-        want = @test_node_info.filter_map { |info| info[:role] == 'master' ? info[:node_key] : nil }.sort
-        got = @test_node.replica_node_keys
-        assert_equal(want, got)
-
-        want = @test_node_info.filter_map { |info| info[:role] == 'slave' ? info[:node_key] : nil }.sort
-        got = @test_node_with_scale_read.replica_node_keys
-        assert_equal(want, got)
-      end
-
       def test_find_by
         @test_node_info.each do |info|
           msg = "Case: primary only: #{info[:node_key]}"

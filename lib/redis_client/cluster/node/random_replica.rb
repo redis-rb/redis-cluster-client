@@ -8,21 +8,25 @@ class RedisClient
       class RandomReplica
         include ::RedisClient::Cluster::Node::ReplicaMixin
 
-        attr_reader :clients_for_scanning
-
-        def initialize(replications, options, pool, **kwargs)
-          super
-
-          @clients_for_scanning = select_first_clients(@replications, @clients)
-        end
-
         def replica_clients
-          keys = @replications.values.map(&:sample)
+          keys = @replications.values.filter_map(&:sample)
           @clients.select { |k, _| keys.include?(k) }
         end
 
-        def find_node_key_of_replica(primary_node_key)
-          @replications.fetch(primary_node_key, EMPTY_ARRAY).sample
+        def clients_for_scanning(random: Random)
+          keys = @replications.map do |primary_node_key, replica_node_keys|
+            replica_node_keys.empty? ? primary_node_key : replica_node_keys.sample(random: random)
+          end
+
+          clients.select { |k, _| keys.include?(k) }
+        end
+
+        def find_node_key_of_replica(primary_node_key, random: Random)
+          @replications.fetch(primary_node_key, EMPTY_ARRAY).sample(random: random) || primary_node_key
+        end
+
+        def any_replica_node_key(random: Random)
+          @replica_node_keys.sample(random: random)
         end
       end
     end

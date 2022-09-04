@@ -44,8 +44,6 @@ classDiagram
     +each()
     +sample()
     +node_keys()
-    +primary_node_keys()
-    +replica_node_keys()
     +find_by()
     +call_all()
     +call_primaries()
@@ -54,36 +52,39 @@ classDiagram
     +clients_for_scanning()
     +find_node_key_of_primary()
     +find_node_key_of_replica()
+    +any_primary_node_key()
+    +any_replica_node_key()
     +update_slot()
-    +replicated?()
   }
 
   class RedisClient_Cluster_Node_PrimaryOnly {
     +clients()
-    +primary_node_keys()
-    +replica_node_keys()
-    +clients_for_scanning()
     +primary_clients()
     +replica_clients()
+    +clients_for_scanning()
     +find_node_key_of_replica()
+    +any_primary_node_key()
+    +any_replica_node_key()
   }
 
   class RedisClient_Cluster_Node_RandomReplica {
     +replica_clients()
+    +clients_for_scanning()
     +find_node_key_of_replica()
+    +any_replica_node_key()
   }
 
   class RedisClient_Cluster_Node_LatencyReplica {
     +replica_clients()
+    +clients_for_scanning()
     +find_node_key_of_replica()
+    +any_replica_node_key()
   }
 
   class module_RedisClient_Cluster_Node_ReplicaMixin {
     +clients()
-    +primary_node_keys()
-    +replica_node_keys()
-    +clients_for_scanning()
     +primary_clients()
+    +any_primary_node_key()
   }
 
   class module_RedisClient_Cluster_NodeKey {
