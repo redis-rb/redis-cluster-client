@@ -393,7 +393,8 @@ class RedisClient
           { block: ->(_, client) { client.call('UNKNOWN') }, errors: ::RedisClient::CommandError }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
-          results, errors = @test_node.send(:try_map, &c[:block])
+          clients = @test_node.instance_variable_get(:@topology).clients
+          results, errors = @test_node.send(:try_map, clients, &c[:block])
           if c.key?(:errors)
             errors.each_value { |e| assert_instance_of(c[:errors], e, msg) }
           else

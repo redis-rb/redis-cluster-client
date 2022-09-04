@@ -153,7 +153,7 @@ class RedisClient
       end
 
       def send_ping(method, command, args, &block)
-        result_values, errors = call_multiple_nodes(@topology.elients, method, command, args, &block)
+        result_values, errors = call_multiple_nodes(@topology.clients, method, command, args, &block)
         return result_values if errors.empty?
 
         raise ReloadNeeded if errors.values.any?(::RedisClient::ConnectionError)
@@ -162,7 +162,7 @@ class RedisClient
       end
 
       def clients_for_scanning
-        @topology.fixed_clients.values.sort_by { |c| "#{c.config.host}-#{c.config.port}" }
+        @topology.clients_for_scanning.values.sort_by { |c| "#{c.config.host}-#{c.config.port}" }
       end
 
       def find_node_key_of_primary(slot)

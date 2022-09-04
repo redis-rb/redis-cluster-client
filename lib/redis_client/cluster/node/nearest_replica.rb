@@ -8,7 +8,7 @@ class RedisClient
       class NearestReplica
         include ::RedisClient::Cluster::Node::ReplicaMixin
 
-        attr_reader :replica_clients
+        attr_reader :replica_clients, :clients_for_scanning
 
         DUMMY_LATENCY_SEC = 100.0
 
@@ -16,22 +16,20 @@ class RedisClient
           super
 
           all_replica_clients = @clients.select { |k, _| @replica_node_keys.include?(k) }
-          @latencies = measure_latency_of_replicas(all_replica_clients)
+          latencies = measure_latencies(all_replica_clients)
+          @replications.each_value { |keys| keys.sort_by! { |k| latencies.fetch(k) } }
 
-          nearest_replica_keys = @replications.values.map do |replica_node_keys|
-            replica_node_keys.min_by { |k| @latencies.fetch(k) }
-          end
-
-          @replica_clients = @clients.select { |k, _| nearest_replica_keys.include?(k) }
+          first_keys = @replications.values.map(&:first)
+          @clients_for_scanning = @replica_clients = @clients.select { |k, _| first_keys.include?(k) }
         end
 
         def find_node_key_of_replica(primary_node_key)
-          @replications[primary_node_key].min_by { |replica_node_key| @latencies.fetch(replica_node_key) }
+          @replications.fetch(primary_node_key, EMPTY_ARRAY).first
         end
 
         private
 
-        def measure_latency_of_replicas(clients) # rubocop:disable Metrics/MethodLength
+        def measure_latencies(clients) # rubocop:disable Metrics/MethodLength
           latencies = {}
 
           clients.each_slice(::RedisClient::Cluster::Node::MAX_THREADS * 2) do |chuncked_clients|
