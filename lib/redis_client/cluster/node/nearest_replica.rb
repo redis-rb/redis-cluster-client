@@ -18,9 +18,7 @@ class RedisClient
           all_replica_clients = @clients.select { |k, _| @replica_node_keys.include?(k) }
           latencies = measure_latencies(all_replica_clients)
           @replications.each_value { |keys| keys.sort_by! { |k| latencies.fetch(k) } }
-
-          first_keys = @replications.values.map(&:first)
-          @clients_for_scanning = @replica_clients = @clients.select { |k, _| first_keys.include?(k) }
+          @clients_for_scanning = @replica_clients = select_first_clients(@replications, @clients)
         end
 
         def find_node_key_of_replica(primary_node_key)

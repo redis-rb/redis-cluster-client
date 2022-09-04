@@ -55,6 +55,7 @@ class RedisClient
                 cli&.close
               end
             end
+
             threads.each(&:join)
           end
 

@@ -13,8 +13,7 @@ class RedisClient
         def initialize(replications, options, pool, **kwargs)
           super
 
-          first_keys = @replications.values.map(&:first)
-          @clients_for_scanning = @clients.select { |k, _| first_keys.include?(k) }
+          @clients_for_scanning = select_first_clients(@replications, @clients)
         end
 
         def replica_clients

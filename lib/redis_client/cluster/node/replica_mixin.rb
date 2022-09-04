@@ -27,6 +27,11 @@ class RedisClient
             [node_key, client]
           end.to_h
         end
+
+        def select_first_clients(replications, clients)
+          first_keys = replications.values.map(&:first)
+          clients.select { |k, _| first_keys.include?(k) }
+        end
       end
     end
   end

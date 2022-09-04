@@ -62,7 +62,7 @@ classDiagram
     +clients()
     +primary_node_keys()
     +replica_node_keys()
-    +fixed_clients()
+    +clients_for_scanning()
     +primary_clients()
     +replica_clients()
     +find_node_key_of_replica()
@@ -82,7 +82,7 @@ classDiagram
     +clients()
     +primary_node_keys()
     +replica_node_keys()
-    +fixed_clients()
+    +clients_for_scanning()
     +primary_clients()
   }
 
