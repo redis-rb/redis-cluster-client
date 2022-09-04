@@ -47,12 +47,18 @@ task :wait do
 end
 
 desc 'Build cluster'
-task :build_cluster do
+task :build_cluster, %i[addr1 addr2] do |_, args|
   $LOAD_PATH.unshift(File.expand_path('test', __dir__))
   require 'cluster_controller'
-  hosts = ARGV[1..]
+  hosts = args.values_at(:addr1, :addr2).compact
   ports = (6379..6384).to_a
-  shards = 3
   nodes = hosts.product(ports).map { |host, port| "redis://#{host}:#{port}" }
-  ::ClusterController.new(nodes, replica_size: (nodes.size / shards) - 1).rebuild
+  shard_size = 3
+  replica_size = (nodes.size / shard_size) - 1
+  ::ClusterController.new(
+    nodes,
+    shard_size: shard_size,
+    replica_size: replica_size,
+    timeout: 30.0
+  ).rebuild
 end
