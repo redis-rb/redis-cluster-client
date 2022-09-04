@@ -36,7 +36,11 @@ class TestAgainstClusterScale < TestingWrapper
     NUMBER_OF_KEYS.times { |i| assert_equal(i.to_s, @client.call('GET', "key#{i}"), "Case: key#{i}") }
 
     want = (TEST_NODE_URIS + build_additional_node_urls).size
-    got = @client.instance_variable_get(:@router).instance_variable_get(:@node).instance_variable_get(:@clients).size
+    got = @client.instance_variable_get(:@router)
+                 .instance_variable_get(:@node)
+                 .instance_variable_get(:@topology)
+                 .instance_variable_get(:@clients)
+                 .size
     assert_equal(want, got, 'Case: number of nodes')
   end
 
@@ -53,7 +57,11 @@ class TestAgainstClusterScale < TestingWrapper
     end
 
     want = TEST_NODE_URIS.size
-    got = @client.instance_variable_get(:@router).instance_variable_get(:@node).instance_variable_get(:@clients).size
+    got = @client.instance_variable_get(:@router)
+                 .instance_variable_get(:@node)
+                 .instance_variable_get(:@topology)
+                 .instance_variable_get(:@clients)
+                 .size
     assert_equal(want, got, 'Case: number of nodes')
   end
 
