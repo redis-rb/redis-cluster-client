@@ -154,8 +154,8 @@ class RedisClient
         raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
-      def clients_for_scanning(random: Random)
-        @topology.clients_for_scanning(random: random).values.sort_by { |c| "#{c.config.host}-#{c.config.port}" }
+      def clients_for_scanning(seed: nil)
+        @topology.clients_for_scanning(seed: seed).values.sort_by { |c| "#{c.config.host}-#{c.config.port}" }
       end
 
       def find_node_key_of_primary(slot)
@@ -167,16 +167,16 @@ class RedisClient
         @slots[slot]
       end
 
-      def find_node_key_of_replica(slot, random: Random)
-        @topology.find_node_key_of_replica(find_node_key_of_primary(slot), random: random)
+      def find_node_key_of_replica(slot, seed: nil)
+        @topology.find_node_key_of_replica(find_node_key_of_primary(slot), seed: seed)
       end
 
-      def any_primary_node_key(random: Random)
-        @topology.any_primary_node_key(random: random)
+      def any_primary_node_key(seed: nil)
+        @topology.any_primary_node_key(seed: seed)
       end
 
-      def any_replica_node_key(random: Random)
-        @topology.any_replica_node_key(random: random)
+      def any_replica_node_key(seed: nil)
+        @topology.any_replica_node_key(seed: seed)
       end
 
       def update_slot(slot, node_key)

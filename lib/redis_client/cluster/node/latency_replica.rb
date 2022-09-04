@@ -22,15 +22,16 @@ class RedisClient
           @clients_for_scanning = select_clients_for_scanning(@replications, @clients)
         end
 
-        def clients_for_scanning(random: Random) # rubocop:disable Lint/UnusedMethodArgument
+        def clients_for_scanning(seed: nil) # rubocop:disable Lint/UnusedMethodArgument
           @clients_for_scanning
         end
 
-        def find_node_key_of_replica(primary_node_key, random: Random) # rubocop:disable Lint/UnusedMethodArgument
+        def find_node_key_of_replica(primary_node_key, seed: nil) # rubocop:disable Lint/UnusedMethodArgument
           @replications.fetch(primary_node_key, EMPTY_ARRAY).first || primary_node_key
         end
 
-        def any_replica_node_key(random: Random)
+        def any_replica_node_key(seed: nil)
+          random = seed.nil? ? Random : Random.new(seed)
           @replications.reject { |_, v| v.empty? }.values.sample(random: random).first
         end
 

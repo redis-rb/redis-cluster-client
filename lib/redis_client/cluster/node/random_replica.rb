@@ -13,7 +13,8 @@ class RedisClient
           @clients.select { |k, _| keys.include?(k) }
         end
 
-        def clients_for_scanning(random: Random)
+        def clients_for_scanning(seed: nil)
+          random = seed.nil? ? Random : Random.new(seed)
           keys = @replications.map do |primary_node_key, replica_node_keys|
             replica_node_keys.empty? ? primary_node_key : replica_node_keys.sample(random: random)
           end
@@ -21,11 +22,13 @@ class RedisClient
           clients.select { |k, _| keys.include?(k) }
         end
 
-        def find_node_key_of_replica(primary_node_key, random: Random)
+        def find_node_key_of_replica(primary_node_key, seed: nil)
+          random = seed.nil? ? Random : Random.new(seed)
           @replications.fetch(primary_node_key, EMPTY_ARRAY).sample(random: random) || primary_node_key
         end
 
-        def any_replica_node_key(random: Random)
+        def any_replica_node_key(seed: nil)
+          random = seed.nil? ? Random : Random.new(seed)
           @replica_node_keys.sample(random: random)
         end
       end

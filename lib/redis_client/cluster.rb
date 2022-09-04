@@ -53,10 +53,10 @@ class RedisClient
     def scan(*args, **kwargs, &block)
       raise ArgumentError, 'block required' unless block
 
-      random = Random.new
+      seed = Random.new_seed
       cursor = ZERO_CURSOR_FOR_SCAN
       loop do
-        cursor, keys = @router.scan('SCAN', cursor, *args, random: random, **kwargs)
+        cursor, keys = @router.scan('SCAN', cursor, *args, seed: seed, **kwargs)
         keys.each(&block)
         break if cursor == ZERO_CURSOR_FOR_SCAN
       end

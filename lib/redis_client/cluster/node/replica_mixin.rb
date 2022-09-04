@@ -16,7 +16,8 @@ class RedisClient
           @primary_clients = @clients.select { |k, _| @primary_node_keys.include?(k) }
         end
 
-        def any_primary_node_key(random: Random)
+        def any_primary_node_key(seed: nil)
+          random = seed.nil? ? Random : Random.new(seed)
           @primary_node_keys.sample(random: random)
         end
 

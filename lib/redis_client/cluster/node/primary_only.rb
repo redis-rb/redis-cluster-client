@@ -14,15 +14,16 @@ class RedisClient
         alias primary_clients clients
         alias replica_clients clients
 
-        def clients_for_scanning(random: Random) # rubocop:disable Lint/UnusedMethodArgument
+        def clients_for_scanning(seed: nil) # rubocop:disable Lint/UnusedMethodArgument
           @clients
         end
 
-        def find_node_key_of_replica(primary_node_key, random: Random) # rubocop:disable Lint/UnusedMethodArgument
+        def find_node_key_of_replica(primary_node_key, seed: nil) # rubocop:disable Lint/UnusedMethodArgument
           primary_node_key
         end
 
-        def any_primary_node_key(random: Random)
+        def any_primary_node_key(seed: nil)
+          random = seed.nil? ? Random : Random.new(seed)
           @primary_node_keys.sample(random: random)
         end
 

@@ -35,7 +35,7 @@ class RedisClient
         when 'wait'     then send_wait_command(method, command, args, &block)
         when 'keys'     then @node.call_replicas(method, command, args, &block).flatten.sort_by(&:to_s)
         when 'dbsize'   then @node.call_replicas(method, command, args, &block).select { |e| e.is_a?(Integer) }.sum
-        when 'scan'     then scan(command)
+        when 'scan'     then scan(command, seed: 1)
         when 'lastsave' then @node.call_all(method, command, args, &block).sort_by(&:to_i)
         when 'role'     then @node.call_all(method, command, args, &block)
         when 'config'   then send_config_command(method, command, args, &block)
@@ -123,7 +123,7 @@ class RedisClient
         retry
       end
 
-      def scan(*command, random: Random, **kwargs) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+      def scan(*command, seed: nil, **kwargs) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         command = @command_builder.generate(command, kwargs)
 
         command[1] = ZERO_CURSOR_FOR_SCAN if command.size == 1
@@ -132,7 +132,7 @@ class RedisClient
         client_index = input_cursor % 256
         raw_cursor = input_cursor >> 8
 
-        clients = @node.clients_for_scanning(random: random)
+        clients = @node.clients_for_scanning(seed: seed)
 
         client = clients[client_index]
         return [ZERO_CURSOR_FOR_SCAN, []] unless client
@@ -152,14 +152,14 @@ class RedisClient
         find_node(node_key)
       end
 
-      def find_node_key(command, random: Random)
+      def find_node_key(command, seed: nil)
         key = @command.extract_first_key(command)
         slot = key.empty? ? nil : ::RedisClient::Cluster::KeySlotConverter.convert(key)
 
         if @command.should_send_to_primary?(command)
-          @node.find_node_key_of_primary(slot) || @node.any_primary_node_key(random: random)
+          @node.find_node_key_of_primary(slot) || @node.any_primary_node_key(seed: seed)
         else
-          @node.find_node_key_of_replica(slot, random: random) || @node.any_replica_node_key(random: random)
+          @node.find_node_key_of_replica(slot, seed: seed) || @node.any_replica_node_key(seed: seed)
         end
       end
 
