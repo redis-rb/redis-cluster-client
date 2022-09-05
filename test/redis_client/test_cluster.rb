@@ -61,8 +61,8 @@ class RedisClient
         @client.call(*%w[RPUSH foo hello])
         @client.call(*%w[RPUSH foo world])
         wait_for_replication
-        client_side_timeout = 0.2
-        server_side_timeout = 0.1
+        client_side_timeout = 1.0
+        server_side_timeout = 0.5
         assert_equal(%w[foo world], @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 1st')
         assert_equal(%w[foo hello], @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 2nd')
         assert_nil(@client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 3rd')
