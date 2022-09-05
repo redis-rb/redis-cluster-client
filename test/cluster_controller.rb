@@ -252,7 +252,7 @@ class ClusterController
       slot_range = slot_idx..slot_idx + s - 1
       c.call('CLUSTER', 'ADDSLOTS', *slot_range.to_a)
       slot_idx += s
-      print_debug("#{c.config.host}:#{c.config.port} ... #{slot_range.to_a}")
+      print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER ADDSLOTS #{slot_range.to_a}")
     end
   end
 
