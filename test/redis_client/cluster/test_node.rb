@@ -251,6 +251,16 @@ class RedisClient
         assert_equal(want, got, 'Case: scale read')
       end
 
+      def test_send_ping
+        want = (1..(@test_node_info.count)).map { |_| 'PONG' }
+
+        got = @test_node.send_ping(:call_v, ['PING'], [])
+        assert_equal(want, got, 'Case: primary only')
+
+        got = @test_node_with_scale_read.send_ping(:call_v, ['PING'], [])
+        assert_equal(want, got, 'Case: scale read')
+      end
+
       def test_clients_for_scanning # rubocop:disable Metrics/CyclomaticComplexity
         want = @test_node_info.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }.sort
         got = @test_node.clients_for_scanning.map { |client| "#{client.config.host}:#{client.config.port}" }
@@ -283,6 +293,27 @@ class RedisClient
         assert_includes(want, got, 'Case: scale read')
 
         assert_nil(@test_node.find_node_key_of_replica(nil), 'Case: nil')
+      end
+
+      def test_any_primary_node_key
+        primary_node_keys = @test_node_info.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
+
+        got = @test_node.any_primary_node_key
+        assert_includes(primary_node_keys, got, 'Case: primary only')
+
+        got = @test_node_with_scale_read.any_primary_node_key
+        assert_includes(primary_node_keys, got, 'Case: scale read')
+      end
+
+      def test_any_replica_node_key
+        primary_node_keys = @test_node_info.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
+        replica_node_keys = @test_node_info.select { |info| info[:role] == 'slave' }.map { |info| info[:node_key] }
+
+        got = @test_node.any_replica_node_key
+        assert_includes(primary_node_keys, got, 'Case: primary only')
+
+        got = @test_node_with_scale_read.any_replica_node_key
+        assert_includes(replica_node_keys, got, 'Case: scale read')
       end
 
       def test_update_slot

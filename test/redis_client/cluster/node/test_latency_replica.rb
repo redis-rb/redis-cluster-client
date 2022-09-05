@@ -6,7 +6,7 @@ require 'testing_helper'
 class RedisClient
   class Cluster
     class Node
-      class TestPrimaryOnly < TestingWrapper
+      class TestLatencyReplica < TestingWrapper
         def setup
           test_config = ::RedisClient::ClusterConfig.new(
             nodes: TEST_NODE_URIS,
@@ -26,7 +26,7 @@ class RedisClient
           test_node = ::RedisClient::Cluster::Node.new(@options, node_info: test_node_info)
           @replications = test_node.instance_variable_get(:@replications)
           test_node&.each(&:close)
-          @test_topology = ::RedisClient::Cluster::Node::PrimaryOnly.new(
+          @test_topology = ::RedisClient::Cluster::Node::LatencyReplica.new(
             @replications,
             @options,
             nil,
@@ -40,14 +40,12 @@ class RedisClient
 
         def test_clients_with_redis_client
           got = @test_topology.clients
-          got.each_value do |client|
-            assert_instance_of(::RedisClient, client)
-            assert_equal('master', client.call('ROLE').first)
-          end
+          got.each_value { |client| assert_instance_of(::RedisClient, client) }
+          assert_equal(%w[master slave], got.map { |_, v| v.call('ROLE').first }.uniq.sort)
         end
 
         def test_clients_with_pooled_redis_client
-          test_topology = ::RedisClient::Cluster::Node::PrimaryOnly.new(
+          test_topology = ::RedisClient::Cluster::Node::LatencyReplica.new(
             @replications,
             @options,
             { timeout: 3, size: 2 },
@@ -55,10 +53,8 @@ class RedisClient
           )
 
           got = test_topology.clients
-          got.each_value do |client|
-            assert_instance_of(::RedisClient::Pooled, client)
-            assert_equal('master', client.call('ROLE').first)
-          end
+          got.each_value { |client| assert_instance_of(::RedisClient::Pooled, client) }
+          assert_equal(%w[master slave], got.map { |_, v| v.call('ROLE').first }.uniq.sort)
         ensure
           test_topology&.clients&.each_value(&:close)
         end
@@ -75,22 +71,25 @@ class RedisClient
           got = @test_topology.replica_clients
           got.each_value do |client|
             assert_instance_of(::RedisClient, client)
-            assert_equal('master', client.call('ROLE').first)
+            assert_equal('slave', client.call('ROLE').first)
           end
         end
 
         def test_clients_for_scanning
           got = @test_topology.clients_for_scanning
-          got.each_value do |client|
-            assert_instance_of(::RedisClient, client)
-            assert_equal('master', client.call('ROLE').first)
-          end
+          got.each_value { |client| assert_instance_of(::RedisClient, client) }
+          assert_equal(TEST_SHARD_SIZE, got.size)
         end
 
         def test_find_node_key_of_replica
           want = 'dummy_key'
           got = @test_topology.find_node_key_of_replica('dummy_key')
           assert_equal(want, got)
+
+          primary_key = @replications.keys.first
+          replica_keys = @replications.fetch(primary_key)
+          got = @test_topology.find_node_key_of_replica(primary_key)
+          assert_includes(replica_keys, got)
         end
 
         def test_any_primary_node_key
@@ -100,7 +99,7 @@ class RedisClient
 
         def test_any_replica_node_key
           got = @test_topology.any_replica_node_key
-          assert_includes(@replications.keys, got)
+          assert_includes(@replications.values.flatten, got)
         end
       end
     end

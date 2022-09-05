@@ -42,7 +42,7 @@ class RedisClient
 
           clients.each_slice(::RedisClient::Cluster::Node::MAX_THREADS * 2) do |chuncked_clients|
             threads = chuncked_clients.map do |k, v|
-              Thraed.new(k, v) do |node_key, client|
+              Thread.new(k, v) do |node_key, client|
                 Thread.pass
                 starting = Process.clock_gettime(Process::CLOCK_MONOTONIC)
                 client.send(:call_once, 'PING')
