@@ -22,6 +22,7 @@ class ClusterController
     @timeout = kwargs.fetch(:timeout, DEFAULT_TIMEOUT_SEC)
     @kwargs = kwargs.merge(timeout: @timeout)
     @clients = node_addrs.map { |addr| ::RedisClient.new(url: addr, **@kwargs) }
+    @debug = ENV.fetch('DEBUG', '0')
   end
 
   def wait_for_cluster_to_be_ready
@@ -225,6 +226,7 @@ class ClusterController
   def flush_all_data(clients)
     clients.each do |c|
       c.call('FLUSHALL')
+      print_debug("#{c.config.host}:#{c.config.port} ... FLUSHALL")
     rescue ::RedisClient::CommandError
       # READONLY You can't write against a read only replica.
       nil
@@ -232,7 +234,10 @@ class ClusterController
   end
 
   def reset_cluster(clients)
-    clients.each { |c| c.call('CLUSTER', 'RESET', 'HARD') }
+    clients.each do |c|
+      c.call('CLUSTER', 'RESET', 'HARD')
+      print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER RESET HARD")
+    end
   end
 
   def assign_slots(clients, shard_size:)
@@ -247,12 +252,14 @@ class ClusterController
       slot_range = slot_idx..slot_idx + s - 1
       c.call('CLUSTER', 'ADDSLOTS', *slot_range.to_a)
       slot_idx += s
+      print_debug("#{c.config.host}:#{c.config.port} ... #{slot_range.to_a}")
     end
   end
 
   def save_config_epoch(clients)
     clients.each_with_index do |c, i|
       c.call('CLUSTER', 'SET-CONFIG-EPOCH', i + 1)
+      print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER SET-CONFIG-EPOCH #{i + 1}")
     rescue ::RedisClient::CommandError
       # ERR Node config epoch is already non-zero
       nil
@@ -263,7 +270,10 @@ class ClusterController
     rows = fetch_cluster_nodes(clients.first)
     rows = parse_cluster_nodes(rows)
     target_host, target_port = rows.first.fetch(:node_key).split(':')
-    clients.drop(1).each { |c| c.call('CLUSTER', 'MEET', target_host, target_port) }
+    clients.drop(1).each do |c|
+      c.call('CLUSTER', 'MEET', target_host, target_port)
+      print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER MEET #{target_host}:#{target_port}")
+    end
   end
 
   def wait_meeting(clients, max_attempts:)
@@ -284,7 +294,10 @@ class ClusterController
 
       loop do
         begin
-          subset.each { |replica| replica.call('CLUSTER', 'REPLICATE', primary_id) }
+          subset.each do |replica|
+            replica.call('CLUSTER', 'REPLICATE', primary_id)
+            print_debug("#{replica.config.host}:#{replica.config.port} ... CLUSTER REPLICATE #{primaries[i].config.host}:#{primaries[i].config.port}")
+          end
         rescue ::RedisClient::CommandError
           # ERR Unknown node [key]
           sleep 0.1
@@ -298,7 +311,10 @@ class ClusterController
   end
 
   def save_config(clients)
-    clients.each { |c| c.call('CLUSTER', 'SAVECONFIG') }
+    clients.each do |c|
+      c.call('CLUSTER', 'SAVECONFIG')
+      print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER SAVECONFIG")
+    end
   end
 
   def wait_cluster_building(clients, max_attempts:)
@@ -427,5 +443,11 @@ class ClusterController
   def take_replicas(clients, shard_size:)
     replicas = clients.select { |cli| cli.call('ROLE').first == 'slave' }
     replicas.size.zero? ? clients[shard_size..] : replicas
+  end
+
+  def print_debug(msg)
+    return unless @debug == '1'
+
+    p msg
   end
 end
