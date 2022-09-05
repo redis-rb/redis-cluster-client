@@ -298,9 +298,10 @@ class ClusterController
             replica.call('CLUSTER', 'REPLICATE', primary_id)
             print_debug("#{replica.config.host}:#{replica.config.port} ... CLUSTER REPLICATE #{primaries[i].config.host}:#{primaries[i].config.port}")
           end
-        rescue ::RedisClient::CommandError
-          # ERR Unknown node [key]
-          sleep 0.1
+        rescue ::RedisClient::CommandError => e
+          print_debug(e.message)
+          # ERR Unknown node [node-id]
+          sleep 1.0
           primary_id = primaries[i].call('CLUSTER', 'MYID')
           next
         end
