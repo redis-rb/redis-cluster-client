@@ -11,6 +11,7 @@ class RedisClient
         attr_reader :replica_clients
 
         DUMMY_LATENCY_SEC = 100.0
+        MEASURE_ATTEMPT_COUNT = 10
 
         def initialize(replications, options, pool, **kwargs)
           super
@@ -37,17 +38,21 @@ class RedisClient
 
         private
 
-        def measure_latencies(clients) # rubocop:disable Metrics/MethodLength
+        def measure_latencies(clients) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
           latencies = {}
 
           clients.each_slice(::RedisClient::Cluster::Node::MAX_THREADS) do |chuncked_clients|
             threads = chuncked_clients.map do |k, v|
               Thread.new(k, v) do |node_key, client|
                 Thread.pass
-                starting = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-                client.send(:call_once, 'PING')
-                ending = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-                latencies[node_key] = ending - starting
+                min = DUMMY_LATENCY_SEC + 1.0
+                MEASURE_ATTEMPT_COUNT.times do
+                  starting = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+                  client.send(:call_once, 'PING')
+                  duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - starting
+                  min = duration if duration < min
+                end
+                latencies[node_key] = min
               rescue StandardError
                 latencies[node_key] = DUMMY_LATENCY_SEC
               end

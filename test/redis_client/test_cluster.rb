@@ -208,6 +208,7 @@ class RedisClient
 
       def test_compatibility_with_redis_gem
         assert_equal('OK', @client.set('foo', 100))
+        wait_for_replication
         assert_equal('100', @client.get('foo'))
         assert_raises(NoMethodError) { @client.densaugeo('1m') }
       end
