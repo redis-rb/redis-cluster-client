@@ -7,7 +7,7 @@ class RedisClient
   class Cluster
     class Pipeline
       ReplySizeError = Class.new(::RedisClient::Error)
-      MAX_THREADS = Integer(ENV.fetch('MAX_THREADS', 5))
+      MAX_THREADS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
 
       def initialize(router, command_builder)
         @router = router
@@ -67,7 +67,7 @@ class RedisClient
       def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
         all_replies = Array.new(@size)
         errors = {}
-        @grouped.each_slice(MAX_THREADS * 2) do |chuncked_grouped|
+        @grouped.each_slice(MAX_THREADS) do |chuncked_grouped|
           threads = chuncked_grouped.map do |k, v|
             Thread.new(@router, k, v) do |router, node_key, rows|
               Thread.pass

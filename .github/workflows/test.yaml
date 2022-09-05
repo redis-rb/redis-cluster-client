@@ -198,6 +198,7 @@ jobs:
     env:
       REDIS_VERSION: '7.0.1'
       DOCKER_COMPOSE_FILE: 'docker-compose.yaml'
+      REDIS_CLIENT_MAX_THREADS: '37'
     steps:
       - name: Check out code
         uses: actions/checkout@v3
