@@ -16,7 +16,7 @@ class RedisClient
       MIN_SLOT = 0
       MAX_SLOT = SLOT_SIZE - 1
       MAX_STARTUP_SAMPLE = 37
-      MAX_THREADS = Integer(ENV.fetch('MAX_THREADS', 5))
+      MAX_THREADS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
       IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
 
       ReloadNeeded = Class.new(::RedisClient::Error)
@@ -43,9 +43,9 @@ class RedisClient
           errors = Array.new(startup_size)
           startup_options = options.to_a.sample(MAX_STARTUP_SAMPLE).to_h
           startup_nodes = ::RedisClient::Cluster::Node.new(startup_options, **kwargs)
-          startup_nodes.each_slice(MAX_THREADS * 2).with_index do |chuncked_startup_nodes, chuncked_idx|
+          startup_nodes.each_slice(MAX_THREADS).with_index do |chuncked_startup_nodes, chuncked_idx|
             threads = chuncked_startup_nodes.each_with_index.map do |raw_client, idx|
-              Thread.new(raw_client, (MAX_THREADS * 2 * chuncked_idx) + idx) do |cli, i|
+              Thread.new(raw_client, (MAX_THREADS * chuncked_idx) + idx) do |cli, i|
                 Thread.pass
                 reply = cli.call('CLUSTER', 'NODES')
                 node_info_list[i] = parse_node_info(reply)
@@ -234,7 +234,7 @@ class RedisClient
       def try_map(clients) # rubocop:disable Metrics/MethodLength
         results = {}
         errors = {}
-        clients.each_slice(MAX_THREADS * 2) do |chuncked_clients|
+        clients.each_slice(MAX_THREADS) do |chuncked_clients|
           threads = chuncked_clients.map do |k, v|
             Thread.new(k, v) do |node_key, client|
               Thread.pass

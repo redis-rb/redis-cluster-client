@@ -40,7 +40,7 @@ class RedisClient
         def measure_latencies(clients) # rubocop:disable Metrics/MethodLength
           latencies = {}
 
-          clients.each_slice(::RedisClient::Cluster::Node::MAX_THREADS * 2) do |chuncked_clients|
+          clients.each_slice(::RedisClient::Cluster::Node::MAX_THREADS) do |chuncked_clients|
             threads = chuncked_clients.map do |k, v|
               Thread.new(k, v) do |node_key, client|
                 Thread.pass
