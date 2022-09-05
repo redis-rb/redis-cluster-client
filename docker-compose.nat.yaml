@@ -1,5 +1,7 @@
 ---
-# REDIS_HOST=192.168.11.9 docker compose -f docker-compose.nat.yaml ps
+# REDIS_HOST=192.168.11.9 docker compose -f docker-compose.nat.yaml up
+# REDIS_HOST=192.168.11.7 docker compose -f docker-compose.nat.yaml up
+# bundle exec rake 'build_cluster[192.168.11.9,192.168.11.7]'
 services:
   node1: &node
     image: "redis:${REDIS_VERSION:-7}"
