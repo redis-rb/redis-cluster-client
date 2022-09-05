@@ -35,7 +35,7 @@ class RedisClient
         when 'wait'     then send_wait_command(method, command, args, &block)
         when 'keys'     then @node.call_replicas(method, command, args, &block).flatten.sort_by(&:to_s)
         when 'dbsize'   then @node.call_replicas(method, command, args, &block).select { |e| e.is_a?(Integer) }.sum
-        when 'scan'     then scan(command)
+        when 'scan'     then scan(command, seed: 1)
         when 'lastsave' then @node.call_all(method, command, args, &block).sort_by(&:to_i)
         when 'role'     then @node.call_all(method, command, args, &block)
         when 'config'   then send_config_command(method, command, args, &block)
@@ -123,7 +123,7 @@ class RedisClient
         retry
       end
 
-      def scan(*command, **kwargs) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+      def scan(*command, seed: nil, **kwargs) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         command = @command_builder.generate(command, kwargs)
 
         command[1] = ZERO_CURSOR_FOR_SCAN if command.size == 1
@@ -132,7 +132,7 @@ class RedisClient
         client_index = input_cursor % 256
         raw_cursor = input_cursor >> 8
 
-        clients = @node.scale_reading_clients
+        clients = @node.clients_for_scanning(seed: seed)
 
         client = clients[client_index]
         return [ZERO_CURSOR_FOR_SCAN, []] unless client
@@ -147,19 +147,19 @@ class RedisClient
         [((result_cursor << 8) + client_index).to_s, result_keys]
       end
 
-      def assign_node(command, primary_only: false)
-        node_key = find_node_key(command, primary_only: primary_only)
+      def assign_node(command)
+        node_key = find_node_key(command)
         find_node(node_key)
       end
 
-      def find_node_key(command, primary_only: false)
+      def find_node_key(command, seed: nil)
         key = @command.extract_first_key(command)
         slot = key.empty? ? nil : ::RedisClient::Cluster::KeySlotConverter.convert(key)
 
-        if @command.should_send_to_primary?(command) || primary_only
-          @node.find_node_key_of_primary(slot) || @node.primary_node_keys.sample
+        if @command.should_send_to_primary?(command)
+          @node.find_node_key_of_primary(slot) || @node.any_primary_node_key(seed: seed)
         else
-          @node.find_node_key_of_replica(slot) || @node.replica_node_keys.sample
+          @node.find_node_key_of_replica(slot, seed: seed) || @node.any_replica_node_key(seed: seed)
         end
       end
 
@@ -266,12 +266,18 @@ class RedisClient
         find_node(node_key)
       end
 
-      def fetch_cluster_info(config, pool: nil, **kwargs)
+      def fetch_cluster_info(config, pool: nil, **kwargs) # rubocop:disable Metrics/MethodLength
         node_info = ::RedisClient::Cluster::Node.load_info(config.per_node_key, **kwargs)
         node_addrs = node_info.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info[:node_key]) }
         config.update_node(node_addrs)
-        ::RedisClient::Cluster::Node.new(config.per_node_key,
-                                         node_info: node_info, pool: pool, with_replica: config.use_replica?, **kwargs)
+        ::RedisClient::Cluster::Node.new(
+          config.per_node_key,
+          node_info: node_info,
+          pool: pool,
+          with_replica: config.use_replica?,
+          replica_affinity: config.replica_affinity,
+          **kwargs
+        )
       end
 
       def update_cluster_info!

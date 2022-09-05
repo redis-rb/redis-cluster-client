@@ -20,10 +20,19 @@ class RedisClient
 
     InvalidClientConfigError = Class.new(::RedisClient::Error)
 
-    attr_reader :command_builder, :client_config
+    attr_reader :command_builder, :client_config, :replica_affinity
 
-    def initialize(nodes: DEFAULT_NODES, replica: false, client_implementation: Cluster, fixed_hostname: '', **client_config)
+    def initialize( # rubocop:disable Metrics/ParameterLists
+      nodes: DEFAULT_NODES,
+      replica: false,
+      replica_affinity: :random,
+      fixed_hostname: '',
+      client_implementation: Cluster,
+      **client_config
+    )
+
       @replica = true & replica
+      @replica_affinity = replica_affinity.to_s.to_sym
       @fixed_hostname = fixed_hostname.to_s
       @node_configs = build_node_configs(nodes.dup)
       client_config = client_config.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) }
