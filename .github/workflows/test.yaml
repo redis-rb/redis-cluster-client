@@ -14,6 +14,9 @@ on:
   pull_request:
     branches:
       - master
+defaults:
+  run:
+    shell: bash
 jobs:
   lint:
     name: Lint
@@ -217,10 +220,34 @@ jobs:
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
         env:
           HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
+      - name: Wait for nodes to be ready
+        run: |
+          node_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $3}' | tail -n +2 | wc -l)
+          i=0
+          while :
+          do
+            if [[ $i -gt $MAX_ATTEMPTS ]]
+            then
+              echo "Max attempts exceeded: $i times"
+              exit 1
+            fi
+            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $5}' | grep '(healthy)' | wc -l)
+            if [[ $healthy_cnt -eq $node_cnt ]]
+            then
+              break
+            fi
+            echo 'Waiting for nodes to be ready...'
+            sleep 3
+            : $((++i))
+          done
+        env:
+          HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
+          MAX_ATTEMPTS: "10"
       - name: Build cluster
         run: bundle exec rake "build_cluster[$HOST_ADDR]"
         env:
           HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
+          DEBUG: "1"
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
         env:
