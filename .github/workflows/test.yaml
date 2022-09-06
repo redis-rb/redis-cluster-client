@@ -231,7 +231,7 @@ jobs:
               echo "Max attempts exceeded: $i times"
               exit 1
             fi
-            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $5}' | grep '(healthy)' || true | wc -l)
+            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $5}' | (grep '(healthy)' || true) | wc -l)
             if [[ $healthy_cnt -eq $node_cnt ]]
             then
               break
