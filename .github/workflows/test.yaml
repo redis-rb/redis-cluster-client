@@ -14,6 +14,9 @@ on:
   pull_request:
     branches:
       - master
+defaults:
+  run:
+    shell: bash
 jobs:
   lint:
     name: Lint
@@ -189,6 +192,72 @@ jobs:
         run: bundle exec rake test_cluster_scale
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
+  nat-ted-env:
+    name: NAT-ted Environments
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-latest
+    env:
+      REDIS_VERSION: '7.0.1'
+      DOCKER_COMPOSE_FILE: 'docker-compose.nat.yaml'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+          bundler-cache: true
+      - name: Pull Docker images
+        run: docker pull redis:$REDIS_VERSION
+      - name: Get IP address of host
+        id: host_ip_addr
+        run: |
+          host_ip_addr=$(ip a | grep eth0 | grep inet | awk '{print $2}' | cut -d'/' -f1)
+          echo "::set-output name=host_ip_addr::$host_ip_addr"
+      - name: Run containers
+        run: docker compose -f $DOCKER_COMPOSE_FILE up -d
+        env:
+          HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
+      - name: Wait for nodes to be ready
+        run: |
+          node_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $3}' | tail -n +2 | wc -l)
+          i=0
+          while :
+          do
+            if [[ $i -gt $MAX_ATTEMPTS ]]
+            then
+              echo "Max attempts exceeded: $i times"
+              exit 1
+            fi
+            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $5}' | (grep '(healthy)' || true) | wc -l)
+            if [[ $healthy_cnt -eq $node_cnt ]]
+            then
+              break
+            fi
+            echo 'Waiting for nodes to be ready...'
+            sleep 3
+            : $((++i))
+          done
+        env:
+          HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
+          MAX_ATTEMPTS: "10"
+      - name: Print containers
+        run: docker compose -f $DOCKER_COMPOSE_FILE ps
+        env:
+          HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
+      - name: Build cluster
+        run: bundle exec rake "build_cluster[$HOST_ADDR]"
+        env:
+          HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
+          DEBUG: "1"
+      - name: Run minitest
+        run: bundle exec rake test
+      - name: Stop containers
+        run: docker compose -f $DOCKER_COMPOSE_FILE down
+        env:
+          HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
   benchmark:
     name: Benchmark
     timeout-minutes: 15
