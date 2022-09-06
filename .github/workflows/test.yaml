@@ -243,15 +243,15 @@ jobs:
         env:
           HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
           MAX_ATTEMPTS: "10"
+      - name: Print containers
+        run: docker compose -f $DOCKER_COMPOSE_FILE ps
+        env:
+          HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
       - name: Build cluster
         run: bundle exec rake "build_cluster[$HOST_ADDR]"
         env:
           HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
           DEBUG: "1"
-      - name: Print containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE ps
-        env:
-          HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
       - name: Run minitest
         run: bundle exec rake test
       - name: Stop containers
