@@ -266,8 +266,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REDIS_VERSION: '7.0.1'
-      DOCKER_COMPOSE_FILE: 'docker-compose.yaml'
-      REDIS_CLIENT_MAX_THREADS: '37'
+      DOCKER_COMPOSE_FILE: 'docker-compose.latency.yaml'
+      REDIS_CLIENT_MAX_THREADS: '5'
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -286,5 +286,11 @@ jobs:
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Run minitest
         run: bundle exec rake bench
+      - name: Reset qdisc
+        run: |
+          for i in {7..9}
+          do
+            docker compose -f $DOCKER_COMPOSE_FILE exec node$i tc qdisc del dev eth0 root netem
+          done
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
