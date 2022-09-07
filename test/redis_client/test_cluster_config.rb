@@ -5,6 +5,23 @@ require 'testing_helper'
 
 class RedisClient
   class TestClusterConfig < TestingWrapper
+    def test_dup
+      orig = ::RedisClient::ClusterConfig.new
+      copy = orig.dup
+      refute_equal(orig.object_id, copy.object_id)
+
+      ::RedisClient::ClusterConfig.instance_method(:initialize).parameters.each do |type, name|
+        case type
+        when :key
+          want = orig.instance_variable_get("@#{name}".to_sym)
+          got = copy.instance_variable_get("@#{name}".to_sym)
+          next if got.nil?
+
+          assert_equal(want, got, "Case: #{type}=#{name}")
+        end
+      end
+    end
+
     def test_inspect
       want = '#<RedisClient::ClusterConfig [{:host=>"127.0.0.1", :port=>6379}]>'
       got = ::RedisClient::ClusterConfig.new.inspect
@@ -98,12 +115,6 @@ class RedisClient
       assert_equal([{ host: '127.0.0.1', port: 6379 }], config.instance_variable_get(:@node_configs))
       config.add_node('127.0.0.2', 6380)
       assert_equal([{ host: '127.0.0.1', port: 6379 }, { host: '127.0.0.2', port: 6380 }], config.instance_variable_get(:@node_configs))
-    end
-
-    def test_dup
-      orig = ::RedisClient::ClusterConfig.new
-      copy = orig.dup
-      refute_equal(orig.object_id, copy.object_id)
     end
 
     def test_command_builder

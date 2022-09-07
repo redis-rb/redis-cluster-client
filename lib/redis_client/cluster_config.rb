@@ -42,6 +42,17 @@ class RedisClient
       @mutex = Mutex.new
     end
 
+    def dup
+      self.class.new(
+        nodes: @node_configs,
+        replica: @replica,
+        replica_affinity: @replica_affinity,
+        fixed_hostname: @fixed_hostname,
+        client_implementation: @client_implementation,
+        **@client_config
+      )
+    end
+
     def inspect
       "#<#{self.class.name} #{per_node_key.values}>"
     end
@@ -77,10 +88,6 @@ class RedisClient
 
     def add_node(host, port)
       @mutex.synchronize { @node_configs << { host: host, port: port } }
-    end
-
-    def dup
-      self.class.new(nodes: @node_configs, replica: @replica, fixed_hostname: @fixed_hostname, **@client_config)
     end
 
     private
