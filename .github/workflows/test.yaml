@@ -308,7 +308,7 @@ jobs:
         run: bundle exec rake bench
       - name: Reset qdisc
         run: |
-          for i in {7..9}
+          for i in {5..9..2}
           do
             docker compose -f $DOCKER_COMPOSE_FILE exec node$i tc qdisc del dev eth0 root netem
           done
