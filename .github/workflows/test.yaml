@@ -267,7 +267,9 @@ jobs:
     env:
       REDIS_VERSION: '7.0.1'
       DOCKER_COMPOSE_FILE: 'docker-compose.latency.yaml'
+      REDIS_REPLICA_SIZE: '2'
       REDIS_CLIENT_MAX_THREADS: '5'
+      DELAY_TIME: '2ms'
     steps:
       - name: Check out code
         uses: actions/checkout@v3
