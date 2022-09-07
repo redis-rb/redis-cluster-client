@@ -302,6 +302,8 @@ jobs:
             sleep 3
             : $((++i))
           done
+        env:
+          MAX_ATTEMPTS: "10"
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Build cluster
