@@ -286,6 +286,8 @@ jobs:
         run: bundle exec rake wait
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
+      - name: Print topology
+        run: docker compose -f $DOCKER_COMPOSE_FILE exec node1 redis-cli cluster nodes
       - name: Run minitest
         run: bundle exec rake bench
       - name: Reset qdisc
