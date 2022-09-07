@@ -303,9 +303,15 @@ jobs:
             : $((++i))
           done
         env:
-          MAX_ATTEMPTS: "10"
+          MAX_ATTEMPTS: "20"
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
+      - name: Print topology
+        run: |
+          for i in {1..9}
+          do
+            echo "node$i: $(docker compose -f $DOCKER_COMPOSE_FILE exec node$i redis-cli cluster nodes | grep myself)"
+          done
       - name: Build cluster
         run: bundle exec rake build_cluster_for_bench
         env:
