@@ -209,13 +209,13 @@ jobs:
         with:
           ruby-version: '3.1'
           bundler-cache: true
-      - name: Pull Docker images
-        run: docker pull redis:$REDIS_VERSION
       - name: Get IP address of host
         id: host_ip_addr
         run: |
           host_ip_addr=$(ip a | grep eth0 | grep inet | awk '{print $2}' | cut -d'/' -f1)
           echo "::set-output name=host_ip_addr::$host_ip_addr"
+      - name: Pull Docker images
+        run: docker pull redis:$REDIS_VERSION
       - name: Run containers
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
         env:
@@ -282,10 +282,32 @@ jobs:
         run: docker pull redis:$REDIS_VERSION
       - name: Run containers
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
-      - name: Wait for Redis cluster to be ready
-        run: bundle exec rake wait
+      - name: Wait for nodes to be ready
+        run: |
+          node_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $3}' | tail -n +2 | wc -l)
+          i=0
+          while :
+          do
+            if [[ $i -gt $MAX_ATTEMPTS ]]
+            then
+              echo "Max attempts exceeded: $i times"
+              exit 1
+            fi
+            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $5}' | (grep '(healthy)' || true) | wc -l)
+            if [[ $healthy_cnt -eq $node_cnt ]]
+            then
+              break
+            fi
+            echo 'Waiting for nodes to be ready...'
+            sleep 3
+            : $((++i))
+          done
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
+      - name: Build cluster
+        run: bundle exec rake build_cluster_for_bench
+        env:
+          DEBUG: "1"
       - name: Print topology
         run: |
           for i in {1..9}
