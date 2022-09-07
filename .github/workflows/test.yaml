@@ -287,7 +287,19 @@ jobs:
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Print topology
-        run: docker compose -f $DOCKER_COMPOSE_FILE exec node1 redis-cli cluster nodes
+        run: |
+          for i in {1..9}
+          do
+            echo "node$i: $(docker compose -f $DOCKER_COMPOSE_FILE exec node$i redis-cli cluster nodes | grep myself)"
+          done
+      - name: Ping nodes
+        run: |
+          for i in {1..9}
+          do
+            node_addr="$(docker compose -f $DOCKER_COMPOSE_FILE exec node$i redis-cli cluster nodes | grep myself | awk '{print $2}' | cut -d'@' -f1 | cut -d':' -f1)"
+            echo "node$i:"
+            ping -c 5 $node_addr
+          done
       - name: Run minitest
         run: bundle exec rake bench
       - name: Reset qdisc
