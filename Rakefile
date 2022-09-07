@@ -62,3 +62,11 @@ task :build_cluster, %i[addr1 addr2] do |_, args|
     timeout: 30.0
   ).rebuild
 end
+
+desc 'Build cluster for benchmark'
+task :build_cluster_for_bench do
+  $LOAD_PATH.unshift(File.expand_path('test', __dir__))
+  require 'cluster_controller'
+  nodes = (6379..6387).map { |port| "redis://127.0.0.1:#{port}" }
+  ::ClusterController.new(nodes, shard_size: 3, replica_size: 2, timeout: 30.0).rebuild
+end

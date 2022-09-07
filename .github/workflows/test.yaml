@@ -209,13 +209,13 @@ jobs:
         with:
           ruby-version: '3.1'
           bundler-cache: true
-      - name: Pull Docker images
-        run: docker pull redis:$REDIS_VERSION
       - name: Get IP address of host
         id: host_ip_addr
         run: |
           host_ip_addr=$(ip a | grep eth0 | grep inet | awk '{print $2}' | cut -d'/' -f1)
           echo "::set-output name=host_ip_addr::$host_ip_addr"
+      - name: Pull Docker images
+        run: docker pull redis:$REDIS_VERSION
       - name: Run containers
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
         env:
@@ -266,8 +266,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REDIS_VERSION: '7.0.1'
-      DOCKER_COMPOSE_FILE: 'docker-compose.yaml'
-      REDIS_CLIENT_MAX_THREADS: '37'
+      DOCKER_COMPOSE_FILE: 'docker-compose.latency.yaml'
+      REDIS_REPLICA_SIZE: '2'
+      REDIS_CLIENT_MAX_THREADS: '5'
+      DELAY_TIME: '2ms'
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -284,7 +286,31 @@ jobs:
         run: bundle exec rake wait
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
+      - name: Rebuild cluster for balancing of replicas
+        run: bundle exec rake build_cluster_for_bench
+        env:
+          DEBUG: "1"
+      - name: Print topology
+        run: |
+          for i in {1..9}
+          do
+            echo "node$i: $(docker compose -f $DOCKER_COMPOSE_FILE exec node$i redis-cli cluster nodes | grep myself)"
+          done
+      - name: Ping nodes
+        run: |
+          for i in {1..9}
+          do
+            node_addr="$(docker compose -f $DOCKER_COMPOSE_FILE exec node$i redis-cli cluster nodes | grep myself | awk '{print $2}' | cut -d'@' -f1 | cut -d':' -f1)"
+            echo "node$i:"
+            ping -c 5 $node_addr
+          done
       - name: Run minitest
         run: bundle exec rake bench
+      - name: Reset qdisc
+        run: |
+          for i in {5..9..2}
+          do
+            docker compose -f $DOCKER_COMPOSE_FILE exec node$i tc qdisc del dev eth0 root netem
+          done
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
