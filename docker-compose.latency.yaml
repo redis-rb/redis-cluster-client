@@ -65,3 +65,39 @@ services:
     <<: *far_node
     ports:
       - "6387:6379"
+  clustering:
+    image: "redis:${REDIS_VERSION:-7}"
+    command: >
+      bash -c "apt-get update > /dev/null
+      && apt-get install --no-install-recommends --no-install-suggests -y dnsutils > /dev/null
+      && rm -rf /var/lib/apt/lists/*
+      && yes yes | redis-cli --cluster create
+      $$(dig node1 +short):6379
+      $$(dig node2 +short):6379
+      $$(dig node3 +short):6379
+      $$(dig node4 +short):6379
+      $$(dig node5 +short):6379
+      $$(dig node6 +short):6379
+      $$(dig node7 +short):6379
+      $$(dig node8 +short):6379
+      $$(dig node9 +short):6379
+      --cluster-replicas 2"
+    depends_on:
+      node1:
+        condition: service_healthy
+      node2:
+        condition: service_healthy
+      node3:
+        condition: service_healthy
+      node4:
+        condition: service_healthy
+      node5:
+        condition: service_healthy
+      node6:
+        condition: service_healthy
+      node7:
+        condition: service_healthy
+      node8:
+        condition: service_healthy
+      node9:
+        condition: service_healthy

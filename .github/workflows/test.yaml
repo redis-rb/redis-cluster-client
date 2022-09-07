@@ -282,37 +282,11 @@ jobs:
         run: docker pull redis:$REDIS_VERSION
       - name: Run containers
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
-      - name: Wait for nodes to be ready
-        run: |
-          node_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $3}' | tail -n +2 | wc -l)
-          i=0
-          while :
-          do
-            if [[ $i -gt $MAX_ATTEMPTS ]]
-            then
-              echo "Max attempts exceeded: $i times"
-              exit 1
-            fi
-            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $5}' | (grep '(healthy)' || true) | wc -l)
-            if [[ $healthy_cnt -eq $node_cnt ]]
-            then
-              break
-            fi
-            echo 'Waiting for nodes to be ready...'
-            sleep 3
-            : $((++i))
-          done
-        env:
-          MAX_ATTEMPTS: "20"
+      - name: Wait for Redis cluster to be ready
+        run: bundle exec rake wait
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
-      - name: Print topology
-        run: |
-          for i in {1..9}
-          do
-            echo "node$i: $(docker compose -f $DOCKER_COMPOSE_FILE exec node$i redis-cli cluster nodes | grep myself)"
-          done
-      - name: Build cluster
+      - name: Rebuild cluster for balancing of replicas
         run: bundle exec rake build_cluster_for_bench
         env:
           DEBUG: "1"
