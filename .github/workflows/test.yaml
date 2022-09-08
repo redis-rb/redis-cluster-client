@@ -269,7 +269,7 @@ jobs:
       DOCKER_COMPOSE_FILE: 'compose.latency.yaml'
       REDIS_REPLICA_SIZE: '2'
       REDIS_CLIENT_MAX_THREADS: '5'
-      DELAY_TIME: '2ms'
+      DELAY_TIME: '1ms'
     steps:
       - name: Check out code
         uses: actions/checkout@v3
