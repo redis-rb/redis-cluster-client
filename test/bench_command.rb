@@ -16,10 +16,10 @@ class BenchCommand
       @client&.close
     end
 
-    def bench_ping
+    def bench_echo
       assert_performance_linear do |n|
         n.times do
-          @client.call('PING')
+          @client.call('ECHO', 'Hello world')
         end
       end
     end
@@ -40,11 +40,11 @@ class BenchCommand
       end
     end
 
-    def bench_pipeline_ping
+    def bench_pipeline_echo
       assert_performance_linear do |n|
         @client.pipelined do |pi|
           n.times do
-            pi.call('PING')
+            pi.call('ECHO', 'Hello world')
           end
         end
       end
