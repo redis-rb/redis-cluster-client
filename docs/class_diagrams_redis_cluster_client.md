@@ -5,8 +5,11 @@ classDiagram
   class RedisClient_Cluster {
     +inspect()
     +call()
+    +call_v()
     +call_once()
+    +call_once_v()
     +blocking_call()
+    +blocking_call_v()
     +scan()
     +sscan()
     +hscan()
