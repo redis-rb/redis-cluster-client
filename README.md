@@ -191,6 +191,9 @@ $ docker compose up
 ## else:
 $ HOST_ADDR=192.168.xxx.xxx docker compose -f compose.nat.yaml up
 $ DEBUG=1 bundle exec rake 'build_cluster[192.168.xxx.xxx]'
+
+### When the above rake task is not working:
+$ docker compose -f compose.nat.yaml exec node1 bash -c "yes yes | redis-cli --cluster create --cluster-replicas 1 $(seq 6379 6384 | xargs -I {} echo 192.168.xxx.xxx:{} | xargs echo)"
 ```
 
 Please run basic test cases.
