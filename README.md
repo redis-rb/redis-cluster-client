@@ -51,12 +51,17 @@ RedisClient.cluster(nodes: %w[redis://node1:6379 redis://node2:6379]).new_client
 ```
 
 ```ruby
-# To connect with single endpoint
+# To connect to single endpoint
 RedisClient.cluster(nodes: 'redis://endpoint.example.com:6379').new_client
 ```
 
 ```ruby
-# To connect to single endpoint with SSL/TLS
+# To connect to single endpoint with SSL/TLS (such as Amazon ElastiCache for Redis)
+RedisClient.cluster(nodes: 'rediss://endpoint.example.com:6379').new_client
+```
+
+```ruby
+# To connect to NAT-ted endpoint with SSL/TLS (such as Microsoft Azure Cache for Redis)
 RedisClient.cluster(nodes: 'rediss://endpoint.example.com:6379', fixed_hostname: 'endpoint.example.com').new_client
 ```
 
