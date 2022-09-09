@@ -63,8 +63,11 @@ RedisClient.cluster(nodes: 'rediss://endpoint.example.com:6379', fixed_hostname:
 ## Interfaces
 The following methods are able to be used like `redis-client`.
 * `#call`
+* `#call_v`
 * `#call_once`
+* `#call_once_v`
 * `#blocking_call`
+* `#blocking_call_v`
 * `#scan`
 * `#sscan`
 * `#hscan`
@@ -153,6 +156,51 @@ RedisClient.cluster.new_pool(timeout: 1.0, size: 2)
 
 ## Connection drivers
 Please see [redis-client](https://github.com/redis-rb/redis-client#drivers).
+
+## Development
+Please make sure the following tools are installed on your machine.
+
+| Tool | Version | URL |
+| --- | --- | --- |
+| Docker | latest stable | https://docs.docker.com/engine/install/ |
+| Docker Compose | V2 | https://docs.docker.com/compose/reference/ |
+| Ruby | latest stable | https://www.ruby-lang.org/en/ |
+| Bundler | latest satble | https://bundler.io/ |
+
+Please fork this repository and check out the codes.
+
+```
+$ git clone git@github.com:your-account-name/redis-cluster-client.git
+$ cd redis-cluster-client/
+$ git remote add upstream https://github.com/redis-rb/redis-cluster-client.git
+$ git fetch -p upstream
+```
+
+Please install libraries.
+
+```
+$ bundle install --path=.bundle --jobs=4
+```
+
+Please run Redis cluster with Docker.
+
+```
+## If you use Docker server and your OS is Linux:
+$ docker compose up
+
+## Else:
+$ host_addr="$(ip a | grep eth0 | grep inet | awk '{print $2}' | cut -d'/' -f1)"
+$ HOST_ADDR=$host_addr docker compose -f compose.nat.yaml up
+$ bundle exec rake "build_cluster[$host_addr]"
+```
+
+Please run basic test cases.
+
+```
+$ bundle exec rake test
+```
+
+You can see more information in the YAML file for GItHub actions.
 
 ## See also
 * https://github.com/redis/redis-rb/issues/1070
