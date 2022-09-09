@@ -188,10 +188,12 @@ Please run Redis cluster with Docker.
 ## If you use Docker server and your OS is Linux:
 $ docker compose up
 
-## Else:
-$ host_addr="$(ip a | grep eth0 | grep inet | awk '{print $2}' | cut -d'/' -f1)"
-$ HOST_ADDR=$host_addr docker compose -f compose.nat.yaml up
-$ bundle exec rake "build_cluster[$host_addr]"
+## else:
+$ HOST_ADDR=192.168.xxx.xxx docker compose -f compose.nat.yaml up
+$ DEBUG=1 bundle exec rake 'build_cluster[192.168.xxx.xxx]'
+
+### When the above rake task is not working:
+$ docker compose -f compose.nat.yaml exec node1 bash -c "yes yes | redis-cli --cluster create --cluster-replicas 1 $(seq 6379 6384 | xargs -I {} echo 192.168.xxx.xxx:{} | xargs echo)"
 ```
 
 Please run basic test cases.
