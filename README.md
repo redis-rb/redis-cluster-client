@@ -51,6 +51,20 @@ RedisClient.cluster(nodes: %w[redis://node1:6379 redis://node2:6379]).new_client
 ```
 
 ```ruby
+# To connect with a subset of auth-needed nodes for startup
+
+# User name and password should be URI encoded and the same in every node.
+username = 'myuser'
+password = URI.encode_www_form_component('!&<123-abc>')
+
+# with URL:
+RedisClient.cluster(nodes: %W[redis://#{username}:#{password}@node1:6379 redis://#{username}:#{password}@node2:6379]).new_client
+
+# with options:
+RedisClient.cluster(nodes: %w[redis://node1:6379 redis://node2:6379], username: username, password: password).new_client
+```
+
+```ruby
 # To connect to single endpoint
 RedisClient.cluster(nodes: 'redis://endpoint.example.com:6379').new_client
 ```
