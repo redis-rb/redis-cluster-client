@@ -21,22 +21,29 @@ TEST_SSL_PARAMS = {
 _base_opts = {
   timeout: TEST_TIMEOUT_SEC,
   reconnect_attempts: TEST_RECONNECT_ATTEMPTS
-}.freeze
+}
 
 _ssl_opts = {
   ssl: true,
   ssl_params: TEST_SSL_PARAMS
 }.freeze
 
+_redis_scheme = 'redis'
+
 begin
-  _new_raw_cli.call(**_base_opts).call('PING')
-  TEST_REDIS_SCHEME = 'redis'
+  _tmp_cli = _new_raw_cli.call(**_base_opts)
+  _tmp_cli.call('PING')
+rescue ::RedisClient::UnsupportedServer
+  _base_opts.merge!(protocol: 2)
 rescue ::RedisClient::ConnectionError => e
   raise e if e.message != 'Connection reset by peer'
 
-  TEST_REDIS_SCHEME = 'rediss'
+  _redis_scheme = 'rediss'
+ensure
+  _tmp_cli&.close
 end
 
+TEST_REDIS_SCHEME = _redis_scheme
 TEST_REDIS_SSL = TEST_REDIS_SCHEME == 'rediss'
 TEST_FIXED_HOSTNAME = TEST_REDIS_SSL ? TEST_REDIS_HOST : nil
 
@@ -50,5 +57,10 @@ TEST_NODE_URIS = TEST_REDIS_PORTS.map { |v| "#{TEST_REDIS_SCHEME}://#{TEST_REDIS
 TEST_NODE_OPTIONS = TEST_REDIS_PORTS.to_h { |v| ["#{TEST_REDIS_HOST}:#{v}", { host: TEST_REDIS_HOST, port: v }] }.freeze
 
 TEST_GENERIC_OPTIONS = TEST_REDIS_SSL ? _base_opts.merge(_ssl_opts).freeze : _base_opts
+
+_tmp_cli = _new_raw_cli.call(**TEST_GENERIC_OPTIONS)
+TEST_REDIS_VERSION = _tmp_cli.call('INFO', 'SERVER').split("\r\n").grep(/redis_version.+/).first.split(':')[1]
+TEST_REDIS_MAJOR_VERSION = Integer(TEST_REDIS_VERSION[0])
+_tmp_cli.close
 
 # rubocop:enable Lint/UnderscorePrefixedVariableName
