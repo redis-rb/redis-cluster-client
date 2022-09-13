@@ -63,8 +63,8 @@ class RedisClient
         @client.call(*%w[RPUSH foo hello])
         @client.call(*%w[RPUSH foo world])
         wait_for_replication
-        client_side_timeout = 1.0
-        server_side_timeout = 0.5
+        client_side_timeout = TEST_REDIS_MAJOR_VERSION < 6 ? 1.5 : 1.0
+        server_side_timeout = TEST_REDIS_MAJOR_VERSION < 6 ? '1' : '0.5'
         assert_equal(%w[foo world], @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 1st')
         assert_equal(%w[foo hello], @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 2nd')
         assert_nil(@client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 3rd')
@@ -129,10 +129,12 @@ class RedisClient
         wait_for_replication
 
         want = %w[PONG] + (0..9).map(&:to_s) + [%w[list 2]]
+        client_side_timeout = TEST_REDIS_MAJOR_VERSION < 6 ? 1.5 : 1.0
+        server_side_timeout = TEST_REDIS_MAJOR_VERSION < 6 ? '1' : '0.5'
         got = @client.pipelined do |pipeline|
           pipeline.call_once('PING')
           10.times { |i| pipeline.call('GET', "string#{i}") }
-          pipeline.blocking_call(0.2, 'BRPOP', 'list', '0.1')
+          pipeline.blocking_call(client_side_timeout, 'BRPOP', 'list', server_side_timeout)
         end
         assert_equal(want, got)
       end
@@ -162,11 +164,11 @@ class RedisClient
         assert_nil(@client.close)
       end
 
-      def test_dedicated_commands
+      def test_dedicated_commands # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         10.times { |i| @client.call('SET', "key#{i}", i) }
         wait_for_replication
         [
-          { command: %w[ACL HELP], is_a: Array },
+          { command: %w[ACL HELP], is_a: Array, supported_redis_version: 6 },
           { command: ['WAIT', TEST_REPLICA_SIZE, '1'], is_a: Integer },
           { command: %w[KEYS *], want: (0..9).map { |i| "key#{i}" } },
           { command: %w[DBSIZE], want: (0..9).size },
@@ -174,10 +176,10 @@ class RedisClient
           { command: %w[LASTSAVE], is_a: Array },
           { command: %w[ROLE], is_a: Array },
           { command: %w[CONFIG RESETSTAT], want: 'OK' },
-          { command: %w[CONFIG GET maxmemory], is_a: Hash },
+          { command: %w[CONFIG GET maxmemory], is_a: TEST_REDIS_MAJOR_VERSION < 6 ? Array : Hash },
           { command: %w[CLIENT LIST], is_a: Array },
           { command: %w[CLIENT PAUSE 100], want: 'OK' },
-          { command: %w[CLIENT INFO], is_a: String },
+          { command: %w[CLIENT INFO], is_a: String, supported_redis_version: 6 },
           { command: %w[CLUSTER SET-CONFIG-EPOCH 0], error: ::RedisClient::Cluster::OrchestrationCommandNotSupported },
           { command: %w[CLUSTER SAVECONFIG], want: 'OK' },
           { command: %w[CLUSTER GETKEYSINSLOT 13252 1], want: %w[key0] },
@@ -196,6 +198,8 @@ class RedisClient
           { command: %w[MULTI], error: ::RedisClient::Cluster::AmbiguousNodeError },
           { command: %w[FLUSHDB], want: 'OK' }
         ].each do |c|
+          next if c.key?(:supported_redis_version) && TEST_REDIS_MAJOR_VERSION < c[:supported_redis_version]
+
           msg = "Case: #{c[:command].join(' ')}"
           got = -> { @client.call(*c[:command]) }
           if c.key?(:error)
