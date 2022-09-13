@@ -56,7 +56,7 @@ TEST_REDIS_PORTS = TEST_REDIS_PORT.upto(TEST_REDIS_PORT + TEST_NUMBER_OF_NODES -
 TEST_NODE_URIS = TEST_REDIS_PORTS.map { |v| "#{TEST_REDIS_SCHEME}://#{TEST_REDIS_HOST}:#{v}" }.freeze
 TEST_NODE_OPTIONS = TEST_REDIS_PORTS.to_h { |v| ["#{TEST_REDIS_HOST}:#{v}", { host: TEST_REDIS_HOST, port: v }] }.freeze
 
-TEST_GENERIC_OPTIONS = TEST_REDIS_SSL ? _base_opts.merge(_ssl_opts).freeze : _base_opts
+TEST_GENERIC_OPTIONS = (TEST_REDIS_SSL ? _base_opts.merge(_ssl_opts) : _base_opts).freeze
 
 _tmp_cli = _new_raw_cli.call(**TEST_GENERIC_OPTIONS)
 TEST_REDIS_VERSION = _tmp_cli.call('INFO', 'SERVER').split("\r\n").grep(/redis_version.+/).first.split(':')[1]
