@@ -60,7 +60,7 @@ TEST_GENERIC_OPTIONS = TEST_REDIS_SSL ? _base_opts.merge(_ssl_opts).freeze : _ba
 
 _tmp_cli = _new_raw_cli.call(**TEST_GENERIC_OPTIONS)
 TEST_REDIS_VERSION = _tmp_cli.call('INFO', 'SERVER').split("\r\n").grep(/redis_version.+/).first.split(':')[1]
-TEST_REDIS_MAJOR_VERSION = Integer(TEST_REDIS_VERSION[0])
+TEST_REDIS_MAJOR_VERSION = Integer(TEST_REDIS_VERSION.split('.').first)
 _tmp_cli.close
 
 # rubocop:enable Lint/UnderscorePrefixedVariableName
