@@ -1,86 +1,11 @@
 # frozen_string_literal: true
 
 require 'benchmark_helper'
+require 'benchmark_mixin'
 
 class BenchCommand
-  module Mixin
-    def setup
-      @client = new_test_client
-      @client.call('FLUSHDB')
-      wait_for_replication
-    end
-
-    def teardown
-      @client.call('FLUSHDB')
-      wait_for_replication
-      @client&.close
-    end
-
-    def bench_echo
-      assert_performance_linear do |n|
-        n.times do
-          @client.call('ECHO', 'Hello world')
-        end
-      end
-    end
-
-    def bench_set
-      assert_performance_linear do |n|
-        n.times do |i|
-          @client.call('SET', "key#{i}", i)
-        end
-      end
-    end
-
-    def bench_get
-      assert_performance_linear do |n|
-        n.times do |i|
-          @client.call('GET', "key#{i}")
-        end
-      end
-    end
-
-    def bench_pipeline_echo
-      assert_performance_linear do |n|
-        @client.pipelined do |pi|
-          n.times do
-            pi.call('ECHO', 'Hello world')
-          end
-        end
-      end
-    end
-
-    def bench_pipeline_set
-      assert_performance_linear do |n|
-        @client.pipelined do |pi|
-          n.times do |i|
-            pi.call('SET', "key#{i}", i)
-          end
-        end
-      end
-    end
-
-    def bench_pipeline_get
-      assert_performance_linear do |n|
-        @client.pipelined do |pi|
-          n.times do |i|
-            pi.call('GET', "key#{i}")
-          end
-        end
-      end
-    end
-
-    private
-
-    def wait_for_replication
-      client_side_timeout = TEST_TIMEOUT_SEC + 1.0
-      server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
-      @client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
-    end
-  end
-
   class PrimaryOnly < BenchmarkWrapper
-    include Mixin
+    include BenchmarkMixin
 
     private
 
@@ -95,7 +20,7 @@ class BenchCommand
   end
 
   class ScaleReadRandom < BenchmarkWrapper
-    include Mixin
+    include BenchmarkMixin
 
     private
 
@@ -112,7 +37,7 @@ class BenchCommand
   end
 
   class ScaleReadLatency < BenchmarkWrapper
-    include Mixin
+    include BenchmarkMixin
 
     private
 
@@ -129,7 +54,7 @@ class BenchCommand
   end
 
   class Pooled < BenchmarkWrapper
-    include Mixin
+    include BenchmarkMixin
 
     private
 
@@ -140,6 +65,49 @@ class BenchCommand
         **TEST_GENERIC_OPTIONS
       )
       ::RedisClient::Cluster.new(config, pool: { timeout: TEST_TIMEOUT_SEC, size: 2 })
+    end
+  end
+
+  class Envoy < BenchmarkWrapper
+    include BenchmarkMixin
+
+    def setup
+      @client = new_test_client
+      @cluster_client = new_cluster_client
+      @cluster_client.call('FLUSHDB')
+      wait_for_replication
+    end
+
+    def teardown
+      @cluster_client.call('FLUSHDB')
+      wait_for_replication
+      @cluster_client&.close
+      @client&.close
+    end
+
+    # https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/other_protocols/redis#supported-commands
+    def bench_echo
+      skip('Envoy does not support ECHO command.')
+    end
+
+    def bench_pipeline_echo
+      skip('Envoy does not support ECHO command.')
+    end
+
+    private
+
+    def new_test_client
+      ::RedisClient.config(**TEST_GENERIC_OPTIONS.merge(port: 7000, protocol: 2)).new_client
+    end
+
+    def new_cluster_client
+      ::RedisClient.cluster(nodes: TEST_NODE_URIS, fixed_hostname: TEST_FIXED_HOSTNAME, **TEST_GENERIC_OPTIONS).new_client
+    end
+
+    def wait_for_replication
+      client_side_timeout = TEST_TIMEOUT_SEC + 1.0
+      server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
+      @cluster_client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
     end
   end
 end

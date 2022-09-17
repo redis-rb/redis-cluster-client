@@ -101,3 +101,12 @@ services:
         condition: service_healthy
       node9:
         condition: service_healthy
+  envoy:
+    image: envoyproxy/envoy:v1.23.1
+    ports:
+      - "7000:10001"
+    volumes:
+      - ./test/proxy/envoy.yaml:/etc/envoy/envoy.yaml
+    depends_on:
+      clustering:
+        condition: service_completed_successfully

@@ -1,0 +1,51 @@
+---
+# https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/examples
+# https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/other_protocols/redis
+# https://github.com/envoyproxy/envoy/blob/main/examples/redis/envoy.yaml
+admin:
+  address:
+    socket_address: 
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 10000
+static_resources:
+  listeners:
+  - name: redis
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10001
+    filter_chains:
+    - filters:
+      # https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/network/redis_proxy/v3/redis_proxy.proto
+      - name: envoy.filters.network.redis_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+          stat_prefix: egress_redis
+          settings:
+            op_timeout: 5s
+            enable_hashtagging: true
+            enable_redirection: true
+            read_policy: PREFER_REPLICA
+          prefix_routes:
+            catch_all_route:
+              cluster: redis
+  clusters:
+  # https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/clusters/redis/v3/redis_cluster.proto
+  - name: redis
+    connect_timeout: 5s
+    dns_lookup_family: V4_ONLY
+    cluster_type:
+      name: envoy.clusters.redis
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          cluster_refresh_rate: 5s
+          cluster_refresh_timeout: 4.5s
+          redirect_refresh_interval: 5s
+          redirect_refresh_threshold: 3
+    load_assignment:
+      cluster_name: redis
+      endpoints:
+      - lb_endpoints:
+        - endpoint: { address: { socket_address: { address: node1, port_value: 6379 } } }
