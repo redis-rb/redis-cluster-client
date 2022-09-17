@@ -68,7 +68,7 @@ class BenchCommand
     end
   end
 
-  class Envoy
+  class Envoy < BenchmarkWrapper
     include BenchmarkMixin
 
     private
