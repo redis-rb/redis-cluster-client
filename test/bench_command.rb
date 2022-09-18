@@ -97,7 +97,7 @@ class BenchCommand
     private
 
     def new_test_client
-      ::RedisClient.config(**TEST_GENERIC_OPTIONS.merge(port: 7000, protocol: 2)).new_client
+      ::RedisClient.config(**TEST_GENERIC_OPTIONS.merge(BENCH_PROXY_OPTIONS)).new_client
     end
 
     def new_cluster_client
