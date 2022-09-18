@@ -281,6 +281,8 @@ class RedisClient
       end
 
       def update_cluster_info!
+        return if @mutex.locked?
+
         @mutex.synchronize do
           begin
             @node.each(&:close)

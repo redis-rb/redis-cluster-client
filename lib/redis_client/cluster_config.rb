@@ -83,10 +83,14 @@ class RedisClient
     end
 
     def update_node(addrs)
+      return if @mutex.locked?
+
       @mutex.synchronize { @node_configs = build_node_configs(addrs) }
     end
 
     def add_node(host, port)
+      return if @mutex.locked?
+
       @mutex.synchronize { @node_configs << { host: host, port: port } }
     end
 

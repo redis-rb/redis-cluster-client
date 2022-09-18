@@ -181,6 +181,8 @@ class RedisClient
       end
 
       def update_slot(slot, node_key)
+        return if @mutex.locked?
+
         @mutex.synchronize { @slots[slot] = node_key }
       end
 
