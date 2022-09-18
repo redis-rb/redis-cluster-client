@@ -63,4 +63,6 @@ TEST_REDIS_VERSION = _tmp_cli.call('INFO', 'SERVER').split("\r\n").grep(/redis_v
 TEST_REDIS_MAJOR_VERSION = Integer(TEST_REDIS_VERSION.split('.').first)
 _tmp_cli.close
 
+BENCH_PROXY_OPTIONS = { port: 7000, protocol: 2 }.freeze
+
 # rubocop:enable Lint/UnderscorePrefixedVariableName
