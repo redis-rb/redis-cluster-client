@@ -66,8 +66,11 @@ class RedisClient
             Thread.new(@router, k, v) do |router, node_key, rows|
               Thread.pass
               replies = router.find_node(node_key).pipelined do |pipeline|
-                rows.each do |(_size, *row, block)|
-                  pipeline.send(*row, &block)
+                rows.each do |row|
+                  case row.size
+                  when 4 then pipeline.send(row[1], row[2], &row[3])
+                  when 5 then pipeline.send(row[1], row[2], row[3], &row[4])
+                  end
                 end
               end
 

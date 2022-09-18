@@ -36,6 +36,7 @@ class RedisClient
 
       def initialize(details)
         @details = pick_details(details)
+        @normalized_cmd_name_cache = {}
       end
 
       def extract_first_key(command)
@@ -72,14 +73,14 @@ class RedisClient
       end
 
       def dig_details(command, key)
-        name = command&.flatten&.first.to_s.downcase # OPTIMIZE: prevent allocation for string
+        name = normalize_cmd_name(command)
         return if name.empty? || !@details.key?(name)
 
         @details.fetch(name).fetch(key)
       end
 
       def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength
-        case command&.flatten&.first.to_s.downcase # OPTIMIZE: prevent allocation for string
+        case normalize_cmd_name(command)
         when 'eval', 'evalsha', 'zinterstore', 'zunionstore' then 3
         when 'object' then 2
         when 'memory'
@@ -107,6 +108,19 @@ class RedisClient
         return '' if s.nil? || e.nil?
 
         key[s + 1..e - 1]
+      end
+
+      def normalize_cmd_name(command)
+        return unless command.is_a?(Array)
+
+        name = case e = command.first
+               when String then e
+               when Array then e.first
+               end
+        return if name.nil?
+
+        @normalized_cmd_name_cache[name] = name.downcase unless @normalized_cmd_name_cache.key?(name)
+        @normalized_cmd_name_cache[name]
       end
     end
   end
