@@ -72,14 +72,14 @@ class RedisClient
       end
 
       def dig_details(command, key)
-        name = command&.flatten&.first.to_s.downcase
+        name = command&.flatten&.first.to_s.downcase # OPTIMIZE: prevent allocation for string
         return if name.empty? || !@details.key?(name)
 
         @details.fetch(name).fetch(key)
       end
 
       def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength
-        case command&.flatten&.first.to_s.downcase
+        case command&.flatten&.first.to_s.downcase # OPTIMIZE: prevent allocation for string
         when 'eval', 'evalsha', 'zinterstore', 'zunionstore' then 3
         when 'object' then 2
         when 'memory'

@@ -4,6 +4,7 @@ source 'https://rubygems.org'
 gemspec name: 'redis-cluster-client'
 
 gem 'hiredis-client', '~> 0.6'
+gem 'memory_profiler'
 gem 'minitest'
 gem 'rake'
 gem 'rubocop'

@@ -9,54 +9,48 @@ class RedisClient
       ReplySizeError = Class.new(::RedisClient::Error)
       MAX_THREADS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
 
-      def initialize(router, command_builder)
+      def initialize(router, command_builder, seed: Random.new_seed)
         @router = router
         @command_builder = command_builder
-        @grouped = Hash.new([].freeze)
+        @grouped = {}
         @size = 0
-        @seed = Random.new_seed
+        @seed = seed
       end
 
       def call(*args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, seed: @seed)
-        @grouped[node_key] += [[@size, :call_v, command, block]]
-        @size += 1
+        add_line(node_key, [@size, :call_v, command, block])
       end
 
       def call_v(args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, seed: @seed)
-        @grouped[node_key] += [[@size, :call_v, command, block]]
-        @size += 1
+        add_line(node_key, [@size, :call_v, command, block])
       end
 
       def call_once(*args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, seed: @seed)
-        @grouped[node_key] += [[@size, :call_once_v, command, block]]
-        @size += 1
+        add_line(node_key, [@size, :call_once_v, command, block])
       end
 
       def call_once_v(args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, seed: @seed)
-        @grouped[node_key] += [[@size, :call_once_v, command, block]]
-        @size += 1
+        add_line(node_key, [@size, :call_once_v, command, block])
       end
 
       def blocking_call(timeout, *args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, seed: @seed)
-        @grouped[node_key] += [[@size, :blocking_call_v, timeout, command, block]]
-        @size += 1
+        add_line(node_key, [@size, :blocking_call_v, timeout, command, block])
       end
 
       def blocking_call_v(timeout, args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, seed: @seed)
-        @grouped[node_key] += [[@size, :blocking_call_v, timeout, command, block]]
-        @size += 1
+        add_line(node_key, [@size, :blocking_call_v, timeout, command, block])
       end
 
       def empty?
@@ -91,6 +85,14 @@ class RedisClient
         return all_replies if errors.empty?
 
         raise ::RedisClient::Cluster::ErrorCollection, errors
+      end
+
+      private
+
+      def add_line(node_key, line)
+        @grouped[node_key] = [] unless @grouped.key?(node_key)
+        @grouped[node_key] << line
+        @size += 1
       end
     end
   end
