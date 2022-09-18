@@ -93,27 +93,40 @@ class TestAgainstClusterState < TestingWrapper
     include Mixin
 
     def new_test_client
-      config = ::RedisClient::ClusterConfig.new(
+      ::RedisClient.cluster(
         nodes: TEST_NODE_URIS,
         fixed_hostname: TEST_FIXED_HOSTNAME,
         **TEST_GENERIC_OPTIONS
-      )
-      ::RedisClient::Cluster.new(config)
+      ).new_client
     end
   end
 
-  # TODO: https://github.com/redis-rb/redis-cluster-client/issues/42
-  # class ScaleRead < TestingWrapper
+  # # TODO: https://github.com/redis-rb/redis-cluster-client/issues/42
+  # class ScaleReadRandom < TestingWrapper
   #   include Mixin
   #
   #   def new_test_client
-  #     config = ::RedisClient::ClusterConfig.new(
+  #     ::RedisClient.cluster(
   #       nodes: TEST_NODE_URIS,
   #       replica: true,
+  #       replica_affinity: :random,
   #       fixed_hostname: TEST_FIXED_HOSTNAME,
   #       **TEST_GENERIC_OPTIONS
-  #     )
-  #     ::RedisClient::Cluster.new(config)
+  #     ).new_client
+  #   end
+  # end
+  #
+  # class ScaleReadLatency < TestingWrapper
+  #   include Mixin
+  #
+  #   def new_test_client
+  #     ::RedisClient.cluster(
+  #       nodes: TEST_NODE_URIS,
+  #       replica: true,
+  #       replica_affinity: :latency,
+  #       fixed_hostname: TEST_FIXED_HOSTNAME,
+  #       **TEST_GENERIC_OPTIONS
+  #     ).new_client
   #   end
   # end
 
@@ -121,12 +134,11 @@ class TestAgainstClusterState < TestingWrapper
     include Mixin
 
     def new_test_client
-      config = ::RedisClient::ClusterConfig.new(
+      ::RedisClient.cluster(
         nodes: TEST_NODE_URIS,
         fixed_hostname: TEST_FIXED_HOSTNAME,
         **TEST_GENERIC_OPTIONS
-      )
-      ::RedisClient::Cluster.new(config, pool: { timeout: TEST_TIMEOUT_SEC, size: 2 })
+      ).new_pool(timeout: TEST_TIMEOUT_SEC, size: 2)
     end
   end
 end
