@@ -11,7 +11,10 @@ module ProfMem
 
   def run
     %w[primary_only scale_read_random scale_read_latency pooled].each do |cli_type|
-      p cli_type
+      print "################################################################################\n"
+      print "# #{cli_type}\n"
+      print "################################################################################\n"
+      print "\n"
 
       profile do
         send("new_#{cli_type}_client".to_sym).pipelined do |pi|

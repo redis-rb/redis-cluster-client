@@ -363,7 +363,7 @@ jobs:
         run: bundle exec rake wait
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
-      - name: Run minitest
+      - name: Run memory profiler
         run: bundle exec rake prof
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
