@@ -78,7 +78,8 @@ class RedisClient
     end
 
     def pipelined
-      pipeline = ::RedisClient::Cluster::Pipeline.new(@router, @command_builder)
+      seed = @config.replica_affinity == :random ? nil : Random.new_seed
+      pipeline = ::RedisClient::Cluster::Pipeline.new(@router, @command_builder, seed: seed)
       yield pipeline
       return [] if pipeline.empty? == 0
 

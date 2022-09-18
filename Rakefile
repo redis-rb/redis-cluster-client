@@ -34,6 +34,14 @@ Rake::TestTask.new(:bench) do |t|
   t.test_files = ARGV.size > 1 ? ARGV[1..] : Dir['test/**/bench_*.rb']
 end
 
+Rake::TestTask.new(:prof) do |t|
+  t.libs << :lib
+  t.libs << :test
+  t.options = '-v'
+  t.warning = false
+  t.test_files = ARGV.size > 1 ? ARGV[1..] : Dir['test/**/prof_*.rb']
+end
+
 desc 'Wait for cluster to be ready'
 task :wait do
   $LOAD_PATH.unshift(File.expand_path('test', __dir__))
