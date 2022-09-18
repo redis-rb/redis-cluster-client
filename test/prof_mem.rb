@@ -18,8 +18,8 @@ module ProfMem
 
       profile do
         send("new_#{cli_type}_client".to_sym).pipelined do |pi|
-          ATTEMPT_COUNT.times { |i| pi.call('SET', "key#{i}", i) }
-          ATTEMPT_COUNT.times { |i| pi.call('GET', "key#{i}") }
+          ATTEMPT_COUNT.times { |i| pi.call('SET', i, i) }
+          ATTEMPT_COUNT.times { |i| pi.call('GET', i) }
         end
       end
     end

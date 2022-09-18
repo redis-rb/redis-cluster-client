@@ -99,14 +99,18 @@ classDiagram
 
   class RedisClient_Cluster_Pipeline {
     +call()
+    +call_v()
     +call_once()
+    +call_once_v()
     +blocking_call()
+    +blocking_call_v()
     +empty?()
     +execute()
   }
 
   class RedisClient_Cluster_PubSub {
     +call()
+    +call_v()
     +close()
     +next_event()
   }

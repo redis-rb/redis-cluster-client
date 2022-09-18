@@ -6,6 +6,8 @@ require 'redis_client/cluster/errors'
 class RedisClient
   class Cluster
     class Command
+      EMPTY_STRING = ''
+
       class << self
         def load(nodes) # rubocop:disable Metrics/MethodLength
           errors = []
@@ -36,11 +38,12 @@ class RedisClient
 
       def initialize(details)
         @details = pick_details(details)
+        @normalized_cmd_name_cache = {}
       end
 
       def extract_first_key(command)
         i = determine_first_key_position(command)
-        return '' if i == 0
+        return EMPTY_STRING if i == 0
 
         key = (command[i].is_a?(Array) ? command[i].flatten.first : command[i]).to_s
         hash_tag = extract_hash_tag(key)
@@ -72,14 +75,14 @@ class RedisClient
       end
 
       def dig_details(command, key)
-        name = command&.flatten&.first.to_s.downcase # OPTIMIZE: prevent allocation for string
+        name = normalize_cmd_name(command)
         return if name.empty? || !@details.key?(name)
 
         @details.fetch(name).fetch(key)
       end
 
       def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength
-        case command&.flatten&.first.to_s.downcase # OPTIMIZE: prevent allocation for string
+        case normalize_cmd_name(command)
         when 'eval', 'evalsha', 'zinterstore', 'zunionstore' then 3
         when 'object' then 2
         when 'memory'
@@ -104,9 +107,22 @@ class RedisClient
         s = key.index('{')
         e = key.index('}', s.to_i + 1)
 
-        return '' if s.nil? || e.nil?
+        return EMPTY_STRING if s.nil? || e.nil?
 
         key[s + 1..e - 1]
+      end
+
+      def normalize_cmd_name(command)
+        return EMPTY_STRING unless command.is_a?(Array)
+
+        name = case e = command.first
+               when String then e
+               when Array then e.first
+               end
+        return EMPTY_STRING if name.nil? || name.empty?
+
+        @normalized_cmd_name_cache[name] = name.downcase unless @normalized_cmd_name_cache.key?(name)
+        @normalized_cmd_name_cache[name]
       end
     end
   end

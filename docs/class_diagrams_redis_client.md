@@ -19,8 +19,11 @@ classDiagram
     +write_timeout=()
     +pubsub()
     +call()
+    +call_v()
     +call_once()
+    +call_once_v()
     +blocking_call()
+    +blocking_call_v()
     +scan()
     +sscan()
     +hscan()
@@ -46,6 +49,7 @@ classDiagram
   class RedisClient_PubSub {
     +initialize()
     +call()
+    +call_v()
     +close()
     +next_event()
   }
@@ -53,12 +57,15 @@ classDiagram
   class RedisClient_Multi {
     +initialize()
     +call()
+    +call_v()
     +call_once()
+    +call_once_v()
   }
 
   class RedisClient_Pipeline {
     +initialize()
     +blocking_call()
+    +blocking_call_v()
   }
 
   class RedisClient_RubyConnection_BufferedIO {
