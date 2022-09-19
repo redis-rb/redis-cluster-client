@@ -6,6 +6,7 @@ require 'redis_client/cluster/errors'
 require 'redis_client/cluster/key_slot_converter'
 require 'redis_client/cluster/node'
 require 'redis_client/cluster/node_key'
+require 'redis_client/cluster/normalized_cmd_name'
 
 class RedisClient
   class Cluster
@@ -25,7 +26,7 @@ class RedisClient
       end
 
       def send_command(method, command, *args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-        cmd = command.first.to_s.downcase
+        cmd = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
         case cmd
         when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save'
           @node.call_all(method, command, args, &block).first
@@ -65,7 +66,12 @@ class RedisClient
       # @see https://redis.io/topics/cluster-spec#redirection-and-resharding
       #   Redirection and resharding
       def try_send(node, method, command, args, retry_count: 3, &block) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        node.send(method, *args, command, &block)
+        if args.empty?
+          # prevent memory allocation for variable-length args
+          node.send(method, command, &block)
+        else
+          node.send(method, *args, command, &block)
+        end
       rescue ::RedisClient::CommandError => e
         raise if retry_count <= 0
 
@@ -193,7 +199,7 @@ class RedisClient
       end
 
       def send_config_command(method, command, args, &block)
-        case command[1].to_s.downcase
+        case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'resetstat', 'rewrite', 'set'
           @node.call_all(method, command, args, &block).first
         else assign_node(command).send(method, *args, command, &block)
@@ -201,7 +207,7 @@ class RedisClient
       end
 
       def send_memory_command(method, command, args, &block)
-        case command[1].to_s.downcase
+        case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'stats' then @node.call_all(method, command, args, &block)
         when 'purge' then @node.call_all(method, command, args, &block).first
         else assign_node(command).send(method, *args, command, &block)
@@ -209,7 +215,7 @@ class RedisClient
       end
 
       def send_client_command(method, command, args, &block)
-        case command[1].to_s.downcase
+        case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'list' then @node.call_all(method, command, args, &block).flatten
         when 'pause', 'reply', 'setname'
           @node.call_all(method, command, args, &block).first
@@ -217,10 +223,8 @@ class RedisClient
         end
       end
 
-      def send_cluster_command(method, command, args, &block) # rubocop:disable Metrics/MethodLength
-        subcommand = command[1].to_s.downcase
-
-        case subcommand
+      def send_cluster_command(method, command, args, &block)
+        case subcommand = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'addslots', 'delslots', 'failover', 'forget', 'meet', 'replicate',
              'reset', 'set-config-epoch', 'setslot'
           raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, ['cluster', subcommand]
@@ -234,7 +238,7 @@ class RedisClient
       end
 
       def send_script_command(method, command, args, &block)
-        case command[1].to_s.downcase
+        case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'debug', 'kill'
           @node.call_all(method, command, args, &block).first
         when 'flush', 'load'
@@ -244,7 +248,7 @@ class RedisClient
       end
 
       def send_pubsub_command(method, command, args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        case command[1].to_s.downcase
+        case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'channels' then @node.call_all(method, command, args, &block).flatten.uniq.sort_by(&:to_s)
         when 'numsub'
           @node.call_all(method, command, args, &block).reject(&:empty?).map { |e| Hash[*e] }

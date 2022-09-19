@@ -2,6 +2,7 @@
 
 require 'redis_client'
 require 'redis_client/cluster/errors'
+require 'redis_client/cluster/normalized_cmd_name'
 
 class RedisClient
   class Cluster
@@ -31,14 +32,16 @@ class RedisClient
 
         def parse_command_details(rows)
           rows&.reject { |row| row[0].nil? }.to_h do |row|
-            [row[0].downcase, { arity: row[1], flags: row[2], first: row[3], last: row[4], step: row[5] }]
+            [
+              ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_name(row[0]),
+              { arity: row[1], flags: row[2], first: row[3], last: row[4], step: row[5] }
+            ]
           end
         end
       end
 
       def initialize(details)
         @details = pick_details(details)
-        @normalized_cmd_name_cache = {}
       end
 
       def extract_first_key(command)
@@ -59,7 +62,8 @@ class RedisClient
       end
 
       def exists?(name)
-        @details.key?(name.to_s.downcase)
+        key = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_name(name)
+        @details.key?(key)
       end
 
       private
@@ -75,14 +79,14 @@ class RedisClient
       end
 
       def dig_details(command, key)
-        name = normalize_cmd_name(command)
+        name = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
         return if name.empty? || !@details.key?(name)
 
         @details.fetch(name).fetch(key)
       end
 
       def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength
-        case normalize_cmd_name(command)
+        case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
         when 'eval', 'evalsha', 'zinterstore', 'zunionstore' then 3
         when 'object' then 2
         when 'memory'
@@ -110,19 +114,6 @@ class RedisClient
         return EMPTY_STRING if s.nil? || e.nil?
 
         key[s + 1..e - 1]
-      end
-
-      def normalize_cmd_name(command)
-        return EMPTY_STRING unless command.is_a?(Array)
-
-        name = case e = command.first
-               when String then e
-               when Array then e.first
-               end
-        return EMPTY_STRING if name.nil? || name.empty?
-
-        @normalized_cmd_name_cache[name] = name.downcase unless @normalized_cmd_name_cache.key?(name)
-        @normalized_cmd_name_cache[name]
       end
     end
   end
