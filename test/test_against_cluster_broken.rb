@@ -6,13 +6,12 @@ class TestAgainstClusterBroken < TestingWrapper
   WAIT_SEC = 3
 
   def setup
-    config = ::RedisClient::ClusterConfig.new(
+    @client = ::RedisClient.cluster(
       nodes: TEST_NODE_URIS,
       replica: true,
       fixed_hostname: TEST_FIXED_HOSTNAME,
       **TEST_GENERIC_OPTIONS
-    )
-    @client = ::RedisClient::Cluster.new(config)
+    ).new_client
     @controller = ClusterController.new(
       TEST_NODE_URIS,
       replica_size: TEST_REPLICA_SIZE,

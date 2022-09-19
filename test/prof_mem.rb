@@ -11,18 +11,34 @@ module ProfMem
 
   def run
     %w[primary_only scale_read_random scale_read_latency pooled].each do |cli_type|
-      print "################################################################################\n"
-      print "# #{cli_type}\n"
-      print "################################################################################\n"
-      print "\n"
-
+      prepare
+      print_letter(cli_type, 'w/ pipelining')
       profile do
         send("new_#{cli_type}_client".to_sym).pipelined do |pi|
           ATTEMPT_COUNT.times { |i| pi.call('SET', i, i) }
           ATTEMPT_COUNT.times { |i| pi.call('GET', i) }
         end
       end
+
+      prepare
+      print_letter(cli_type, 'w/o pipelining')
+      profile do
+        cli = send("new_#{cli_type}_client".to_sym)
+        ATTEMPT_COUNT.times { |i| cli.call('SET', i, i) }
+        ATTEMPT_COUNT.times { |i| cli.call('GET', i) }
+      end
     end
+  end
+
+  def prepare
+    ::RedisClient::Cluster::NormalizedCmdName.instance.clear
+  end
+
+  def print_letter(title, sub_titile)
+    print "################################################################################\n"
+    print "# #{title}: #{sub_titile}\n"
+    print "################################################################################\n"
+    print "\n"
   end
 
   def profile(&block)

@@ -10,13 +10,12 @@ class TestAgainstClusterScale < TestingWrapper
   end
 
   def setup
-    config = ::RedisClient::ClusterConfig.new(
+    @client = ::RedisClient.cluster(
       nodes: TEST_NODE_URIS,
       replica: true,
       fixed_hostname: TEST_FIXED_HOSTNAME,
       **TEST_GENERIC_OPTIONS
-    )
-    @client = ::RedisClient::Cluster.new(config)
+    ).new_client
   end
 
   def teardown
