@@ -23,18 +23,16 @@ class RedisClient
       end
 
       def get_by_name(name)
-        normalize(name)
+        get(name, index: 0)
       end
 
       def clear
-        @mutex.synchronize { @cache = {} }
+        @mutex.synchronize { @cache.clear }
       end
 
       private
 
       def get(command, index:)
-        return EMPTY_STRING unless command.is_a?(Array)
-
         name = extract_name(command, index: index)
         return EMPTY_STRING if name.nil? || name.empty?
 
@@ -42,8 +40,17 @@ class RedisClient
       end
 
       def extract_name(command, index:)
+        case command
+        when String, Symbol then index.zero? ? command : nil
+        when Array then extract_name_from_array(command, index: index)
+        end
+      end
+
+      def extract_name_from_array(command, index:)
+        return if command.size - 1 < index
+
         case e = command[index]
-        when String then e
+        when String, Symbol then e
         when Array then e[index]
         end
       end
