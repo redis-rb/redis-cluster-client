@@ -15,10 +15,18 @@ Metrics/AbcSize:
     - 'test/**/*'
 
 Metrics/ClassLength:
-  Max: 400
+  Max: 500
+
+Metrics/ModuleLength:
+  Max: 500
 
 Metrics/MethodLength:
   Max: 50
+  Exclude:
+    - 'test/**/*'
+
+Metrics/BlockLength:
+  Max: 25
   Exclude:
     - 'test/**/*'
 
