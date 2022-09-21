@@ -10,7 +10,7 @@ class RedisClient
       EMPTY_STRING = ''
 
       class << self
-        def load(nodes) # rubocop:disable Metrics/MethodLength
+        def load(nodes)
           errors = []
           cmd = nil
           nodes&.each do |node|
@@ -82,7 +82,7 @@ class RedisClient
         @details.fetch(name).fetch(key)
       end
 
-      def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength
+      def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity
         case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
         when 'eval', 'evalsha', 'zinterstore', 'zunionstore' then 3
         when 'object' then 2
