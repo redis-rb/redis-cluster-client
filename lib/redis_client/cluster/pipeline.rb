@@ -64,7 +64,7 @@ class RedisClient
           threads = chuncked_grouped.map do |k, v|
             Thread.new(@router, k, v) do |router, node_key, rows|
               Thread.pass
-              replies = do_pipelining(router, node_key, rows)
+              replies = do_pipelining(router.find_node(node_key), rows)
               raise ReplySizeError, "commands: #{rows.size}, replies: #{replies.size}" if rows.size != replies.size
 
               Thread.current.thread_variable_set(:rows, rows)
@@ -100,8 +100,8 @@ class RedisClient
         @size += 1
       end
 
-      def do_pipelining(router, node_key, rows)
-        router.find_node(node_key).pipelined do |pipeline|
+      def do_pipelining(node, rows)
+        node.pipelined do |pipeline|
           rows.each do |row|
             case row.size
             when 4 then pipeline.send(row[1], row[2], &row[3])
