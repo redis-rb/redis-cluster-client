@@ -68,7 +68,7 @@ class RedisClient
       # TODO: https://github.com/redis-rb/redis-cluster-client/issues/37 handle redirections
       def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         all_replies = errors = nil
-        @pipelines.each_slice(MAX_THREADS) do |chuncked_pipelines|
+        @pipelines&.each_slice(MAX_THREADS) do |chuncked_pipelines|
           threads = chuncked_pipelines.map do |node_key, pipeline|
             Thread.new(node_key, pipeline) do |nk, pl|
               Thread.pass
