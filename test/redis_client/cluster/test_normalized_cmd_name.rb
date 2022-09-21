@@ -67,17 +67,22 @@ class RedisClient
         threads = results.each_with_index.map do |_, i|
           Thread.new do
             Thread.pass
+            Thread.current.thread_variable_set(:index, i)
             if i.even?
-              results[i] = @subject.get_by_command(%w[SET foo bar]) == 'set'
+              Thread.current.thread_variable_set(:result, @subject.get_by_command(%w[SET foo bar]) == 'set')
             else
               @subject.clear
             end
           rescue StandardError
-            results[i] = false
+            Thread.current.thread_variable_set(:result, false)
           end
         end
 
-        threads.each(&:join)
+        threads.each do |t|
+          t.join
+          results[t.thread_variable_get(:index)] = t.thread_variable_get(:result)
+        end
+
         refute_includes(results, false)
       end
     end
