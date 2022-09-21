@@ -40,12 +40,12 @@ class RedisClient
         private
 
         def measure_latencies(clients) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
-          latencies = {}
-
+          latencies = nil
           clients.each_slice(::RedisClient::Cluster::Node::MAX_THREADS) do |chuncked_clients|
             threads = chuncked_clients.map do |k, v|
               Thread.new(k, v) do |node_key, client|
                 Thread.pass
+                Thread.current.thread_variable_set(:node_key, node_key)
 
                 min = DUMMY_LATENCY_NSEC
                 MEASURE_ATTEMPT_COUNT.times do
@@ -55,13 +55,17 @@ class RedisClient
                   min = duration if duration < min
                 end
 
-                latencies[node_key] = min
+                Thread.current.thread_variable_set(:latency, min)
               rescue StandardError
-                latencies[node_key] = DUMMY_LATENCY_NSEC
+                Thread.current.thread_variable_set(:latency, DUMMY_LATENCY_NSEC)
               end
             end
 
-            threads.each(&:join)
+            threads.each do |t|
+              t.join
+              latencies ||= {}
+              latencies[t.thread_variable_get(:node_key)] = t.thread_variable_get(:latency)
+            end
           end
 
           latencies

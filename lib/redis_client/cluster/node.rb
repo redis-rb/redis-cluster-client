@@ -39,27 +39,36 @@ class RedisClient
       class << self
         def load_info(options, **kwargs) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
           startup_size = options.size > MAX_STARTUP_SAMPLE ? MAX_STARTUP_SAMPLE : options.size
-          node_info_list = Array.new(startup_size)
-          errors = Array.new(startup_size)
+          node_info_list = errors = nil
           startup_options = options.to_a.sample(MAX_STARTUP_SAMPLE).to_h
           startup_nodes = ::RedisClient::Cluster::Node.new(startup_options, **kwargs)
           startup_nodes.each_slice(MAX_THREADS).with_index do |chuncked_startup_nodes, chuncked_idx|
             threads = chuncked_startup_nodes.each_with_index.map do |raw_client, idx|
               Thread.new(raw_client, (MAX_THREADS * chuncked_idx) + idx) do |cli, i|
                 Thread.pass
+                Thread.current.thread_variable_set(:index, i)
                 reply = cli.call('CLUSTER', 'NODES')
-                node_info_list[i] = parse_node_info(reply)
+                Thread.current.thread_variable_set(:info, parse_node_info(reply))
               rescue StandardError => e
-                errors[i] = e
+                Thread.current.thread_variable_set(:error, e)
               ensure
                 cli&.close
               end
             end
 
-            threads.each(&:join)
+            threads.each do |t|
+              t.join
+              if t.thread_variable?(:info)
+                node_info_list ||= Array.new(startup_size)
+                node_info_list[t.thread_variable_get(:index)] = t.thread_variable_get(:info)
+              elsif t.thread_variable?(:error)
+                errors ||= Array.new(startup_size)
+                errors[t.thread_variable_get(:index)] = t.thread_variable_get(:error)
+              end
+            end
           end
 
-          raise ::RedisClient::Cluster::InitialSetupError, errors if node_info_list.all?(&:nil?)
+          raise ::RedisClient::Cluster::InitialSetupError, errors if node_info_list.nil?
 
           grouped = node_info_list.compact.group_by do |rows|
             rows.sort_by { |row| row[:id] }
@@ -147,7 +156,7 @@ class RedisClient
 
       def send_ping(method, command, args, &block)
         result_values, errors = call_multiple_nodes(@topology.clients, method, command, args, &block)
-        return result_values if errors.empty?
+        return result_values if errors.nil? || errors.empty?
 
         raise ReloadNeeded if errors.values.any?(::RedisClient::ConnectionError)
 
@@ -228,26 +237,35 @@ class RedisClient
 
       def call_multiple_nodes!(clients, method, command, args, &block)
         result_values, errors = call_multiple_nodes(clients, method, command, args, &block)
-        return result_values if errors.empty?
+        return result_values if errors.nil? || errors.empty?
 
         raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
-      def try_map(clients) # rubocop:disable Metrics/MethodLength
-        results = {}
-        errors = {}
+      def try_map(clients) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        results = errors = nil
         clients.each_slice(MAX_THREADS) do |chuncked_clients|
           threads = chuncked_clients.map do |k, v|
             Thread.new(k, v) do |node_key, client|
               Thread.pass
+              Thread.current.thread_variable_set(:node_key, node_key)
               reply = yield(node_key, client)
-              results[node_key] = reply unless reply.nil?
+              Thread.current.thread_variable_set(:result, reply)
             rescue StandardError => e
-              errors[node_key] = e
+              Thread.current.thread_variable_set(:error, e)
             end
           end
 
-          threads.each(&:join)
+          threads.each do |t|
+            t.join
+            if t.thread_variable?(:result)
+              results ||= {}
+              results[t.thread_variable_get(:node_key)] = t.thread_variable_get(:result)
+            elsif t.thread_variable?(:error)
+              errors ||= {}
+              errors[t.thread_variable_get(:node_key)] = t.thread_variable_get(:error)
+            end
+          end
         end
 
         [results, errors]
