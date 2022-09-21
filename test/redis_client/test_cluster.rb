@@ -4,7 +4,7 @@ require 'testing_helper'
 
 class RedisClient
   class TestCluster
-    module Mixin # rubocop:disable Metrics/ModuleLength
+    module Mixin
       def setup
         @client = new_test_client
         @client.call('FLUSHDB')

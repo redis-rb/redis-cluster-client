@@ -37,7 +37,7 @@ class RedisClient
       end
 
       class << self
-        def load_info(options, **kwargs) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+        def load_info(options, **kwargs) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
           startup_size = options.size > MAX_STARTUP_SAMPLE ? MAX_STARTUP_SAMPLE : options.size
           node_info_list = errors = nil
           startup_options = options.to_a.sample(MAX_STARTUP_SAMPLE).to_h
@@ -83,7 +83,7 @@ class RedisClient
 
         # @see https://redis.io/commands/cluster-nodes/
         # @see https://github.com/redis/redis/blob/78960ad57b8a5e6af743d789ed8fd767e37d42b8/src/cluster.c#L4660-L4683
-        def parse_node_info(info) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+        def parse_node_info(info) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
           rows = info.split("\n").map(&:split)
           rows.each { |arr| arr[2] = arr[2].split(',') }
           rows.select! { |arr| arr[7] == 'connected' && (arr[2] & %w[fail? fail handshake noaddr noflags]).empty? }
@@ -242,7 +242,7 @@ class RedisClient
         raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
-      def try_map(clients) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      def try_map(clients) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         results = errors = nil
         clients.each_slice(MAX_THREADS) do |chuncked_clients|
           threads = chuncked_clients.map do |k, v|

@@ -25,7 +25,7 @@ class RedisClient
         @command_builder = @config.command_builder
       end
 
-      def send_command(method, command, *args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+      def send_command(method, command, *args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         cmd = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
         case cmd
         when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save'
@@ -65,7 +65,7 @@ class RedisClient
 
       # @see https://redis.io/topics/cluster-spec#redirection-and-resharding
       #   Redirection and resharding
-      def try_send(node, method, command, args, retry_count: 3, &block) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      def try_send(node, method, command, args, retry_count: 3, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         if args.empty?
           # prevent memory allocation for variable-length args
           node.send(method, command, &block)
@@ -100,7 +100,7 @@ class RedisClient
         retry
       end
 
-      def try_delegate(node, method, *args, retry_count: 3, **kwargs, &block) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+      def try_delegate(node, method, *args, retry_count: 3, **kwargs, &block) # rubocop:disable Metrics/AbcSize
         node.send(method, *args, **kwargs, &block)
       rescue ::RedisClient::CommandError => e
         raise if retry_count <= 0
@@ -129,7 +129,7 @@ class RedisClient
         retry
       end
 
-      def scan(*command, seed: nil, **kwargs) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+      def scan(*command, seed: nil, **kwargs) # rubocop:disable Metrics/AbcSize
         command = @command_builder.generate(command, kwargs)
 
         command[1] = ZERO_CURSOR_FOR_SCAN if command.size == 1
@@ -270,7 +270,7 @@ class RedisClient
         find_node(node_key)
       end
 
-      def fetch_cluster_info(config, pool: nil, **kwargs) # rubocop:disable Metrics/MethodLength
+      def fetch_cluster_info(config, pool: nil, **kwargs)
         node_info = ::RedisClient::Cluster::Node.load_info(config.per_node_key, **kwargs)
         node_addrs = node_info.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info[:node_key]) }
         config.update_node(node_addrs)
