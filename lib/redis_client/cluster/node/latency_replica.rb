@@ -40,8 +40,7 @@ class RedisClient
         private
 
         def measure_latencies(clients) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
-          latencies = nil
-          clients.each_slice(::RedisClient::Cluster::Node::MAX_THREADS) do |chuncked_clients|
+          clients.each_slice(::RedisClient::Cluster::Node::MAX_THREADS).each_with_object({}) do |chuncked_clients, acc|
             threads = chuncked_clients.map do |k, v|
               Thread.new(k, v) do |node_key, client|
                 Thread.pass
@@ -63,12 +62,9 @@ class RedisClient
 
             threads.each do |t|
               t.join
-              latencies ||= {}
-              latencies[t.thread_variable_get(:node_key)] = t.thread_variable_get(:latency)
+              acc[t.thread_variable_get(:node_key)] = t.thread_variable_get(:latency)
             end
           end
-
-          latencies
         end
 
         def select_replica_clients(replications, clients)

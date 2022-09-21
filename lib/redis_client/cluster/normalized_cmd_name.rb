@@ -28,6 +28,7 @@ class RedisClient
 
       def clear
         @mutex.synchronize { @cache.clear }
+        true
       end
 
       private

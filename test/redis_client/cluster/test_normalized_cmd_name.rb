@@ -63,27 +63,29 @@ class RedisClient
       end
 
       def test_thread_safety
-        results = Array.new(10, true)
-        threads = results.each_with_index.map do |_, i|
+        attempts = Array.new(100, true)
+        threads = attempts.each_with_index.map do |_, i|
           Thread.new do
             Thread.pass
             Thread.current.thread_variable_set(:index, i)
-            if i.even?
-              Thread.current.thread_variable_set(:result, @subject.get_by_command(%w[SET foo bar]) == 'set')
-            else
-              @subject.clear
-            end
+            got = if i.even?
+                    @subject.get_by_command(%w[SET foo bar]) == 'set'
+                  else
+                    @subject.clear
+                  end
+            Thread.current.thread_variable_set(:got, got)
           rescue StandardError
-            Thread.current.thread_variable_set(:result, false)
+            Thread.current.thread_variable_set(:got, false)
           end
         end
 
         threads.each do |t|
           t.join
-          results[t.thread_variable_get(:index)] = t.thread_variable_get(:result)
+          attempts[t.thread_variable_get(:index)] = t.thread_variable_get(:got)
         end
 
-        refute_includes(results, false)
+        refute_includes(attempts, false)
+        refute_includes(attempts, nil)
       end
     end
   end

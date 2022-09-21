@@ -2,6 +2,8 @@
 
 require 'redis_client'
 require 'redis_client/cluster/errors'
+require 'redis_client/middlewares'
+require 'redis_client/pooled'
 
 class RedisClient
   class Cluster
@@ -12,45 +14,52 @@ class RedisClient
       def initialize(router, command_builder, seed: Random.new_seed)
         @router = router
         @command_builder = command_builder
-        @grouped = {}
-        @size = 0
         @seed = seed
+        @pipelines = {}
+        @indices = {}
+        @size = 0
       end
 
       def call(*args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, seed: @seed)
-        add_row(node_key, [@size, :call_v, command, block])
+        get_pipeline(node_key).call_v(command, &block)
+        index_pipeline(node_key)
       end
 
       def call_v(args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, seed: @seed)
-        add_row(node_key, [@size, :call_v, command, block])
+        get_pipeline(node_key).call_v(command, &block)
+        index_pipeline(node_key)
       end
 
       def call_once(*args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, seed: @seed)
-        add_row(node_key, [@size, :call_once_v, command, block])
+        get_pipeline(node_key).call_once_v(command, &block)
+        index_pipeline(node_key)
       end
 
       def call_once_v(args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, seed: @seed)
-        add_row(node_key, [@size, :call_once_v, command, block])
+        get_pipeline(node_key).call_once_v(command, &block)
+        index_pipeline(node_key)
       end
 
       def blocking_call(timeout, *args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, seed: @seed)
-        add_row(node_key, [@size, :blocking_call_v, timeout, command, block])
+        get_pipeline(node_key).blocking_call_v(timeout, command, &block)
+        index_pipeline(node_key)
       end
 
       def blocking_call_v(timeout, args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, seed: @seed)
-        add_row(node_key, [@size, :blocking_call_v, timeout, command, block])
+        get_pipeline(node_key).blocking_call_v(timeout, command, &block)
+        index_pipeline(node_key)
       end
 
       def empty?
@@ -60,17 +69,17 @@ class RedisClient
       # TODO: https://github.com/redis-rb/redis-cluster-client/issues/37 handle redirections
       def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
         all_replies = errors = nil
-        @grouped.each_slice(MAX_THREADS) do |chuncked_grouped|
-          threads = chuncked_grouped.map do |k, v|
-            Thread.new(@router, k, v) do |router, node_key, rows|
+        @pipelines.each_slice(MAX_THREADS) do |chuncked_pipelines|
+          threads = chuncked_pipelines.map do |node_key, pipeline|
+            node = @router.find_node(node_key)
+            Thread.new(node, pipeline) do |nd, pl|
               Thread.pass
-              replies = do_pipelining(router.find_node(node_key), rows)
-              raise ReplySizeError, "commands: #{rows.size}, replies: #{replies.size}" if rows.size != replies.size
+              Thread.current.thread_variable_set(:node_key, node_key)
+              replies = do_pipelining(nd, pl)
+              raise ReplySizeError, "commands: #{pipeline._size}, replies: #{replies.size}" if pipeline._size != replies.size
 
-              Thread.current.thread_variable_set(:rows, rows)
               Thread.current.thread_variable_set(:replies, replies)
             rescue StandardError => e
-              Thread.current.thread_variable_set(:node_key, node_key)
               Thread.current.thread_variable_set(:error, e)
             end
           end
@@ -79,7 +88,7 @@ class RedisClient
             t.join
             if t.thread_variable?(:replies)
               all_replies ||= Array.new(@size)
-              t.thread_variable_get(:rows).each_with_index { |r, i| all_replies[r.first] = t.thread_variable_get(:replies)[i] }
+              @indices[t.thread_variable_get(:node_key)].each_with_index { |gi, i| all_replies[gi] = t.thread_variable_get(:replies)[i] }
             elsif t.thread_variable?(:error)
               errors ||= {}
               errors[t.thread_variable_get(:node_key)] = t.thread_variable_get(:error)
@@ -94,21 +103,33 @@ class RedisClient
 
       private
 
-      def add_row(node_key, row)
-        @grouped[node_key] = [] unless @grouped.key?(node_key)
-        @grouped[node_key] << row
+      def get_pipeline(node_key)
+        @pipelines[node_key] ||= ::RedisClient::Pipeline.new(@command_builder)
+      end
+
+      def index_pipeline(node_key)
+        @indices[node_key] ||= []
+        @indices[node_key] << @size
         @size += 1
       end
 
-      def do_pipelining(node, rows)
-        node.pipelined do |pipeline|
-          rows.each do |row|
-            case row.size
-            when 4 then pipeline.send(row[1], row[2], &row[3])
-            when 5 then pipeline.send(row[1], row[2], row[3], &row[4])
-            end
+      def do_pipelining(client, pipeline)
+        case client
+        when ::RedisClient then send_pipeline(client, pipeline)
+        when ::RedisClient::Pooled then client.with { |cli| send_pipeline(cli, pipeline) }
+        else raise NotImplementedError, "#{client.class.name}#pipelined for cluster client"
+        end
+      end
+
+      def send_pipeline(client, pipeline)
+        results = client.send(:ensure_connected, retryable: pipeline._retryable?) do |connection|
+          commands = pipeline._commands
+          ::RedisClient::Middlewares.call_pipelined(commands, client.config) do
+            connection.call_pipelined(commands, pipeline._timeouts)
           end
         end
+
+        pipeline._coerce!(results)
       end
     end
   end

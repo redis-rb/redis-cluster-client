@@ -32,10 +32,7 @@ class RedisClient
 
         def parse_command_details(rows)
           rows&.reject { |row| row[0].nil? }.to_h do |row|
-            [
-              ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_name(row[0]),
-              { arity: row[1], flags: row[2], first: row[3], last: row[4], step: row[5] }
-            ]
+            [row[0].downcase, { arity: row[1], flags: row[2], first: row[3], last: row[4], step: row[5] }]
           end
         end
       end
