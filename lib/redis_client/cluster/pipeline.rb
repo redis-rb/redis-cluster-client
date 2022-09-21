@@ -15,8 +15,7 @@ class RedisClient
         @router = router
         @command_builder = command_builder
         @seed = seed
-        @pipelines = {}
-        @indices = {}
+        @pipelines = @indices = nil
         @size = 0
       end
 
@@ -103,10 +102,12 @@ class RedisClient
       private
 
       def get_pipeline(node_key)
+        @pipelines ||= {}
         @pipelines[node_key] ||= ::RedisClient::Pipeline.new(@command_builder)
       end
 
       def index_pipeline(node_key)
+        @indices ||= {}
         @indices[node_key] ||= []
         @indices[node_key] << @size
         @size += 1
