@@ -232,7 +232,7 @@ class RedisClient
           client.send(method, *args, command, &block)
         end
 
-        [results.values, errors]
+        [results&.values, errors]
       end
 
       def call_multiple_nodes!(clients, method, command, args, &block)
