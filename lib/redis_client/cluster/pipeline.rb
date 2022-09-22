@@ -155,9 +155,8 @@ class RedisClient
             end
           end
 
+          threads.each(&:join)
           threads.each do |t|
-            t.join
-
             if t.thread_variable?(:replies)
               all_replies ||= Array.new(@size)
               @pipelines[t.thread_variable_get(:node_key)]
