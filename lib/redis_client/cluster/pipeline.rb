@@ -157,6 +157,7 @@ class RedisClient
 
           threads.each do |t|
             t.join
+
             if t.thread_variable?(:replies)
               all_replies ||= Array.new(@size)
               @pipelines[t.thread_variable_get(:node_key)]
@@ -165,12 +166,9 @@ class RedisClient
             elsif t.thread_variable?(:redirection_needed)
               all_replies ||= Array.new(@size)
               pipeline = @pipelines[t.thread_variable_get(:node_key)]
-              pipeline.outer_indices.each_with_index do |outer, inner|
-                err = t.thread_variable_get(:redirection_needed)
-                replies = err.replies
-                err.indices.each { |i| replies[i] = handle_redirection(replies[i], pipeline, i) }
-                all_replies[outer] = replies[inner]
-              end
+              err = t.thread_variable_get(:redirection_needed)
+              err.indices.each { |i| err.replies[i] = handle_redirection(err.replies[i], pipeline, i) }
+              pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = err.replies[inner] }
             elsif t.thread_variable?(:error)
               errors ||= {}
               errors[t.thread_variable_get(:node_key)] = t.thread_variable_get(:error)
