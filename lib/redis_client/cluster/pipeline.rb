@@ -50,7 +50,7 @@ class RedisClient
       end
 
       ::RedisClient::ConnectionMixin.module_eval do
-        def call_pipelined_dedicated_redirection(commands, timeouts) # rubocop:disable Metrics/AbcSize
+        def call_pipelined_aware_of_redirection(commands, timeouts) # rubocop:disable Metrics/AbcSize
           size = commands.size
           results = Array.new(commands.size)
           @pending_reads += size
@@ -205,7 +205,7 @@ class RedisClient
         results = client.send(:ensure_connected, retryable: pipeline._retryable?) do |connection|
           commands = pipeline._commands
           ::RedisClient::Middlewares.call_pipelined(commands, client.config) do
-            connection.call_pipelined_dedicated_redirection(commands, pipeline._timeouts)
+            connection.call_pipelined_aware_of_redirection(commands, pipeline._timeouts)
           end
         end
 
@@ -217,13 +217,19 @@ class RedisClient
 
         if err.message.start_with?('MOVED')
           node = @router.assign_redirection_node(err.message)
-          redirect_command(node, pipeline, inner_index)
+          try_redirection(node, pipeline, inner_index)
         elsif err.message.start_with?('ASK')
           node = @router.assign_asking_node(err.message)
-          try_asking(node) ? redirect_command(node, pipeline, inner_index) : err
+          try_asking(node) ? try_redirection(node, pipeline, inner_index) : err
         else
           err
         end
+      end
+
+      def try_redirection(node, pipeline, inner_index)
+        redirect_command(node, pipeline, inner_index)
+      rescue StandardError => e
+        e
       end
 
       def redirect_command(node, pipeline, inner_index)
