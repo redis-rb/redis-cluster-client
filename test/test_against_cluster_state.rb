@@ -47,8 +47,6 @@ class TestAgainstClusterState < TestingWrapper
     end
 
     def test_the_state_of_cluster_resharding_with_pipelining
-      skip('TODO: https://github.com/redis-rb/redis-cluster-client/issues/37')
-
       do_resharding_test do |keys|
         values = @client.pipelined do |pipeline|
           keys.each { |key| pipeline.call('GET', key) }

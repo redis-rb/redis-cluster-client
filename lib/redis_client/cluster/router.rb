@@ -172,7 +172,7 @@ class RedisClient
       def find_node(node_key, retry_count: 3)
         @node.find_by(node_key)
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
-        raise ::RedieClient::Cluster::NodeMightBeDown if retry_count <= 0
+        raise ::RedisClient::Cluster::NodeMightBeDown if retry_count <= 0
 
         update_cluster_info!
         retry_count -= 1
@@ -181,6 +181,18 @@ class RedisClient
 
       def command_exists?(name)
         @command.exists?(name)
+      end
+
+      def assign_redirection_node(err_msg)
+        _, slot, node_key = err_msg.split
+        slot = slot.to_i
+        @node.update_slot(slot, node_key)
+        find_node(node_key)
+      end
+
+      def assign_asking_node(err_msg)
+        _, _, node_key = err_msg.split
+        find_node(node_key)
       end
 
       private
@@ -256,18 +268,6 @@ class RedisClient
         when 'numpat' then @node.call_all(method, command, args, &block).select { |e| e.is_a?(Integer) }.sum
         else assign_node(command).send(method, *args, command, &block)
         end
-      end
-
-      def assign_redirection_node(err_msg)
-        _, slot, node_key = err_msg.split
-        slot = slot.to_i
-        @node.update_slot(slot, node_key)
-        find_node(node_key)
-      end
-
-      def assign_asking_node(err_msg)
-        _, _, node_key = err_msg.split
-        find_node(node_key)
       end
 
       def fetch_cluster_info(config, pool: nil, **kwargs)

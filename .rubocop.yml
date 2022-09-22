@@ -26,7 +26,7 @@ Metrics/MethodLength:
     - 'test/**/*'
 
 Metrics/BlockLength:
-  Max: 25
+  Max: 40
   Exclude:
     - 'test/**/*'
 
