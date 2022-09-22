@@ -19,7 +19,7 @@ class RedisClient
 
         def add_outer_index(index)
           @outer_indices ||= []
-          @outer_indices[@outer_indices.size] = index
+          @outer_indices << index
         end
 
         def get_inner_index(outer_index)
@@ -100,37 +100,37 @@ class RedisClient
       def call(*args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, seed: @seed)
-        get_pipeline(node_key).call_v(command, &block)
+        append_pipeline(node_key).call_v(command, &block)
       end
 
       def call_v(args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, seed: @seed)
-        get_pipeline(node_key).call_v(command, &block)
+        append_pipeline(node_key).call_v(command, &block)
       end
 
       def call_once(*args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, seed: @seed)
-        get_pipeline(node_key).call_once_v(command, &block)
+        append_pipeline(node_key).call_once_v(command, &block)
       end
 
       def call_once_v(args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, seed: @seed)
-        get_pipeline(node_key).call_once_v(command, &block)
+        append_pipeline(node_key).call_once_v(command, &block)
       end
 
       def blocking_call(timeout, *args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, seed: @seed)
-        get_pipeline(node_key).blocking_call_v(timeout, command, &block)
+        append_pipeline(node_key).blocking_call_v(timeout, command, &block)
       end
 
       def blocking_call_v(timeout, args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, seed: @seed)
-        get_pipeline(node_key).blocking_call_v(timeout, command, &block)
+        append_pipeline(node_key).blocking_call_v(timeout, command, &block)
       end
 
       def empty?
@@ -183,7 +183,7 @@ class RedisClient
 
       private
 
-      def get_pipeline(node_key)
+      def append_pipeline(node_key)
         @pipelines ||= {}
         @pipelines[node_key] ||= ::RedisClient::Cluster::Pipeline::Extended.new(@command_builder)
         @pipelines[node_key].add_outer_index(@size)
