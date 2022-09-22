@@ -21,6 +21,32 @@ class RedisClient
           @outer_indices ||= []
           @outer_indices[@outer_indices.size] = index
         end
+
+        def get_inner_index(outer_index)
+          @outer_indices&.find_index(outer_index)
+        end
+
+        def get_callee_method(inner_index)
+          if !@timeouts[inner_index].nil?
+            :blocking_call_v
+          elsif _retryable?
+            :call_once_v
+          else
+            :call_v
+          end
+        end
+
+        def get_command(inner_index)
+          @commands[inner_index]
+        end
+
+        def get_timeout(inner_index)
+          @timeouts[inner_index]
+        end
+
+        def get_block(inner_index)
+          @blocks[inner_index]
+        end
       end
 
       ::RedisClient::ConnectionMixin.module_eval do
@@ -93,7 +119,6 @@ class RedisClient
         @size.zero?
       end
 
-      # TODO: https://github.com/redis-rb/redis-cluster-client/issues/37 handle redirections
       def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         all_replies = errors = nil
         @pipelines&.each_slice(MAX_THREADS) do |chuncked_pipelines|
@@ -124,9 +149,9 @@ class RedisClient
           end
         end
 
-        return all_replies if errors.nil?
+        raise ::RedisClient::Cluster::ErrorCollection, errors unless errors.nil?
 
-        raise ::RedisClient::Cluster::ErrorCollection, errors
+        retry_redirections_if_needed(all_replies)
       end
 
       private
@@ -156,6 +181,42 @@ class RedisClient
         end
 
         pipeline._coerce!(results)
+      end
+
+      def retry_redirections_if_needed(replies)
+        replies.map!.with_index do |reply, i|
+          case reply
+          when ::RedisClient::CommandError
+            if reply.message.start_with?('MOVED')
+              node = assign_redirection_node(reply.message)
+              retry_redirection(node, reply, i)
+            elsif reply.message.start_with?('ASK')
+              node = assign_asking_node(reply.message)
+              retry_redirection(node, reply, i)
+            else
+              reply
+            end
+          else reply
+          end
+        end
+      end
+
+      def retry_redirection(node, err, outer_index)
+        _, _, node_key = err.message.split
+        return err unless @pipelines.key?(node_key)
+
+        pl = @pipelines.fetch(node_key)
+        inner_index = pl.get_inner_index(outer_index)
+        method = pl.get_callee_method(inner_index)
+        command = pl.get_command(inner_index)
+        timeout = pl.get_timeout(inner_index)
+        args = timeout.nil? ? [] : [timeout]
+        block = pl.get_block(inner_index)
+        if block.nil?
+          @router.try_send(node, method, command, args)
+        else
+          @router.try_send(node, method, command, args, &block)
+        end
       end
     end
   end
