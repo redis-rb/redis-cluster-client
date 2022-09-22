@@ -140,14 +140,20 @@ class RedisClient
       end
 
       def test_pipelined_with_errors
-        assert_raises(::RedisClient::Cluster::ErrorCollection) do
-          @client.pipelined do |pipeline|
-            10.times do |i|
-              pipeline.call('SET', "string#{i}", i)
-              pipeline.call('SET', "string#{i}", i, 'too many args')
-              pipeline.call('SET', "string#{i}", i + 10)
-            end
+        got = @client.pipelined do |pipeline|
+          10.times do |i|
+            pipeline.call('SET', "string#{i}", i)
+            pipeline.call('SET', "string#{i}", i, 'too many args')
+            pipeline.call('SET', "string#{i}", i + 10)
           end
+        end
+
+        assert_equal(30, got.size)
+
+        10.times do |i|
+          assert_equal('OK', got[(3 * i) + 0])
+          assert_instance_of(::RedisClient::CommandError, got[(3 * i) + 1])
+          assert_equal('OK', got[(3 * i) + 2])
         end
 
         wait_for_replication

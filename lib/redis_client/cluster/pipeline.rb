@@ -2,12 +2,46 @@
 
 require 'redis_client'
 require 'redis_client/cluster/errors'
+require 'redis_client/connection_mixin'
 require 'redis_client/middlewares'
 require 'redis_client/pooled'
 
 class RedisClient
   class Cluster
     class Pipeline
+      class Extended < ::RedisClient::Pipeline
+        attr_reader :outer_indices
+
+        def initialize(command_builder)
+          super
+          @outer_indices = nil
+        end
+
+        def add_outer_index(index)
+          @outer_indices ||= []
+          @outer_indices[@outer_indices.size] = index
+        end
+      end
+
+      ::RedisClient::ConnectionMixin.module_eval do
+        def call_pipelined_without_raising_error(commands, timeouts)
+          size = commands.size
+          results = Array.new(commands.size)
+          @pending_reads += size
+          write_multi(commands)
+
+          size.times do |index|
+            timeout = timeouts && timeouts[index]
+            result = read(timeout)
+            @pending_reads -= 1
+            result._set_command(commands[index]) if result.is_a?(CommandError)
+            results[index] = result
+          end
+
+          results
+        end
+      end
+
       ReplySizeError = Class.new(::RedisClient::Error)
       MAX_THREADS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
 
@@ -15,7 +49,7 @@ class RedisClient
         @router = router
         @command_builder = command_builder
         @seed = seed
-        @pipelines = @indices = nil
+        @pipelines = nil
         @size = 0
       end
 
@@ -23,42 +57,36 @@ class RedisClient
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, seed: @seed)
         get_pipeline(node_key).call_v(command, &block)
-        index_pipeline(node_key)
       end
 
       def call_v(args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, seed: @seed)
         get_pipeline(node_key).call_v(command, &block)
-        index_pipeline(node_key)
       end
 
       def call_once(*args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, seed: @seed)
         get_pipeline(node_key).call_once_v(command, &block)
-        index_pipeline(node_key)
       end
 
       def call_once_v(args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, seed: @seed)
         get_pipeline(node_key).call_once_v(command, &block)
-        index_pipeline(node_key)
       end
 
       def blocking_call(timeout, *args, **kwargs, &block)
         command = @command_builder.generate(args, kwargs)
         node_key = @router.find_node_key(command, seed: @seed)
         get_pipeline(node_key).blocking_call_v(timeout, command, &block)
-        index_pipeline(node_key)
       end
 
       def blocking_call_v(timeout, args, &block)
         command = @command_builder.generate(args)
         node_key = @router.find_node_key(command, seed: @seed)
         get_pipeline(node_key).blocking_call_v(timeout, command, &block)
-        index_pipeline(node_key)
       end
 
       def empty?
@@ -86,7 +114,9 @@ class RedisClient
             t.join
             if t.thread_variable?(:replies)
               all_replies ||= Array.new(@size)
-              @indices[t.thread_variable_get(:node_key)].each_with_index { |gi, i| all_replies[gi] = t.thread_variable_get(:replies)[i] }
+              @pipelines[t.thread_variable_get(:node_key)]
+                .outer_indices
+                .each_with_index { |outer, inner| all_replies[outer] = t.thread_variable_get(:replies)[inner] }
             elsif t.thread_variable?(:error)
               errors ||= {}
               errors[t.thread_variable_get(:node_key)] = t.thread_variable_get(:error)
@@ -103,14 +133,10 @@ class RedisClient
 
       def get_pipeline(node_key)
         @pipelines ||= {}
-        @pipelines[node_key] ||= ::RedisClient::Pipeline.new(@command_builder)
-      end
-
-      def index_pipeline(node_key)
-        @indices ||= {}
-        @indices[node_key] ||= []
-        @indices[node_key] << @size
+        @pipelines[node_key] ||= ::RedisClient::Cluster::Pipeline::Extended.new(@command_builder)
+        @pipelines[node_key].add_outer_index(@size)
         @size += 1
+        @pipelines[node_key]
       end
 
       def do_pipelining(client, pipeline)
@@ -125,7 +151,7 @@ class RedisClient
         results = client.send(:ensure_connected, retryable: pipeline._retryable?) do |connection|
           commands = pipeline._commands
           ::RedisClient::Middlewares.call_pipelined(commands, client.config) do
-            connection.call_pipelined(commands, pipeline._timeouts)
+            connection.call_pipelined_without_raising_error(commands, pipeline._timeouts)
           end
         end
 
