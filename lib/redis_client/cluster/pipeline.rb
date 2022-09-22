@@ -188,10 +188,10 @@ class RedisClient
           case reply
           when ::RedisClient::CommandError
             if reply.message.start_with?('MOVED')
-              node = assign_redirection_node(reply.message)
+              node = @router.assign_redirection_node(reply.message)
               retry_redirection(node, reply, i)
             elsif reply.message.start_with?('ASK')
-              node = assign_asking_node(reply.message)
+              node = @router.assign_asking_node(reply.message)
               retry_redirection(node, reply, i)
             else
               reply
