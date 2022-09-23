@@ -63,8 +63,7 @@ class RedisClient
         raise
       end
 
-      # @see https://redis.io/topics/cluster-spec#redirection-and-resharding
-      #   Redirection and resharding
+      # @see https://redis.io/docs/reference/cluster-spec/#redirection-and-resharding Redirection and resharding
       def try_send(node, method, command, args, retry_count: 3, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         if args.empty?
           # prevent memory allocation for variable-length args

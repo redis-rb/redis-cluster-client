@@ -30,6 +30,9 @@ Metrics/BlockLength:
   Exclude:
     - 'test/**/*'
 
+Metrics/ParameterLists:
+  Max: 10
+
 Layout/LineLength:
   Max: 200
 

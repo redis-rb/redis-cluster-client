@@ -105,7 +105,7 @@ class RedisClient
         end
       end
 
-      def initialize( # rubocop:disable Metrics/ParameterLists
+      def initialize(
         options,
         node_info: [],
         with_replica: false,
