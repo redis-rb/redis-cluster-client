@@ -17,7 +17,6 @@ class TestAgainstClusterState < TestingWrapper
     end
 
     def teardown
-      @controller.rebuild
       @controller.close
       @client.close
     end
@@ -90,6 +89,8 @@ class TestAgainstClusterState < TestingWrapper
   class PrimaryOnly < TestingWrapper
     include Mixin
 
+    private
+
     def new_test_client
       ::RedisClient.cluster(
         nodes: TEST_NODE_URIS,
@@ -99,37 +100,68 @@ class TestAgainstClusterState < TestingWrapper
     end
   end
 
-  # # TODO: https://github.com/redis-rb/redis-cluster-client/issues/42
-  # class ScaleReadRandom < TestingWrapper
-  #   include Mixin
-  #
-  #   def new_test_client
-  #     ::RedisClient.cluster(
-  #       nodes: TEST_NODE_URIS,
-  #       replica: true,
-  #       replica_affinity: :random,
-  #       fixed_hostname: TEST_FIXED_HOSTNAME,
-  #       **TEST_GENERIC_OPTIONS
-  #     ).new_client
-  #   end
-  # end
-  #
-  # class ScaleReadLatency < TestingWrapper
-  #   include Mixin
-  #
-  #   def new_test_client
-  #     ::RedisClient.cluster(
-  #       nodes: TEST_NODE_URIS,
-  #       replica: true,
-  #       replica_affinity: :latency,
-  #       fixed_hostname: TEST_FIXED_HOSTNAME,
-  #       **TEST_GENERIC_OPTIONS
-  #     ).new_client
-  #   end
-  # end
+  class ScaleReadRandom < TestingWrapper
+    include Mixin
+
+    def test_the_state_of_cluster_resharding
+      keys = nil
+      do_resharding_test { |ks| keys = ks }
+      keys.each { |key| assert_equal(key, @client.call('GET', key), "Case: GET: #{key}") }
+    end
+
+    def test_the_state_of_cluster_resharding_with_pipelining
+      keys = nil
+      do_resharding_test { |ks| keys = ks }
+      values = @client.pipelined { |pipeline| keys.each { |key| pipeline.call('GET', key) } }
+      keys.each_with_index { |key, i| assert_equal(key, values[i], "Case: GET: #{key}") }
+    end
+
+    private
+
+    def new_test_client
+      ::RedisClient.cluster(
+        nodes: TEST_NODE_URIS,
+        replica: true,
+        replica_affinity: :random,
+        fixed_hostname: TEST_FIXED_HOSTNAME,
+        **TEST_GENERIC_OPTIONS
+      ).new_client
+    end
+  end
+
+  class ScaleReadLatency < TestingWrapper
+    include Mixin
+
+    def test_the_state_of_cluster_resharding
+      keys = nil
+      do_resharding_test { |ks| keys = ks }
+      keys.each { |key| assert_equal(key, @client.call('GET', key), "Case: GET: #{key}") }
+    end
+
+    def test_the_state_of_cluster_resharding_with_pipelining
+      keys = nil
+      do_resharding_test { |ks| keys = ks }
+      values = @client.pipelined { |pipeline| keys.each { |key| pipeline.call('GET', key) } }
+      keys.each_with_index { |key, i| assert_equal(key, values[i], "Case: GET: #{key}") }
+    end
+
+    private
+
+    def new_test_client
+      ::RedisClient.cluster(
+        nodes: TEST_NODE_URIS,
+        replica: true,
+        replica_affinity: :latency,
+        fixed_hostname: TEST_FIXED_HOSTNAME,
+        **TEST_GENERIC_OPTIONS
+      ).new_client
+    end
+  end
 
   class Pooled < TestingWrapper
     include Mixin
+
+    private
 
     def new_test_client
       ::RedisClient.cluster(

@@ -34,7 +34,7 @@ class RedisClient
 
         def any_replica_node_key(seed: nil)
           random = seed.nil? ? Random : Random.new(seed)
-          @existed_replicas.sample(random: random)&.first
+          @existed_replicas.sample(random: random)&.first || any_primary_node_key(seed: seed)
         end
 
         private
