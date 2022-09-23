@@ -9,6 +9,8 @@ class RedisClient
     class Command
       EMPTY_STRING = ''
 
+      RedisCommand = Struct.new('RedisCommand', :first_key_position, :write?, :readonly?, keyword_init: true)
+
       class << self
         def load(nodes)
           errors = []
@@ -32,13 +34,20 @@ class RedisClient
 
         def parse_command_details(rows)
           rows&.reject { |row| row[0].nil? }.to_h do |row|
-            [row[0].downcase, { arity: row[1], flags: row[2], first: row[3], last: row[4], step: row[5] }]
+            [
+              row[0].downcase,
+              RedisCommand.new(
+                first_key_position: row[3],
+                write?: row[2].include?('write'),
+                readonly?: row[2].include?('readonly')
+              )
+            ]
           end
         end
       end
 
       def initialize(details)
-        @details = pick_details(details)
+        @details = details || {}
       end
 
       def extract_first_key(command)
@@ -51,39 +60,23 @@ class RedisClient
       end
 
       def should_send_to_primary?(command)
-        dig_details(command, :write)
+        name = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
+        @details[name]&.write?
       end
 
       def should_send_to_replica?(command)
-        dig_details(command, :readonly)
+        name = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
+        @details[name]&.readonly?
       end
 
       def exists?(name)
-        key = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_name(name)
-        @details.key?(key)
+        @details.key?(::RedisClient::Cluster::NormalizedCmdName.instance.get_by_name(name))
       end
 
       private
 
-      def pick_details(details)
-        (details || {}).transform_values do |detail|
-          {
-            first_key_position: detail[:first],
-            write: detail[:flags].include?('write'),
-            readonly: detail[:flags].include?('readonly')
-          }
-        end
-      end
-
-      def dig_details(command, key)
-        name = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
-        return if name.empty? || !@details.key?(name)
-
-        @details.fetch(name).fetch(key)
-      end
-
       def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity
-        case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
+        case name = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
         when 'eval', 'evalsha', 'zinterstore', 'zunionstore' then 3
         when 'object' then 2
         when 'memory'
@@ -93,7 +86,7 @@ class RedisClient
         when 'xread', 'xreadgroup'
           determine_optional_key_position(command, 'streams')
         else
-          dig_details(command, :first_key_position).to_i
+          @details[name]&.first_key_position.to_i
         end
       end
 
