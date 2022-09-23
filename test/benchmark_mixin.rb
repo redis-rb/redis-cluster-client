@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 module BenchmarkMixin
+  MIN_THRESHOLD = 0.95
+
   def setup
     @client = new_test_client
     @client.call('FLUSHDB')
@@ -14,7 +16,7 @@ module BenchmarkMixin
   end
 
   def bench_echo
-    assert_performance_linear do |n|
+    assert_performance_linear(MIN_THRESHOLD) do |n|
       n.times do
         @client.call('ECHO', 'Hello world')
       end
@@ -22,7 +24,7 @@ module BenchmarkMixin
   end
 
   def bench_set
-    assert_performance_linear do |n|
+    assert_performance_linear(MIN_THRESHOLD) do |n|
       n.times do |i|
         @client.call('SET', "key#{i}", i)
       end
@@ -30,7 +32,7 @@ module BenchmarkMixin
   end
 
   def bench_get
-    assert_performance_linear do |n|
+    assert_performance_linear(MIN_THRESHOLD) do |n|
       n.times do |i|
         @client.call('GET', "key#{i}")
       end
@@ -38,7 +40,7 @@ module BenchmarkMixin
   end
 
   def bench_pipeline_echo
-    assert_performance_linear do |n|
+    assert_performance_linear(MIN_THRESHOLD) do |n|
       @client.pipelined do |pi|
         n.times do
           pi.call('ECHO', 'Hello world')
@@ -48,7 +50,7 @@ module BenchmarkMixin
   end
 
   def bench_pipeline_set
-    assert_performance_linear do |n|
+    assert_performance_linear(MIN_THRESHOLD) do |n|
       @client.pipelined do |pi|
         n.times do |i|
           pi.call('SET', "key#{i}", i)
@@ -58,7 +60,7 @@ module BenchmarkMixin
   end
 
   def bench_pipeline_get
-    assert_performance_linear do |n|
+    assert_performance_linear(MIN_THRESHOLD) do |n|
       @client.pipelined do |pi|
         n.times do |i|
           pi.call('GET', "key#{i}")
