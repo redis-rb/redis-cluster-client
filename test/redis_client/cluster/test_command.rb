@@ -31,7 +31,7 @@ class RedisClient
         end
       end
 
-      def test_parse_command_details
+      def test_parse_command_reply
         [
           {
             rows: [
@@ -56,7 +56,7 @@ class RedisClient
           { rows: nil, want: {} }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
-          got = ::RedisClient::Cluster::Command.send(:parse_command_details, c[:rows])
+          got = ::RedisClient::Cluster::Command.send(:parse_command_reply, c[:rows])
           assert_equal(c[:want].size, got.size, msg)
           assert_equal(c[:want].keys.sort, got.keys.sort, msg)
           c[:want].each do |k, v|

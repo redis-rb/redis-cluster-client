@@ -19,8 +19,8 @@ class RedisClient
             break unless cmd.nil?
 
             reply = node.call('COMMAND')
-            details = parse_command_details(reply)
-            cmd = ::RedisClient::Cluster::Command.new(details)
+            commands = parse_command_reply(reply)
+            cmd = ::RedisClient::Cluster::Command.new(commands)
           rescue ::RedisClient::Error => e
             errors << e
           end
@@ -32,7 +32,7 @@ class RedisClient
 
         private
 
-        def parse_command_details(rows)
+        def parse_command_reply(rows)
           rows&.reject { |row| row[0].nil? }.to_h do |row|
             [
               row[0].downcase,
@@ -46,8 +46,8 @@ class RedisClient
         end
       end
 
-      def initialize(details)
-        @details = details || {}
+      def initialize(commands)
+        @commands = commands || {}
       end
 
       def extract_first_key(command)
@@ -61,16 +61,16 @@ class RedisClient
 
       def should_send_to_primary?(command)
         name = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
-        @details[name]&.write?
+        @commands[name]&.write?
       end
 
       def should_send_to_replica?(command)
         name = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
-        @details[name]&.readonly?
+        @commands[name]&.readonly?
       end
 
       def exists?(name)
-        @details.key?(::RedisClient::Cluster::NormalizedCmdName.instance.get_by_name(name))
+        @commands.key?(::RedisClient::Cluster::NormalizedCmdName.instance.get_by_name(name))
       end
 
       private
@@ -86,7 +86,7 @@ class RedisClient
         when 'xread', 'xreadgroup'
           determine_optional_key_position(command, 'streams')
         else
-          @details[name]&.first_key_position.to_i
+          @commands[name]&.first_key_position.to_i
         end
       end
 
