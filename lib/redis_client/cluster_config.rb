@@ -22,7 +22,7 @@ class RedisClient
 
     attr_reader :command_builder, :client_config, :replica_affinity
 
-    def initialize( # rubocop:disable Metrics/ParameterLists
+    def initialize(
       nodes: DEFAULT_NODES,
       replica: false,
       replica_affinity: :random,
