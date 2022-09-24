@@ -240,7 +240,7 @@ class RedisClient
         node_info_list.each_with_object(Hash.new { |h, k| h[k] = [] }) do |info, acc|
           primary_info = dict[info.primary_id]
           acc[primary_info.node_key] << info.node_key unless primary_info.nil?
-          acc[info.node_key] if info.role == 'master' # for the primary which have no replicas
+          acc[info.node_key] if info.primary? # for the primary which have no replicas
         end
       end
 
