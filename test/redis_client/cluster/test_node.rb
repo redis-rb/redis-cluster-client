@@ -27,22 +27,22 @@ class RedisClient
           fixed_hostname: TEST_FIXED_HOSTNAME,
           **TEST_GENERIC_OPTIONS
         )
-        @test_node_info = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key)
+        @test_node_info_list = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key)
         if TEST_FIXED_HOSTNAME
-          @test_node_info.each do |info|
-            _, port = ::RedisClient::Cluster::NodeKey.split(info[:node_key])
-            info[:node_key] = ::RedisClient::Cluster::NodeKey.build_from_host_port(TEST_FIXED_HOSTNAME, port)
+          @test_node_info_list.each do |info|
+            _, port = ::RedisClient::Cluster::NodeKey.split(info.node_key)
+            info.node_key = ::RedisClient::Cluster::NodeKey.build_from_host_port(TEST_FIXED_HOSTNAME, port)
           end
         end
-        node_addrs = @test_node_info.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info[:node_key]) }
+        node_addrs = @test_node_info_list.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info.node_key) }
         @test_config.update_node(node_addrs)
         @test_node = ::RedisClient::Cluster::Node.new(
           @test_config.per_node_key,
-          node_info: @test_node_info
+          node_info_list: @test_node_info_list
         )
         @test_node_with_scale_read = ::RedisClient::Cluster::Node.new(
           @test_config.per_node_key,
-          node_info: @test_node_info,
+          node_info_list: @test_node_info_list,
           with_replica: true
         )
       end
@@ -77,7 +77,7 @@ class RedisClient
         end
       end
 
-      def test_parse_node_info
+      def test_parse_cluster_node_reply_continuous_slots
         info = <<~INFO
           07c37dfeb235213a872192d90877d0cd55635b91 127.0.0.1:30004@31004 slave e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 0 1426238317239 4 connected
           67ed2db8d677e59ec4a4cefb06858cf2a1a89fa1 127.0.0.1:30002@31002 master - 0 1426238316232 2 connected 5461-10922
@@ -107,8 +107,11 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 5460]] }
         ]
 
-        assert_equal(want, ::RedisClient::Cluster::Node.send(:parse_node_info, info), 'Case: success: continuous slots')
+        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        assert_equal(want, got.map(&:to_h))
+      end
 
+      def test_parse_cluster_node_reply_discrete_slots
         info = <<~INFO
           07c37dfeb235213a872192d90877d0cd55635b91 127.0.0.1:30004@31004 slave e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 0 1426238317239 4 connected
           67ed2db8d677e59ec4a4cefb06858cf2a1a89fa1 127.0.0.1:30002@31002 master - 0 1426238316232 2 connected 3001 5461-7000 7002-10922
@@ -138,8 +141,11 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 3000], [3002, 5460], [15_001, 15_001]] }
         ]
 
-        assert_equal(want, ::RedisClient::Cluster::Node.send(:parse_node_info, info), 'Case: success: discrete slots')
+        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        assert_equal(want, got.map(&:to_h))
+      end
 
+      def test_parse_cluster_node_reply_discrete_slots_and_resharding
         info = <<~INFO
           07c37dfeb235213a872192d90877d0cd55635b91 127.0.0.1:30004@31004 slave e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 0 1426238317239 4 connected
           67ed2db8d677e59ec4a4cefb06858cf2a1a89fa1 127.0.0.1:30002@31002 master - 0 1426238316232 2 connected 3001 5461-7000 7002-10922 [5462->-292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f]
@@ -169,8 +175,11 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 3000], [3002, 5460], [15_001, 15_001]] }
         ]
 
-        assert_equal(want, ::RedisClient::Cluster::Node.send(:parse_node_info, info), 'Case: success: discrete slots and resharding')
+        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        assert_equal(want, got.map(&:to_h))
+      end
 
+      def test_parse_cluster_node_reply_failure_link_state
         info = <<~INFO
           07c37dfeb235213a872192d90877d0cd55635b91 127.0.0.1:30004@31004 slave e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 0 1426238317239 4 disconnected
           67ed2db8d677e59ec4a4cefb06858cf2a1a89fa1 127.0.0.1:30002@31002 master - 0 1426238316232 2 disconnected 5461-10922
@@ -180,8 +189,10 @@ class RedisClient
           e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 127.0.0.1:30001@31001 myself,master - 0 0 1 disconnected 0-5460
         INFO
 
-        assert_empty(::RedisClient::Cluster::Node.send(:parse_node_info, info), 'Case: failure: link state')
+        assert_empty(::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info))
+      end
 
+      def test_parse_cluster_node_reply_failure_flags
         info = <<~INFO
           07c37dfeb235213a872192d90877d0cd55635b91 127.0.0.1:30004@31004 fail?,slave e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 0 1426238317239 4 connected
           67ed2db8d677e59ec4a4cefb06858cf2a1a89fa1 127.0.0.1:30002@31002 fail,master - 0 1426238316232 2 connected 5461-10922
@@ -191,7 +202,7 @@ class RedisClient
           e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 127.0.0.1:30001@31001 myself,fail,master - 0 0 1 connected 0-5460
         INFO
 
-        assert_empty(::RedisClient::Cluster::Node.send(:parse_node_info, info), 'Case: failure: flags')
+        assert_empty(::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info))
       end
 
       def test_inspect
@@ -203,14 +214,14 @@ class RedisClient
       end
 
       def test_node_keys
-        want = @test_node_info.map { |info| info[:node_key] }
+        want = @test_node_info_list.map { |info| info[:node_key] }
         @test_node.node_keys.each do |got|
           assert_includes(want, got, "Case: #{got}")
         end
       end
 
       def test_find_by
-        @test_node_info.each do |info|
+        @test_node_info_list.each do |info|
           msg = "Case: primary only: #{info[:node_key]}"
           got = -> { @test_node.find_by(info[:node_key]) }
           if info[:role] == 'master'
@@ -226,17 +237,17 @@ class RedisClient
       end
 
       def test_call_all
-        want = (1..(@test_node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
+        want = (1..(@test_node_info_list.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
         got = @test_node.call_all(:call_v, ['PING'], [])
         assert_equal(want, got, 'Case: primary only')
 
-        want = (1..(@test_node_info.count)).map { |_| 'PONG' }
+        want = (1..(@test_node_info_list.count)).map { |_| 'PONG' }
         got = @test_node_with_scale_read.call_all(:call_v, ['PING'], [])
         assert_equal(want, got, 'Case: scale read')
       end
 
       def test_call_primaries
-        want = (1..(@test_node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
+        want = (1..(@test_node_info_list.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
 
         got = @test_node.call_primaries(:call_v, ['PING'], [])
         assert_equal(want, got)
@@ -246,7 +257,7 @@ class RedisClient
       end
 
       def test_call_replicas
-        want = (1..(@test_node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
+        want = (1..(@test_node_info_list.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
 
         got = @test_node.call_replicas(:call_v, ['PING'], [])
         assert_equal(want, got, 'Case: primary only')
@@ -256,27 +267,27 @@ class RedisClient
       end
 
       def test_send_ping
-        want = (1..(@test_node_info.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
+        want = (1..(@test_node_info_list.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
         got = @test_node.send_ping(:call_v, ['PING'], [])
         assert_equal(want, got, 'Case: primary only')
 
-        want = (1..(@test_node_info.count)).map { |_| 'PONG' }
+        want = (1..(@test_node_info_list.count)).map { |_| 'PONG' }
         got = @test_node_with_scale_read.send_ping(:call_v, ['PING'], [])
         assert_equal(want, got, 'Case: scale read')
       end
 
       def test_clients_for_scanning # rubocop:disable Metrics/CyclomaticComplexity
-        want = @test_node_info.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }.sort
+        want = @test_node_info_list.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }.sort
         got = @test_node.clients_for_scanning.map { |client| "#{client.config.host}:#{client.config.port}" }
         assert_equal(want, got, 'Case: primary only')
 
-        want = @test_node_info.select { |info| info[:role] == 'slave' }.map { |info| info[:node_key] }
+        want = @test_node_info_list.select { |info| info[:role] == 'slave' }.map { |info| info[:node_key] }
         got = @test_node_with_scale_read.clients_for_scanning.map { |client| "#{client.config.host}:#{client.config.port}" }
         got.each { |e| assert_includes(want, e, 'Case: scale read') }
       end
 
       def test_find_node_key_of_primary
-        sample_node = @test_node_info.find { |info| info[:role] == 'master' }
+        sample_node = @test_node_info_list.find { |info| info[:role] == 'master' }
         sample_slot = sample_node[:slots].first.first
         got = @test_node.find_node_key_of_primary(sample_slot)
         assert_equal(sample_node[:node_key], got, 'Case: sample slot')
@@ -284,13 +295,13 @@ class RedisClient
       end
 
       def test_find_node_key_of_replica
-        sample_node = @test_node_info.find { |info| info[:role] == 'master' }
+        sample_node = @test_node_info_list.find { |info| info[:role] == 'master' }
         sample_slot = sample_node[:slots].first.first
         got = @test_node.find_node_key_of_replica(sample_slot)
         assert_equal(sample_node[:node_key], got, 'Case: primary only')
 
-        sample_replicas = @test_node_info.select { |info| info[:role] == 'slave' }
-        sample_primary = @test_node_info.find { |info| info[:id] == sample_replicas.first[:primary_id] }
+        sample_replicas = @test_node_info_list.select { |info| info[:role] == 'slave' }
+        sample_primary = @test_node_info_list.find { |info| info[:id] == sample_replicas.first[:primary_id] }
         sample_slot = sample_primary[:slots].first.first
         got = @test_node_with_scale_read.find_node_key_of_replica(sample_slot)
         want = sample_replicas.map { |info| info[:node_key] }
@@ -300,7 +311,7 @@ class RedisClient
       end
 
       def test_any_primary_node_key
-        primary_node_keys = @test_node_info.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
+        primary_node_keys = @test_node_info_list.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
 
         got = @test_node.any_primary_node_key
         assert_includes(primary_node_keys, got, 'Case: primary only')
@@ -310,8 +321,8 @@ class RedisClient
       end
 
       def test_any_replica_node_key
-        primary_node_keys = @test_node_info.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
-        replica_node_keys = @test_node_info.select { |info| info[:role] == 'slave' }.map { |info| info[:node_key] }
+        primary_node_keys = @test_node_info_list.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
+        replica_node_keys = @test_node_info_list.select { |info| info[:role] == 'slave' }.map { |info| info[:node_key] }
 
         got = @test_node.any_replica_node_key
         assert_includes(primary_node_keys, got, 'Case: primary only')
@@ -323,7 +334,7 @@ class RedisClient
       def test_update_slot
         sample_slot = 0
         base_node_key = @test_node.find_node_key_of_primary(sample_slot)
-        another_node_key = @test_node_info.find { |info| info[:node_key] != base_node_key && info[:role] == 'master' }
+        another_node_key = @test_node_info_list.find { |info| info[:node_key] != base_node_key && info[:role] == 'master' }
         @test_node.update_slot(sample_slot, another_node_key)
         assert_equal(another_node_key, @test_node.find_node_key_of_primary(sample_slot))
       end
@@ -341,25 +352,27 @@ class RedisClient
       end
 
       def test_build_slot_node_mappings
-        node_info = [
+        node_info_list = [
           { node_key: '127.0.0.1:7001', slots: [[0, 3000], [3002, 5460], [15_001, 15_001]] },
           { node_key: '127.0.0.1:7002', slots: [[3001, 3001], [5461, 7000], [7002, 10_922]] },
           { node_key: '127.0.0.1:7003', slots: [[7001, 7001], [10_923, 15_000], [15_002, 16_383]] },
           { node_key: '127.0.0.1:7004', slots: [] },
           { node_key: '127.0.0.1:7005', slots: [] },
           { node_key: '127.0.0.1:7006', slots: [] }
-        ]
-        got = @test_node.send(:build_slot_node_mappings, node_info)
-        node_info.each do |info|
-          next if info[:slots].empty?
+        ].map { |info| ::RedisClient::Cluster::Node::Info.new(**info) }
 
-          info[:slots].each do |range|
-            (range[0]..range[1]).each { |slot| assert_same(info[:node_key], got[slot], "Case: #{slot}") }
+        got = @test_node.send(:build_slot_node_mappings, node_info_list)
+
+        node_info_list.each do |info|
+          next if info.slots.empty?
+
+          info.slots.each do |range|
+            (range[0]..range[1]).each { |slot| assert_same(info.node_key, got[slot], "Case: #{slot}") }
           end
         end
       end
 
-      def test_build_replication_mappings
+      def test_build_replication_mappings_regular
         node_key1 = '127.0.0.1:7001'
         node_key2 = '127.0.0.1:7002'
         node_key3 = '127.0.0.1:7003'
@@ -370,7 +383,7 @@ class RedisClient
         node_key8 = '127.0.0.1:7008'
         node_key9 = '127.0.0.1:7009'
 
-        node_info = [
+        node_info_list = [
           { id: '1', node_key: node_key1, primary_id: '-' },
           { id: '2', node_key: node_key2, primary_id: '-' },
           { id: '3', node_key: node_key3, primary_id: '-' },
@@ -380,33 +393,46 @@ class RedisClient
           { id: '7', node_key: node_key7, primary_id: '1' },
           { id: '8', node_key: node_key8, primary_id: '2' },
           { id: '9', node_key: node_key9, primary_id: '3' }
-        ]
-        got = @test_node.send(:build_replication_mappings, node_info)
-        got.transform_values!(&:sort!)
-        assert_same(node_key4, got[node_key1][0], 'Case: regular')
-        assert_same(node_key7, got[node_key1][1], 'Case: regular')
-        assert_same(node_key5, got[node_key2][0], 'Case: regular')
-        assert_same(node_key8, got[node_key2][1], 'Case: regular')
-        assert_same(node_key6, got[node_key3][0], 'Case: regular')
-        assert_same(node_key9, got[node_key3][1], 'Case: regular')
+        ].map { |info| ::RedisClient::Cluster::Node::Info.new(**info) }
 
-        node_info = [
+        got = @test_node.send(:build_replication_mappings, node_info_list)
+        got.transform_values!(&:sort!)
+
+        assert_same(node_key4, got[node_key1][0])
+        assert_same(node_key7, got[node_key1][1])
+        assert_same(node_key5, got[node_key2][0])
+        assert_same(node_key8, got[node_key2][1])
+        assert_same(node_key6, got[node_key3][0])
+        assert_same(node_key9, got[node_key3][1])
+      end
+
+      def test_build_replication_mappings_lack_of_replica
+        node_key1 = '127.0.0.1:7001'
+        # node_key2 = '127.0.0.1:7002' # lack
+        node_key3 = '127.0.0.1:7003'
+        node_key4 = '127.0.0.1:7004'
+        node_key5 = '127.0.0.1:7005'
+        node_key6 = '127.0.0.1:7006'
+
+        node_info_list = [
           { id: '1', role: 'master', node_key: node_key1, primary_id: '-' },
           { id: '3', role: 'master', node_key: node_key3, primary_id: '-' },
           { id: '4', role: 'slave', node_key: node_key4, primary_id: '1' },
           { id: '5', role: 'master', node_key: node_key5, primary_id: '-' },
           { id: '6', role: 'slave', node_key: node_key6, primary_id: '3' }
-        ]
-        got = @test_node.send(:build_replication_mappings, node_info)
+        ].map { |info| ::RedisClient::Cluster::Node::Info.new(**info) }
+
+        got = @test_node.send(:build_replication_mappings, node_info_list)
         got.transform_values!(&:sort!)
-        assert_equal(3, got.size, 'Case: lack of replica')
-        assert_same(node_key4, got[node_key1][0], 'Case: lack of replica')
-        assert_same(node_key6, got[node_key3][0], 'Case: lack of replica')
-        assert_empty(got[node_key5], 'Case: lack of replica')
+
+        assert_equal(3, got.size)
+        assert_same(node_key4, got[node_key1][0])
+        assert_same(node_key6, got[node_key3][0])
+        assert_empty(got[node_key5])
       end
 
       def test_try_map
-        primary_node_keys = @test_node_info.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
+        primary_node_keys = @test_node_info_list.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
         [
           { block: ->(_, client) { client.call('PING') }, results: primary_node_keys.to_h { |k| [k, 'PONG'] } },
           { block: ->(_, client) { client.call('UNKNOWN') }, errors: ::RedisClient::CommandError }

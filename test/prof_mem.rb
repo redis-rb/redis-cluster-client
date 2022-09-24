@@ -43,7 +43,7 @@ module ProfMem
 
   def profile(&block)
     # https://github.com/SamSaffron/memory_profiler
-    report = ::MemoryProfiler.report(top: 10, &block)
+    report = ::MemoryProfiler.report(top: 20, &block)
     report.pretty_print(color_output: true, normalize_paths: true)
   end
 

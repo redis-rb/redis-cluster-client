@@ -1,42 +1,13 @@
 # frozen_string_literal: true
 
-require 'uri'
 require 'testing_helper'
+require 'redis_client/cluster/node/testing_topology_mixin'
 
 class RedisClient
   class Cluster
     class Node
       class TestLatencyReplica < TestingWrapper
-        def setup
-          test_config = ::RedisClient::ClusterConfig.new(
-            nodes: TEST_NODE_URIS,
-            fixed_hostname: TEST_FIXED_HOSTNAME,
-            **TEST_GENERIC_OPTIONS
-          )
-          test_node_info = ::RedisClient::Cluster::Node.load_info(test_config.per_node_key)
-          if TEST_FIXED_HOSTNAME
-            test_node_info.each do |info|
-              _, port = ::RedisClient::Cluster::NodeKey.split(info[:node_key])
-              info[:node_key] = ::RedisClient::Cluster::NodeKey.build_from_host_port(TEST_FIXED_HOSTNAME, port)
-            end
-          end
-          node_addrs = test_node_info.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info[:node_key]) }
-          test_config.update_node(node_addrs)
-          @options = test_config.per_node_key
-          test_node = ::RedisClient::Cluster::Node.new(@options, node_info: test_node_info)
-          @replications = test_node.instance_variable_get(:@replications)
-          test_node&.each(&:close)
-          @test_topology = ::RedisClient::Cluster::Node::LatencyReplica.new(
-            @replications,
-            @options,
-            nil,
-            **TEST_GENERIC_OPTIONS
-          )
-        end
-
-        def teardown
-          @test_topology&.clients&.each_value(&:close)
-        end
+        include TestingTopologyMixin
 
         def test_clients_with_redis_client
           got = @test_topology.clients
@@ -100,6 +71,12 @@ class RedisClient
         def test_any_replica_node_key
           got = @test_topology.any_replica_node_key
           assert_includes(@replications.values.flatten, got)
+        end
+
+        private
+
+        def topology_class
+          ::RedisClient::Cluster::Node::LatencyReplica
         end
       end
     end
