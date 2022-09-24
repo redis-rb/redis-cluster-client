@@ -9,7 +9,13 @@ class RedisClient
     class Command
       EMPTY_STRING = ''
 
-      RedisCommand = Struct.new('RedisCommand', :first_key_position, :write?, :readonly?, keyword_init: true)
+      Detail = Struct.new(
+        'RedisCommand',
+        :first_key_position,
+        :write?,
+        :readonly?,
+        keyword_init: true
+      )
 
       class << self
         def load(nodes)
@@ -36,7 +42,7 @@ class RedisClient
           rows&.reject { |row| row[0].nil? }.to_h do |row|
             [
               row[0].downcase,
-              RedisCommand.new(
+              ::RedisClient::Cluster::Command::Detail.new(
                 first_key_position: row[3],
                 write?: row[2].include?('write'),
                 readonly?: row[2].include?('readonly')
