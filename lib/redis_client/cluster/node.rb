@@ -44,7 +44,12 @@ class RedisClient
 
         def []=(slot, primary_node_key)
           index = primary_node_keys.find_index(primary_node_key)
-          raise(::RedisClient::Cluster::Node::ReloadNeeded, primary_node_key) if index.nil?
+          if index.nil?
+            raise(::RedisClient::Cluster::Node::ReloadNeeded, primary_node_key) if primary_node_keys.size >= SLOT_OPTIMIZATION_MAX_SHARD_SIZE
+
+            index = primary_node_keys.size
+            primary_node_keys << primary_node_key
+          end
 
           slots.setbyte(slot, index)
         end

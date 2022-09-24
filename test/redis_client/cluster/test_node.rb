@@ -372,6 +372,40 @@ class RedisClient
         end
       end
 
+      def test_make_array_for_slot_node_mappings_optimized
+        node_info_list = Array.new(256) do |i|
+          ::RedisClient::Cluster::Node::Info.new(
+            node_key: "127.0.0.1:#{1024 + i + 1}",
+            role: 'master'
+          )
+        end
+
+        want = node_info_list.first.node_key
+        got = @test_node.send(:make_array_for_slot_node_mappings, node_info_list)
+        assert_instance_of(Struct::RedisSlot, got)
+        ::RedisClient::Cluster::Node::SLOT_SIZE.times do |i|
+          got[i] = want
+          assert_equal(want, got[i], "Case: #{i}")
+        end
+      end
+
+      def test_make_array_for_slot_node_mappings_unoptimized
+        node_info_list = Array.new(257) do |i|
+          ::RedisClient::Cluster::Node::Info.new(
+            node_key: "127.0.0.1:#{1024 + i + 1}",
+            role: 'master'
+          )
+        end
+
+        want = node_info_list.first.node_key
+        got = @test_node.send(:make_array_for_slot_node_mappings, node_info_list)
+        assert_instance_of(Array, got)
+        ::RedisClient::Cluster::Node::SLOT_SIZE.times do |i|
+          got[i] = want
+          assert_equal(want, got[i], "Case: #{i}")
+        end
+      end
+
       def test_build_replication_mappings_regular
         node_key1 = '127.0.0.1:7001'
         node_key2 = '127.0.0.1:7002'
