@@ -28,7 +28,7 @@ class ClusterController
     end
 
     def include_slot?(slot)
-      slots.include?(slot)
+      slots&.include?(slot) || false
     end
 
     def slot_size
