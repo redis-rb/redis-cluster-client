@@ -406,6 +406,24 @@ class RedisClient
         end
       end
 
+      def test_make_array_for_slot_node_mappings_max_shard_size
+        node_info_list = Array.new(255) do |i|
+          ::RedisClient::Cluster::Node::Info.new(
+            node_key: "127.0.0.1:#{1024 + i + 1}",
+            role: 'master'
+          )
+        end
+
+        got = @test_node.send(:make_array_for_slot_node_mappings, node_info_list)
+        assert_instance_of(Struct::RedisSlot, got)
+
+        ::RedisClient::Cluster::Node::SLOT_SIZE.times { |i| got[i] = node_info_list.first.node_key }
+
+        got[0] = 'newbie:6379'
+        assert_equal('newbie:6379', got[0])
+        assert_raises(::RedisClient::Cluster::Node::ReloadNeeded) { got[0] = 'zombie:6379' }
+      end
+
       def test_build_replication_mappings_regular
         node_key1 = '127.0.0.1:7001'
         node_key2 = '127.0.0.1:7002'
