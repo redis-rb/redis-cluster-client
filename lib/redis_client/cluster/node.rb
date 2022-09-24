@@ -35,6 +35,21 @@ class RedisClient
         end
       end
 
+      SLOT_OPTIMIZATION_MAX_SHARD_SIZE = 256
+      SLOT_OPTIMIZATION_STRING = '0' * SLOT_SIZE
+      Slot = Struct.new('RedisSlot', :slots, :primary_node_keys, keyword_init: true) do
+        def [](slot)
+          primary_node_keys[slots.getbyte(slot)]
+        end
+
+        def []=(slot, primary_node_key)
+          index = primary_node_keys.find_index(primary_node_key)
+          raise(::RedisClient::Cluster::Node::ReloadNeeded, primary_node_key) if index.nil?
+
+          slots.setbyte(slot, index)
+        end
+      end
+
       class Config < ::RedisClient::Config
         def initialize(scale_read: false, **kwargs)
           @scale_read = scale_read
@@ -225,7 +240,7 @@ class RedisClient
       end
 
       def build_slot_node_mappings(node_info_list)
-        slots = Array.new(SLOT_SIZE)
+        slots = make_array_for_slot_node_mappings(node_info_list)
         node_info_list.each do |info|
           next if info.slots.nil? || info.slots.empty?
 
@@ -233,6 +248,15 @@ class RedisClient
         end
 
         slots
+      end
+
+      def make_array_for_slot_node_mappings(node_info_list)
+        return Array.new(SLOT_SIZE) if node_info_list.count(&:primary?) > SLOT_OPTIMIZATION_MAX_SHARD_SIZE
+
+        ::RedisClient::Cluster::Node::Slot.new(
+          slots: String.new(SLOT_OPTIMIZATION_STRING, encoding: Encoding::BINARY, capacity: SLOT_SIZE),
+          primary_node_keys: node_info_list.select(&:primary?).map(&:node_key)
+        )
       end
 
       def build_replication_mappings(node_info_list) # rubocop:disable Metrics/AbcSize

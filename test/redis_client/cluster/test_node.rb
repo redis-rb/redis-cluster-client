@@ -334,7 +334,7 @@ class RedisClient
       def test_update_slot
         sample_slot = 0
         base_node_key = @test_node.find_node_key_of_primary(sample_slot)
-        another_node_key = @test_node_info_list.find { |info| info.node_key != base_node_key && info.primary? }
+        another_node_key = @test_node_info_list.find { |info| info.node_key != base_node_key && info.primary? }&.node_key
         @test_node.update_slot(sample_slot, another_node_key)
         assert_equal(another_node_key, @test_node.find_node_key_of_primary(sample_slot))
       end
@@ -353,12 +353,12 @@ class RedisClient
 
       def test_build_slot_node_mappings
         node_info_list = [
-          { node_key: '127.0.0.1:7001', slots: [[0, 3000], [3002, 5460], [15_001, 15_001]] },
-          { node_key: '127.0.0.1:7002', slots: [[3001, 3001], [5461, 7000], [7002, 10_922]] },
-          { node_key: '127.0.0.1:7003', slots: [[7001, 7001], [10_923, 15_000], [15_002, 16_383]] },
-          { node_key: '127.0.0.1:7004', slots: [] },
-          { node_key: '127.0.0.1:7005', slots: [] },
-          { node_key: '127.0.0.1:7006', slots: [] }
+          { node_key: '127.0.0.1:7001', role: 'master', slots: [[0, 3000], [3002, 5460], [15_001, 15_001]] },
+          { node_key: '127.0.0.1:7002', role: 'master', slots: [[3001, 3001], [5461, 7000], [7002, 10_922]] },
+          { node_key: '127.0.0.1:7003', role: 'master', slots: [[7001, 7001], [10_923, 15_000], [15_002, 16_383]] },
+          { node_key: '127.0.0.1:7004', role: 'slave', slots: [] },
+          { node_key: '127.0.0.1:7005', role: 'slave', slots: [] },
+          { node_key: '127.0.0.1:7006', role: 'slave', slots: [] }
         ].map { |info| ::RedisClient::Cluster::Node::Info.new(**info) }
 
         got = @test_node.send(:build_slot_node_mappings, node_info_list)
