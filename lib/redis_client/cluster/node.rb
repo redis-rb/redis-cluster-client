@@ -25,7 +25,15 @@ class RedisClient
         :id, :node_key, :role, :primary_id, :ping_sent,
         :pong_recv, :config_epoch, :link_state, :slots,
         keyword_init: true
-      )
+      ) do
+        def primary?
+          role == 'master'
+        end
+
+        def replica?
+          role == 'slave'
+        end
+      end
 
       class Config < ::RedisClient::Config
         def initialize(scale_read: false, **kwargs)

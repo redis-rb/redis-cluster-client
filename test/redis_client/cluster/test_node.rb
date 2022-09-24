@@ -214,7 +214,7 @@ class RedisClient
       end
 
       def test_node_keys
-        want = @test_node_info_list.map { |info| info[:node_key] }
+        want = @test_node_info_list.map(&:node_key)
         @test_node.node_keys.each do |got|
           assert_includes(want, got, "Case: #{got}")
         end
@@ -222,22 +222,22 @@ class RedisClient
 
       def test_find_by
         @test_node_info_list.each do |info|
-          msg = "Case: primary only: #{info[:node_key]}"
-          got = -> { @test_node.find_by(info[:node_key]) }
-          if info[:role] == 'master'
+          msg = "Case: primary only: #{info.node_key}"
+          got = -> { @test_node.find_by(info.node_key) }
+          if info.primary?
             assert_instance_of(::RedisClient, got.call, msg)
           else
             assert_raises(::RedisClient::Cluster::Node::ReloadNeeded, msg, &got)
           end
 
-          msg = "Case: scale read: #{info[:node_key]}"
-          got = @test_node_with_scale_read.find_by(info[:node_key])
+          msg = "Case: scale read: #{info.node_key}"
+          got = @test_node_with_scale_read.find_by(info.node_key)
           assert_instance_of(::RedisClient, got, msg)
         end
       end
 
       def test_call_all
-        want = (1..(@test_node_info_list.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
+        want = (1..(@test_node_info_list.count(&:primary?))).map { |_| 'PONG' }
         got = @test_node.call_all(:call_v, ['PING'], [])
         assert_equal(want, got, 'Case: primary only')
 
@@ -247,7 +247,7 @@ class RedisClient
       end
 
       def test_call_primaries
-        want = (1..(@test_node_info_list.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
+        want = (1..(@test_node_info_list.count(&:primary?))).map { |_| 'PONG' }
 
         got = @test_node.call_primaries(:call_v, ['PING'], [])
         assert_equal(want, got)
@@ -257,7 +257,7 @@ class RedisClient
       end
 
       def test_call_replicas
-        want = (1..(@test_node_info_list.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
+        want = (1..(@test_node_info_list.count(&:primary?))).map { |_| 'PONG' }
 
         got = @test_node.call_replicas(:call_v, ['PING'], [])
         assert_equal(want, got, 'Case: primary only')
@@ -267,7 +267,7 @@ class RedisClient
       end
 
       def test_send_ping
-        want = (1..(@test_node_info_list.count { |info| info[:role] == 'master' })).map { |_| 'PONG' }
+        want = (1..(@test_node_info_list.count(&:primary?))).map { |_| 'PONG' }
         got = @test_node.send_ping(:call_v, ['PING'], [])
         assert_equal(want, got, 'Case: primary only')
 
@@ -277,41 +277,41 @@ class RedisClient
       end
 
       def test_clients_for_scanning # rubocop:disable Metrics/CyclomaticComplexity
-        want = @test_node_info_list.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }.sort
+        want = @test_node_info_list.select(&:primary?).map(&:node_key).sort
         got = @test_node.clients_for_scanning.map { |client| "#{client.config.host}:#{client.config.port}" }
         assert_equal(want, got, 'Case: primary only')
 
-        want = @test_node_info_list.select { |info| info[:role] == 'slave' }.map { |info| info[:node_key] }
+        want = @test_node_info_list.select(&:replica?).map(&:node_key)
         got = @test_node_with_scale_read.clients_for_scanning.map { |client| "#{client.config.host}:#{client.config.port}" }
         got.each { |e| assert_includes(want, e, 'Case: scale read') }
       end
 
       def test_find_node_key_of_primary
-        sample_node = @test_node_info_list.find { |info| info[:role] == 'master' }
-        sample_slot = sample_node[:slots].first.first
+        sample_node = @test_node_info_list.find(&:primary?)
+        sample_slot = sample_node.slots.first.first
         got = @test_node.find_node_key_of_primary(sample_slot)
-        assert_equal(sample_node[:node_key], got, 'Case: sample slot')
+        assert_equal(sample_node.node_key, got, 'Case: sample slot')
         assert_nil(@test_node.find_node_key_of_primary(nil), 'Case: nil')
       end
 
       def test_find_node_key_of_replica
-        sample_node = @test_node_info_list.find { |info| info[:role] == 'master' }
-        sample_slot = sample_node[:slots].first.first
+        sample_node = @test_node_info_list.find(&:primary?)
+        sample_slot = sample_node.slots.first.first
         got = @test_node.find_node_key_of_replica(sample_slot)
-        assert_equal(sample_node[:node_key], got, 'Case: primary only')
+        assert_equal(sample_node.node_key, got, 'Case: primary only')
 
-        sample_replicas = @test_node_info_list.select { |info| info[:role] == 'slave' }
-        sample_primary = @test_node_info_list.find { |info| info[:id] == sample_replicas.first[:primary_id] }
-        sample_slot = sample_primary[:slots].first.first
+        sample_replicas = @test_node_info_list.select(&:replica?)
+        sample_primary = @test_node_info_list.find { |info| info.id == sample_replicas.first.primary_id }
+        sample_slot = sample_primary.slots.first.first
         got = @test_node_with_scale_read.find_node_key_of_replica(sample_slot)
-        want = sample_replicas.map { |info| info[:node_key] }
+        want = sample_replicas.map(&:node_key)
         assert_includes(want, got, 'Case: scale read')
 
         assert_nil(@test_node.find_node_key_of_replica(nil), 'Case: nil')
       end
 
       def test_any_primary_node_key
-        primary_node_keys = @test_node_info_list.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
+        primary_node_keys = @test_node_info_list.select(&:primary?).map(&:node_key)
 
         got = @test_node.any_primary_node_key
         assert_includes(primary_node_keys, got, 'Case: primary only')
@@ -321,8 +321,8 @@ class RedisClient
       end
 
       def test_any_replica_node_key
-        primary_node_keys = @test_node_info_list.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
-        replica_node_keys = @test_node_info_list.select { |info| info[:role] == 'slave' }.map { |info| info[:node_key] }
+        primary_node_keys = @test_node_info_list.select(&:primary?).map(&:node_key)
+        replica_node_keys = @test_node_info_list.select(&:replica?).map(&:node_key)
 
         got = @test_node.any_replica_node_key
         assert_includes(primary_node_keys, got, 'Case: primary only')
@@ -334,7 +334,7 @@ class RedisClient
       def test_update_slot
         sample_slot = 0
         base_node_key = @test_node.find_node_key_of_primary(sample_slot)
-        another_node_key = @test_node_info_list.find { |info| info[:node_key] != base_node_key && info[:role] == 'master' }
+        another_node_key = @test_node_info_list.find { |info| info.node_key != base_node_key && info.primary? }
         @test_node.update_slot(sample_slot, another_node_key)
         assert_equal(another_node_key, @test_node.find_node_key_of_primary(sample_slot))
       end
@@ -432,7 +432,7 @@ class RedisClient
       end
 
       def test_try_map
-        primary_node_keys = @test_node_info_list.select { |info| info[:role] == 'master' }.map { |info| info[:node_key] }
+        primary_node_keys = @test_node_info_list.select(&:primary?).map(&:node_key)
         [
           { block: ->(_, client) { client.call('PING') }, results: primary_node_keys.to_h { |k| [k, 'PONG'] } },
           { block: ->(_, client) { client.call('UNKNOWN') }, errors: ::RedisClient::CommandError }
