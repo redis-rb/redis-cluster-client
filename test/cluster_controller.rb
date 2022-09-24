@@ -9,6 +9,33 @@ class ClusterController
   DEFAULT_MAX_ATTEMPTS = 600
   DEFAULT_TIMEOUT_SEC = 5.0
 
+  RedisNodeInfo = Struct.new(
+    'RedisNodeInfo',
+    :id, :node_key, :flags, :role, :myself?, :primary_id, :ping_sent, :pong_recv,
+    :config_epoch, :link_state, :slots, :client, :client_node_key,
+    keyword_init: true
+  ) do
+    def primary?
+      role == 'master'
+    end
+
+    def replica?
+      role == 'slave'
+    end
+
+    def empty_slots?
+      slots.nil? || slots.empty?
+    end
+
+    def include_slot?(slot)
+      slots&.include?(slot) || false
+    end
+
+    def slot_size
+      slots&.size.to_i
+    end
+  end
+
   def initialize(node_addrs,
                  shard_size: DEFAULT_SHARD_SIZE,
                  replica_size: DEFAULT_REPLICA_SIZE,
@@ -53,15 +80,15 @@ class ClusterController
 
   def failover
     rows = associate_with_clients_and_nodes(@clients)
-    primary_info = rows.find { |row| row[:role] == 'master' }
-    replica_info = rows.find { |row| row[:primary_id] == primary_info[:id] }
+    primary_info = rows.find(&:primary?)
+    replica_info = rows.find { |row| row.primary_id == primary_info.id }
 
     wait_replication_delay(@clients, replica_size: @replica_size, timeout: @timeout)
-    replica_info.fetch(:client).call('CLUSTER', 'FAILOVER', 'TAKEOVER')
+    replica_info.client.call('CLUSTER', 'FAILOVER', 'TAKEOVER')
     wait_failover(
       @clients,
-      primary_node_key: primary_info.fetch(:node_key),
-      replica_node_key: replica_info.fetch(:node_key),
+      primary_node_key: primary_info.node_key,
+      replica_node_key: replica_info.node_key,
       max_attempts: @max_attempts
     )
     wait_replication_delay(@clients, replica_size: @replica_size, timeout: @timeout)
@@ -70,14 +97,14 @@ class ClusterController
 
   def start_resharding(slot:, src_node_key:, dest_node_key:) # rubocop:disable Metrics/CyclomaticComplexity
     rows = associate_with_clients_and_nodes(@clients)
-    src_info = rows.find { |r| r[:node_key] == src_node_key || r[:client_node_key] == src_node_key }
-    dest_info = rows.find { |r| r[:node_key] == dest_node_key || r[:client_node_key] == dest_node_key }
+    src_info = rows.find { |r| r.node_key == src_node_key || r.client_node_key == src_node_key }
+    dest_info = rows.find { |r| r.node_key == dest_node_key || r.client_node_key == dest_node_key }
 
-    src_node_id = src_info.fetch(:id)
-    src_client = src_info.fetch(:client)
-    dest_node_id = dest_info.fetch(:id)
-    dest_client = dest_info.fetch(:client)
-    dest_host, dest_port = dest_info.fetch(:node_key).split(':')
+    src_node_id = src_info.id
+    src_client = src_info.client
+    dest_node_id = dest_info.id
+    dest_client = dest_info.client
+    dest_host, dest_port = dest_info.node_key.split(':')
 
     # @see https://redis.io/commands/cluster-setslot/#redis-cluster-live-resharding-explained
     dest_client.call('CLUSTER', 'SETSLOT', slot, 'IMPORTING', src_node_id)
@@ -104,13 +131,13 @@ class ClusterController
 
   def finish_resharding(slot:, src_node_key:, dest_node_key:) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     rows = associate_with_clients_and_nodes(@clients)
-    src_info = rows.find { |r| r[:node_key] == src_node_key || r[:client_node_key] == src_node_key }
-    dest_info = rows.find { |r| r[:node_key] == dest_node_key || r[:client_node_key] == dest_node_key }
+    src_info = rows.find { |r| r.node_key == src_node_key || r.client_node_key == src_node_key }
+    dest_info = rows.find { |r| r.node_key == dest_node_key || r.client_node_key == dest_node_key }
 
-    src = src_info.fetch(:client)
-    dest = dest_info.fetch(:client)
-    id = dest_info.fetch(:id)
-    rest = rows.reject { |r| r[:role] == 'slave' || r[:client].equal?(src) || r[:client].equal?(dest) }.map { |r| r[:client] }
+    src = src_info.client
+    dest = dest_info.client
+    id = dest_info.id
+    rest = rows.reject { |r| r.replica? || r.client.equal?(src) || r.client.equal?(dest) }.map(&:client)
 
     ([dest, src] + rest).each do |cli|
       cli.call('CLUSTER', 'SETSLOT', slot, 'NODE', id)
@@ -120,10 +147,10 @@ class ClusterController
     end
   end
 
-  def scale_out(primary_url:, replica_url:)
+  def scale_out(primary_url:, replica_url:) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     # @see https://redis.io/docs/manual/scaling/
     rows = associate_with_clients_and_nodes(@clients)
-    target_host, target_port = rows.find { |row| row[:role] == 'master' }.fetch(:node_key).split(':')
+    target_host, target_port = rows.find(&:primary?)&.node_key&.split(':')
 
     primary = ::RedisClient.new(url: primary_url, **@kwargs)
     replica = ::RedisClient.new(url: replica_url, **@kwargs)
@@ -145,8 +172,8 @@ class ClusterController
     rows = associate_with_clients_and_nodes(@clients)
 
     SLOT_SIZE.times.to_a.sample(100).sort.each do |slot|
-      src = rows.find { |row| row[:slots].include?(slot) }.fetch(:node_key)
-      dest = rows.find { |row| row[:id] == primary_id }.fetch(:node_key)
+      src = rows.find { |row| row.include_slot?(slot) }&.node_key
+      dest = rows.find { |row| row.id == primary_id }&.node_key
       start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
       finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
     end
@@ -155,25 +182,25 @@ class ClusterController
   def scale_in # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     rows = associate_with_clients_and_nodes(@clients)
 
-    primary_info = rows.reject { |r| r[:slots].empty? }.min_by { |r| r[:slots].size }
-    replica_info = rows.find { |r| r[:primary_id] == primary_info[:id] }
-    rest_primary_node_keys = rows.reject { |r| r[:id] == primary_info[:id] || r[:role] == 'slave' }.map { |r| r[:node_key] }
+    primary_info = rows.reject(&:empty_slots?).min_by(&:slot_size)
+    replica_info = rows.find { |r| r.primary_id == primary_info.id }
+    rest_primary_node_keys = rows.reject { |r| r.id == primary_info.id || r.replica? }.map(&:node_key)
 
-    primary_info[:slots].each do |slot|
-      src = primary_info.fetch(:node_key)
+    primary_info.slots.each do |slot|
+      src = primary_info.node_key
       dest = rest_primary_node_keys.sample
       start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
       finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
     end
 
-    replica = replica_info.fetch(:client)
-    primary = primary_info.fetch(:client)
+    replica = replica_info.client
+    primary = primary_info.client
     threads = @clients.map do |cli|
       Thread.new(cli) do |c|
         Thread.pass
         c.pipelined do |pi|
-          pi.call('CLUSTER', 'FORGET', replica_info[:id])
-          pi.call('CLUSTER', 'FORGET', primary_info[:id])
+          pi.call('CLUSTER', 'FORGET', replica_info.id)
+          pi.call('CLUSTER', 'FORGET', primary_info.id)
         end
       rescue ::RedisClient::Error
         # ignore
@@ -196,21 +223,21 @@ class ClusterController
 
   def select_resharding_target(slot)
     rows = associate_with_clients_and_nodes(@clients)
-    src = rows.find { |r| r[:role] == 'master' && r[:slots].include?(slot) }
-    dest = rows.reject { |r| r[:role] == 'slave' || r[:id] == src[:id] }.sample
-    [src.fetch(:node_key), dest.fetch(:node_key)]
+    src = rows.find { |r| r.primary? && r.include_slot?(slot) }
+    dest = rows.reject { |r| r.replica? || r.id == src.id }.sample
+    [src.node_key, dest.node_key]
   end
 
   def select_sacrifice_of_primary
     rows = associate_with_clients_and_nodes(@clients)
-    rows.select { |r| r[:role] == 'master' }
-        .reject { |primary| rows.none? { |r| r[:primary_id] == primary[:id] } }
-        .sample.fetch(:client)
+    rows.select(&:primary?)
+        .reject { |primary| rows.none? { |r| r.primary_id == primary.id } }
+        .sample.client
   end
 
   def select_sacrifice_of_replica
     rows = associate_with_clients_and_nodes(@clients)
-    rows.select { |r| r[:role] == 'slave' }.sample.fetch(:client)
+    rows.select(&:replica?).sample.client
   end
 
   def close
@@ -269,7 +296,7 @@ class ClusterController
   def meet_each_other(clients)
     rows = fetch_cluster_nodes(clients.first)
     rows = parse_cluster_nodes(rows)
-    target_host, target_port = rows.first.fetch(:node_key).split(':')
+    target_host, target_port = rows.first.node_key.split(':')
     clients.drop(1).each do |c|
       c.call('CLUSTER', 'MEET', target_host, target_port)
       print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER MEET #{target_host}:#{target_port}")
@@ -331,7 +358,7 @@ class ClusterController
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       rows = fetch_cluster_nodes(client)
       rows = parse_cluster_nodes(rows)
-      rows.count { |r| r[:role] == 'slave' } == number_of_replicas
+      rows.count(&:replica?) == number_of_replicas
     rescue ::RedisClient::ConnectionError
       true
     end
@@ -341,9 +368,9 @@ class ClusterController
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       rows = fetch_cluster_nodes(client)
       rows = parse_cluster_nodes(rows)
-      primary_info = rows.find { |r| r[:node_key] == primary_node_key || r[:client_node_key] == primary_node_key }
-      replica_info = rows.find { |r| r[:node_key] == replica_node_key || r[:client_node_key] == replica_node_key }
-      primary_info[:role] == 'slave' && replica_info[:role] == 'master'
+      primary_info = rows.find { |r| r.node_key == primary_node_key || r.client_node_key == primary_node_key }
+      replica_info = rows.find { |r| r.node_key == replica_node_key || r.client_node_key == replica_node_key }
+      primary_info.replica? && replica_info.primary?
     rescue ::RedisClient::ConnectionError
       true
     end
@@ -352,7 +379,7 @@ class ClusterController
   def wait_replication_delay(clients, replica_size:, timeout:)
     timeout_msec = timeout.to_i * 1000
     wait_for_state(clients, max_attempts: clients.size + 1) do |client|
-      client.blocking_call(timeout, 'WAIT', replica_size, timeout_msec - 100) if client.call('ROLE').first == 'master'
+      client.blocking_call(timeout, 'WAIT', replica_size, timeout_msec - 100) if primary_client?(client)
       true
     rescue ::RedisClient::ConnectionError
       true
@@ -362,7 +389,7 @@ class ClusterController
   def wait_cluster_recovering(clients, max_attempts:)
     key = 0
     wait_for_state(clients, max_attempts: max_attempts) do |client|
-      client.call('GET', key) if client.call('ROLE').first == 'master'
+      client.call('GET', key) if primary_client?(client)
       true
     rescue ::RedisClient::CommandError => e
       if e.message.start_with?('CLUSTERDOWN')
@@ -404,8 +431,12 @@ class ClusterController
     clients.filter_map do |client|
       rows = fetch_cluster_nodes(client)
       rows = parse_cluster_nodes(rows)
-      row = rows.find { |r| r[:flags].include?('myself') }
-      row.merge(client: client, client_node_key: "#{client.config.host}:#{client.config.port}")
+      row = rows.find(&:myself?)
+      next if row.nil?
+
+      row.client = client
+      row.client_node_key = "#{client.config.host}:#{client.config.port}"
+      row
     rescue ::RedisClient::ConnectionError
       next
     end
@@ -422,28 +453,37 @@ class ClusterController
                         .flat_map { |first, last| (first..last).to_a }.sort
               end
 
-      {
+      RedisNodeInfo.new(
         id: row[0],
         node_key: row[1].split('@').first,
         flags: flags,
         role: (flags & %w[master slave]).first,
+        myself?: flags.include?('myself'),
         primary_id: row[3],
         ping_sent: row[4],
         pong_recv: row[5],
         config_epoch: row[6],
         link_state: row[7],
         slots: slots
-      }
+      )
     end
   end
 
   def take_primaries(clients, shard_size:)
-    clients.select { |cli| cli.call('ROLE').first == 'master' }.take(shard_size)
+    clients.select { |cli| primary_client?(cli) }.take(shard_size)
   end
 
   def take_replicas(clients, shard_size:)
-    replicas = clients.select { |cli| cli.call('ROLE').first == 'slave' }
+    replicas = clients.select { |cli| replica_client?(cli) }
     replicas.size.zero? ? clients[shard_size..] : replicas
+  end
+
+  def primary_client?(client)
+    client.call('ROLE').first == 'master'
+  end
+
+  def replica_client?(client)
+    client.call('ROLE').first == 'slave'
   end
 
   def print_debug(msg)

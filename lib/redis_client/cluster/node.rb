@@ -20,6 +20,20 @@ class RedisClient
       IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
 
       ReloadNeeded = Class.new(::RedisClient::Error)
+      Info = Struct.new(
+        'RedisNode',
+        :id, :node_key, :role, :primary_id, :ping_sent,
+        :pong_recv, :config_epoch, :link_state, :slots,
+        keyword_init: true
+      ) do
+        def primary?
+          role == 'master'
+        end
+
+        def replica?
+          role == 'slave'
+        end
+      end
 
       class Config < ::RedisClient::Config
         def initialize(scale_read: false, **kwargs)
@@ -48,7 +62,7 @@ class RedisClient
                 Thread.pass
                 Thread.current.thread_variable_set(:index, i)
                 reply = cli.call('CLUSTER', 'NODES')
-                Thread.current.thread_variable_set(:info, parse_node_info(reply))
+                Thread.current.thread_variable_set(:info, parse_cluster_node_reply(reply))
               rescue StandardError => e
                 Thread.current.thread_variable_set(:error, e)
               ensure
@@ -70,10 +84,11 @@ class RedisClient
 
           raise ::RedisClient::Cluster::InitialSetupError, errors if node_info_list.nil?
 
-          grouped = node_info_list.compact.group_by do |rows|
-            rows.sort_by { |row| row[:id] }
-                .map { |r| "#{r[:id]}#{r[:node_key]}#{r[:role]}#{r[:primary_id]}#{r[:config_epoch]}" }
-                .join
+          grouped = node_info_list.compact.group_by do |info_list|
+            info_list
+              .sort_by(&:id)
+              .map { |i| "#{i.id}#{i.node_key}#{i.role}#{i.primary_id}#{i.config_epoch}" }
+              .join
           end
 
           grouped.max_by { |_, v| v.size }[1].first
@@ -83,8 +98,8 @@ class RedisClient
 
         # @see https://redis.io/commands/cluster-nodes/
         # @see https://github.com/redis/redis/blob/78960ad57b8a5e6af743d789ed8fd767e37d42b8/src/cluster.c#L4660-L4683
-        def parse_node_info(info) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-          rows = info.split("\n").map(&:split)
+        def parse_cluster_node_reply(reply) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+          rows = reply.split("\n").map(&:split)
           rows.each { |arr| arr[2] = arr[2].split(',') }
           rows.select! { |arr| arr[7] == 'connected' && (arr[2] & %w[fail? fail handshake noaddr noflags]).empty? }
           rows.each do |arr|
@@ -99,23 +114,25 @@ class RedisClient
           end
 
           rows.map do |arr|
-            { id: arr[0], node_key: arr[1], role: arr[2], primary_id: arr[3], ping_sent: arr[4],
-              pong_recv: arr[5], config_epoch: arr[6], link_state: arr[7], slots: arr[8] }
+            ::RedisClient::Cluster::Node::Info.new(
+              id: arr[0], node_key: arr[1], role: arr[2], primary_id: arr[3], ping_sent: arr[4],
+              pong_recv: arr[5], config_epoch: arr[6], link_state: arr[7], slots: arr[8]
+            )
           end
         end
       end
 
       def initialize(
         options,
-        node_info: [],
+        node_info_list: [],
         with_replica: false,
         replica_affinity: :random,
         pool: nil,
         **kwargs
       )
 
-        @slots = build_slot_node_mappings(node_info)
-        @replications = build_replication_mappings(node_info)
+        @slots = build_slot_node_mappings(node_info_list)
+        @replications = build_replication_mappings(node_info_list)
         @topology = make_topology_class(with_replica, replica_affinity).new(@replications, options, pool, **kwargs)
         @mutex = Mutex.new
       end
@@ -207,23 +224,23 @@ class RedisClient
         end
       end
 
-      def build_slot_node_mappings(node_info)
+      def build_slot_node_mappings(node_info_list)
         slots = Array.new(SLOT_SIZE)
-        node_info.each do |info|
-          next if info[:slots].nil? || info[:slots].empty?
+        node_info_list.each do |info|
+          next if info.slots.nil? || info.slots.empty?
 
-          info[:slots].each { |start, last| (start..last).each { |i| slots[i] = info[:node_key] } }
+          info.slots.each { |start, last| (start..last).each { |i| slots[i] = info.node_key } }
         end
 
         slots
       end
 
-      def build_replication_mappings(node_info) # rubocop:disable Metrics/AbcSize
-        dict = node_info.to_h { |info| [info[:id], info] }
-        node_info.each_with_object(Hash.new { |h, k| h[k] = [] }) do |info, acc|
-          primary_info = dict[info[:primary_id]]
-          acc[primary_info[:node_key]] << info[:node_key] unless primary_info.nil?
-          acc[info[:node_key]] if info[:role] == 'master' # for the primary which have no replicas
+      def build_replication_mappings(node_info_list) # rubocop:disable Metrics/AbcSize
+        dict = node_info_list.to_h { |info| [info.id, info] }
+        node_info_list.each_with_object(Hash.new { |h, k| h[k] = [] }) do |info, acc|
+          primary_info = dict[info.primary_id]
+          acc[primary_info.node_key] << info.node_key unless primary_info.nil?
+          acc[info.node_key] if info.primary? # for the primary which have no replicas
         end
       end
 

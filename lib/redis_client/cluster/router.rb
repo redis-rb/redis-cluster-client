@@ -270,12 +270,12 @@ class RedisClient
       end
 
       def fetch_cluster_info(config, pool: nil, **kwargs)
-        node_info = ::RedisClient::Cluster::Node.load_info(config.per_node_key, **kwargs)
-        node_addrs = node_info.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info[:node_key]) }
+        node_info_list = ::RedisClient::Cluster::Node.load_info(config.per_node_key, **kwargs)
+        node_addrs = node_info_list.map { |i| ::RedisClient::Cluster::NodeKey.hashify(i.node_key) }
         config.update_node(node_addrs)
         ::RedisClient::Cluster::Node.new(
           config.per_node_key,
-          node_info: node_info,
+          node_info_list: node_info_list,
           pool: pool,
           with_replica: config.use_replica?,
           replica_affinity: config.replica_affinity,
