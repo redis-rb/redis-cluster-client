@@ -57,11 +57,12 @@ class RedisClient
       end
 
       def normalize(name)
-        return @cache[name] if @cache.key?(name)
+        return @cache[name] || name.to_s.downcase if @cache.key?(name)
         return name.to_s.downcase if @mutex.locked?
 
-        @mutex.synchronize { @cache[name] = name.to_s.downcase }
-        @cache[name]
+        str = name.to_s.downcase
+        @mutex.synchronize { @cache[name] = str }
+        str
       end
     end
   end
