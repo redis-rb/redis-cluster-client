@@ -39,12 +39,14 @@ class RedisClient
 
       Slot = Struct.new('StringArray', :string, :elements, keyword_init: true) do
         def [](index)
+          raise IndexError if index < 0
           return if index >= string.bytesize
 
           elements[string.getbyte(index)]
         end
 
         def []=(index, element)
+          raise IndexError if index < 0
           return if index >= string.bytesize
 
           pos = elements.find_index(element) # O(N)

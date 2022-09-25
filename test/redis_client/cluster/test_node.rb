@@ -422,6 +422,12 @@ class RedisClient
         got[0] = 'newbie:6379'
         assert_equal('newbie:6379', got[0])
         assert_raises(RangeError) { got[0] = 'zombie:6379' }
+
+        assert_raises(IndexError) { got[-1] = 'newbie:6379' }
+        assert_raises(IndexError) { got[-1] }
+
+        got[16_384] = 'newbie:6379'
+        assert_nil(got[16_384])
       end
 
       def test_build_replication_mappings_regular
