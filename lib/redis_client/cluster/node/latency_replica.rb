@@ -21,7 +21,7 @@ class RedisClient
           @replications.each_value { |keys| keys.sort_by! { |k| latencies.fetch(k) } }
           @replica_clients = select_replica_clients(@replications, @clients)
           @clients_for_scanning = select_clients_for_scanning(@replications, @clients)
-          @existed_replicas = @replications.reject { |_, v| v.empty? }.values
+          @existed_replicas = @replications.values.reject(&:empty?)
         end
 
         def clients_for_scanning(seed: nil) # rubocop:disable Lint/UnusedMethodArgument
