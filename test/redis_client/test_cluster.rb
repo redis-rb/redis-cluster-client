@@ -37,7 +37,7 @@ class RedisClient
 
         assert(@client.call('PING') { |r| r == 'PONG' })
 
-        assert_equal(2, @client.call('HSET', 'hash', { foo: 1, bar: 2 }))
+        assert_equal(2, @client.call('HSET', 'hash', foo: 1, bar: 2))
         wait_for_replication
         assert_equal(%w[1 2], @client.call('HMGET', 'hash', %w[foo bar]))
       end

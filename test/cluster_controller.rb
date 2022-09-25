@@ -10,7 +10,7 @@ class ClusterController
   DEFAULT_TIMEOUT_SEC = 5.0
 
   RedisNodeInfo = Struct.new(
-    'RedisNodeInfo',
+    'RedisClusterNodeInfo',
     :id, :node_key, :flags, :role, :myself?, :primary_id, :ping_sent, :pong_recv,
     :config_epoch, :link_state, :slots, :client, :client_node_key,
     keyword_init: true

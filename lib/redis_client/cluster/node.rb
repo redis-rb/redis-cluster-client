@@ -18,10 +18,12 @@ class RedisClient
       MAX_STARTUP_SAMPLE = 37
       MAX_THREADS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
       IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
+      SLOT_OPTIMIZATION_STRING = '0' * SLOT_SIZE
 
       ReloadNeeded = Class.new(::RedisClient::Error)
+
       Info = Struct.new(
-        'RedisNode',
+        'RedisClusterNode',
         :id, :node_key, :role, :primary_id, :ping_sent,
         :pong_recv, :config_epoch, :link_state, :slots,
         keyword_init: true
@@ -35,23 +37,25 @@ class RedisClient
         end
       end
 
-      SLOT_OPTIMIZATION_MAX_SHARD_SIZE = 256
-      SLOT_OPTIMIZATION_STRING = '0' * SLOT_SIZE
-      Slot = Struct.new('RedisSlot', :slots, :primary_node_keys, keyword_init: true) do
-        def [](slot)
-          primary_node_keys[slots.getbyte(slot)]
+      Slot = Struct.new('StringArray', :string, :elements, keyword_init: true) do
+        def [](index)
+          return if index >= string.bytesize
+
+          elements[string.getbyte(index)]
         end
 
-        def []=(slot, primary_node_key)
-          index = primary_node_keys.find_index(primary_node_key)
-          if index.nil?
-            raise(::RedisClient::Cluster::Node::ReloadNeeded, primary_node_key) if primary_node_keys.size >= SLOT_OPTIMIZATION_MAX_SHARD_SIZE
+        def []=(index, element)
+          return if index >= string.bytesize
 
-            index = primary_node_keys.size
-            primary_node_keys << primary_node_key
+          pos = elements.find_index(element) # O(N)
+          if pos.nil?
+            raise(RangeError, 'full of elements') if elements.size >= 256
+
+            pos = elements.size
+            elements << element
           end
 
-          slots.setbyte(slot, index)
+          string.setbyte(index, pos)
         end
       end
 
@@ -229,7 +233,12 @@ class RedisClient
       def update_slot(slot, node_key)
         return if @mutex.locked?
 
-        @mutex.synchronize { @slots[slot] = node_key }
+        @mutex.synchronize do
+          @slots[slot] = node_key
+        rescue RangeError
+          @slots = Array.new(SLOT_SIZE) { |i| @slots[i] }
+          @slots[slot] = node_key
+        end
       end
 
       private
@@ -256,11 +265,11 @@ class RedisClient
       end
 
       def make_array_for_slot_node_mappings(node_info_list)
-        return Array.new(SLOT_SIZE) if node_info_list.count(&:primary?) > SLOT_OPTIMIZATION_MAX_SHARD_SIZE
+        return Array.new(SLOT_SIZE) if node_info_list.count(&:primary?) > 256
 
         ::RedisClient::Cluster::Node::Slot.new(
-          slots: String.new(SLOT_OPTIMIZATION_STRING, encoding: Encoding::BINARY, capacity: SLOT_SIZE),
-          primary_node_keys: node_info_list.select(&:primary?).map(&:node_key)
+          string: String.new(SLOT_OPTIMIZATION_STRING, encoding: Encoding::BINARY, capacity: SLOT_SIZE),
+          elements: node_info_list.select(&:primary?).map(&:node_key)
         )
       end
 

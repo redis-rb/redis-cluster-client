@@ -12,6 +12,7 @@ class RedisClient
   class Cluster
     class Router
       ZERO_CURSOR_FOR_SCAN = '0'
+      METHODS_FOR_BLOCKING_CMD = %i[blocking_call_v blocking_call].freeze
 
       attr_reader :node
 
@@ -91,7 +92,7 @@ class RedisClient
           raise
         end
       rescue ::RedisClient::ConnectionError => e
-        raise if method == :blocking_call_v || (method == :blocking_call && e.is_a?(RedisClient::ReadTimeoutError))
+        raise if METHODS_FOR_BLOCKING_CMD.include?(method) && e.is_a?(RedisClient::ReadTimeoutError)
         raise if retry_count <= 0
 
         update_cluster_info!
