@@ -67,7 +67,6 @@ class RedisClient
 
         threads = attempts.each_with_index.map do |_, i|
           Thread.new do
-            Thread.pass
             Thread.current.thread_variable_set(:index, i)
             got = if i.even?
                     @subject.get_by_command(%w[SET foo bar])

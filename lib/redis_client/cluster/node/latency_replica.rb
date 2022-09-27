@@ -43,7 +43,6 @@ class RedisClient
           clients.each_slice(::RedisClient::Cluster::Node::MAX_THREADS).each_with_object({}) do |chuncked_clients, acc|
             threads = chuncked_clients.map do |k, v|
               Thread.new(k, v) do |node_key, client|
-                Thread.pass
                 Thread.current.thread_variable_set(:node_key, node_key)
 
                 min = DUMMY_LATENCY_NSEC

@@ -85,7 +85,6 @@ class RedisClient
           startup_nodes.each_slice(MAX_THREADS).with_index do |chuncked_startup_nodes, chuncked_idx|
             threads = chuncked_startup_nodes.each_with_index.map do |raw_client, idx|
               Thread.new(raw_client, (MAX_THREADS * chuncked_idx) + idx) do |cli, i|
-                Thread.pass
                 Thread.current.thread_variable_set(:index, i)
                 reply = cli.call('CLUSTER', 'NODES')
                 Thread.current.thread_variable_set(:info, parse_cluster_node_reply(reply))
@@ -304,7 +303,6 @@ class RedisClient
         clients.each_slice(MAX_THREADS) do |chuncked_clients|
           threads = chuncked_clients.map do |k, v|
             Thread.new(k, v) do |node_key, client|
-              Thread.pass
               Thread.current.thread_variable_set(:node_key, node_key)
               reply = yield(node_key, client)
               Thread.current.thread_variable_set(:result, reply)
