@@ -197,7 +197,6 @@ class ClusterController
     primary = primary_info.client
     threads = @clients.map do |cli|
       Thread.new(cli) do |c|
-        Thread.pass
         c.pipelined do |pi|
           pi.call('CLUSTER', 'FORGET', replica_info.id)
           pi.call('CLUSTER', 'FORGET', primary_info.id)

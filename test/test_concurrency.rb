@@ -53,9 +53,7 @@ class TestConcurrency < TestingWrapper
   def test_threading
     threads = Array.new(MAX_THREADS) do
       Thread.new do
-        Thread.pass
         ATTEMPTS.times { MAX_THREADS.times { |i| @client.call('INCR', "key#{i}") } }
-        Thread.pass
         ATTEMPTS.times { MAX_THREADS.times { |i| @client.call('DECR', "key#{i}") } }
       rescue StandardError => e
         Thread.current.thread_variable_set(:error, e)
@@ -70,9 +68,7 @@ class TestConcurrency < TestingWrapper
   def test_threading_with_pipelining
     threads = Array.new(MAX_THREADS) do
       Thread.new do
-        Thread.pass
         @client.pipelined { |pi| ATTEMPTS.times { MAX_THREADS.times { |i| pi.call('INCR', "key#{i}") } } }
-        Thread.pass
         @client.pipelined { |pi| ATTEMPTS.times { MAX_THREADS.times { |i| pi.call('DECR', "key#{i}") } } }
       rescue StandardError => e
         Thread.current.thread_variable_set(:error, e)
