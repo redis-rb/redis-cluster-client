@@ -142,7 +142,6 @@ class RedisClient
         @pipelines&.each_slice(MAX_THREADS) do |chuncked_pipelines|
           threads = chuncked_pipelines.map do |node_key, pipeline|
             Thread.new(node_key, pipeline) do |nk, pl|
-              Thread.pass
               Thread.current.thread_variable_set(:node_key, nk)
               replies = do_pipelining(@router.find_node(nk), pl)
               raise ReplySizeError, "commands: #{pl._size}, replies: #{replies.size}" if pl._size != replies.size
