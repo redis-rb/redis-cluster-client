@@ -77,3 +77,31 @@ module BenchmarkMixin
     @client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
   end
 end
+
+module BenchmarkMixinForProxy
+  def setup
+    @client = new_test_client
+    @cluster_client = new_cluster_client
+    @cluster_client.call('FLUSHDB')
+    wait_for_replication
+  end
+
+  def teardown
+    @cluster_client.call('FLUSHDB')
+    wait_for_replication
+    @cluster_client&.close
+    @client&.close
+  end
+
+  private
+
+  def new_cluster_client
+    ::RedisClient.cluster(nodes: TEST_NODE_URIS, fixed_hostname: TEST_FIXED_HOSTNAME, **TEST_GENERIC_OPTIONS).new_client
+  end
+
+  def wait_for_replication
+    client_side_timeout = TEST_TIMEOUT_SEC + 1.0
+    server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
+    @cluster_client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+  end
+end
