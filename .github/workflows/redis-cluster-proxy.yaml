@@ -1,0 +1,34 @@
+---
+name: Redis Cluster Proxy
+on:
+  push:
+    branches:
+      - "master"
+    paths:
+      - test/proxy/redis-cluster-proxy/**
+defaults:
+  run:
+    shell: bash
+jobs:
+  container-image:
+    name: Container Image
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: redis-cluster-proxy
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Build image
+        run: docker build ./test/proxy/redis-cluster-proxy --file Dockerfile --tag $IMAGE_NAME
+
+      - name: Log into GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push image to GitHub Container Registry
+        run: |
+          IMAGE_ID=$(echo "ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME" | tr '[A-Z]' '[a-z]')
+          VERSION=latest
+          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:$VERSION
