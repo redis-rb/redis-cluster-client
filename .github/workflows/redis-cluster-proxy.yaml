@@ -6,6 +6,7 @@ on:
       - "master"
     paths:
       - test/proxy/redis-cluster-proxy/**
+      - .github/workflows/redis-cluster-proxy.yaml
 defaults:
   run:
     shell: bash
