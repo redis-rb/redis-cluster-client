@@ -112,15 +112,15 @@ services:
     depends_on:
       clustering:
         condition: service_completed_successfully
-# redis-cluster-proxy:
-#   image: ghcr.io/redis-rb/redis-cluster-proxy:latest
-#   restart: "${RESTART_POLICY:-always}"
-#   command:
-#     - "--bind"
-#     - "0.0.0.0"
-#     - "node1:6379"
-#   ports:
-#     - "7001:7777"
-#   depends_on:
-#     clustering:
-#       condition: service_completed_successfully
+  redis-cluster-proxy:
+    image: ghcr.io/redis-rb/redis-cluster-proxy:latest
+    restart: "${RESTART_POLICY:-always}"
+    command:
+      - "--bind"
+      - "0.0.0.0"
+      - "node1:6379"
+    ports:
+      - "7001:7777"
+    depends_on:
+      clustering:
+        condition: service_completed_successfully
