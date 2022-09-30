@@ -84,14 +84,14 @@ class BenchCommand
     end
   end
 
-  # class RedisClusterProxy < BenchmarkWrapper
-  #   include BenchmarkMixin
-  #   include BenchmarkMixinForProxy
+  class RedisClusterProxy < BenchmarkWrapper
+    include BenchmarkMixin
+    include BenchmarkMixinForProxy
 
-  #   private
+    private
 
-  #   def new_test_client
-  #     ::RedisClient.config(**TEST_GENERIC_OPTIONS.merge(BENCH_REDIS_CLUSTER_PROXY_OPTIONS)).new_client
-  #   end
-  # end
+    def new_test_client
+      ::RedisClient.config(**TEST_GENERIC_OPTIONS.merge(BENCH_REDIS_CLUSTER_PROXY_OPTIONS)).new_client
+    end
+  end
 end
