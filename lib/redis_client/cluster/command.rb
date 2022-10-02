@@ -7,9 +7,9 @@ require 'redis_client/cluster/normalized_cmd_name'
 class RedisClient
   class Cluster
     class Command
-      EMPTY_STRING = "".freeze
-      LEFT_BRACKET = "{".freeze
-      RIGHT_BRACKET = "}".freeze
+      EMPTY_STRING = ''
+      LEFT_BRACKET = '{'
+      RIGHT_BRACKET = '}'
 
       Detail = Struct.new(
         'RedisCommand',
@@ -106,10 +106,9 @@ class RedisClient
       # @see https://redis.io/topics/cluster-spec#keys-hash-tags Keys hash tags
       def extract_hash_tag(key)
         key = key.to_s
-        
         s = key.index(LEFT_BRACKET)
         return EMPTY_STRING if s.nil?
-        
+
         e = key.index(RIGHT_BRACKET, s + 1)
         return EMPTY_STRING if e.nil?
 
