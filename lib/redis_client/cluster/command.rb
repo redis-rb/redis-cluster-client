@@ -106,10 +106,12 @@ class RedisClient
       # @see https://redis.io/topics/cluster-spec#keys-hash-tags Keys hash tags
       def extract_hash_tag(key)
         key = key.to_s
+        
         s = key.index(LEFT_BRACKET)
-        e = key.index(RIGHT_BRACKET, s.to_i + 1)
-
-        return EMPTY_STRING if s.nil? || e.nil?
+        return EMPTY_STRING if s.nil?
+        
+        e = key.index(RIGHT_BRACKET, s + 1)
+        return EMPTY_STRING if e.nil?
 
         key[s + 1..e - 1]
       end
