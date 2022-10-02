@@ -328,6 +328,12 @@ jobs:
             echo "node$i:"
             ping -c 5 $node_addr
           done
+      - name: Print cpu info
+        run: grep 'model name' /proc/cpuinfo
+      - name: Print memory info
+        run: free
+      - name: Print disk info
+        run: df -h
       - name: Run minitest
         run: bundle exec rake bench
       - name: Reset qdisc
