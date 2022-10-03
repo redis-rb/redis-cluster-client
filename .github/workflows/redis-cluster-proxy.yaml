@@ -1,4 +1,5 @@
 ---
+# @see https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
 name: Redis Cluster Proxy
 on:
   push:
@@ -13,7 +14,7 @@ defaults:
 jobs:
   container-image:
     name: Container Image
-    if: github.repository == "redis-rb/redis-cluster-client"
+    if: github.repository == 'redis-rb/redis-cluster-client'
     timeout-minutes: 15
     runs-on: ubuntu-latest
     concurrency: redis-cluster-proxy
