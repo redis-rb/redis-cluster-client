@@ -13,6 +13,7 @@ defaults:
 jobs:
   container-image:
     name: Container Image
+    if: github.repository == "redis-rb/redis-cluster-client"
     timeout-minutes: 15
     runs-on: ubuntu-latest
     concurrency: redis-cluster-proxy
