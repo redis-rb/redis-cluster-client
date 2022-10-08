@@ -22,7 +22,7 @@ services:
     restart: "${RESTART_POLICY:-always}"
     healthcheck:
       test:
-        - "CMD-SHELL"
+        - "CMD"
         - "redis-cli"
         - "-h"
         - "127.0.0.1"
@@ -66,7 +66,7 @@ services:
       --replica-announce-ip  node2
     healthcheck:
       test:
-        - "CMD-SHELL"
+        - "CMD"
         - "redis-cli"
         - "-h"
         - "127.0.0.1"
@@ -108,7 +108,7 @@ services:
       --replica-announce-ip  node3
     healthcheck:
       test:
-        - "CMD-SHELL"
+        - "CMD"
         - "redis-cli"
         - "-h"
         - "127.0.0.1"
@@ -150,7 +150,7 @@ services:
       --replica-announce-ip  node4
     healthcheck:
       test:
-        - "CMD-SHELL"
+        - "CMD"
         - "redis-cli"
         - "-h"
         - "127.0.0.1"
@@ -192,7 +192,7 @@ services:
       --replica-announce-ip  node5
     healthcheck:
       test:
-        - "CMD-SHELL"
+        - "CMD"
         - "redis-cli"
         - "-h"
         - "127.0.0.1"
@@ -234,7 +234,7 @@ services:
       --replica-announce-ip  node6
     healthcheck:
       test:
-        - "CMD-SHELL"
+        - "CMD"
         - "redis-cli"
         - "-h"
         - "127.0.0.1"
