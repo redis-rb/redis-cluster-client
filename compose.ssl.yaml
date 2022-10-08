@@ -18,15 +18,26 @@ services:
       --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
       --tls-cluster          yes
       --tls-replication      yes
+      --replica-announce-ip  node1
     restart: "${RESTART_POLICY:-always}"
     healthcheck:
       test:
-        - "CMD-SHELL"
+        - "CMD"
         - "redis-cli"
+        - "-h"
+        - "127.0.0.1"
+        - "-p"
+        - "6379"
+        - "--no-raw"
         - "--tls"
-        - "--cert=/etc/ssl/private/redis-rb-cert.crt"
-        - "--key=/etc/ssl/private/redis-rb-cert.key"
-        - "--cacert=/etc/ssl/private/redis-rb-ca.crt"
+        - "--sni"
+        - "localhost"
+        - "--cert"
+        - "/etc/ssl/private/redis-rb-cert.crt"
+        - "--key"
+        - "/etc/ssl/private/redis-rb-cert.key"
+        - "--cacert"
+        - "/etc/ssl/private/redis-rb-ca.crt"
         - "ping"
       interval: "7s"
       timeout: "5s"
@@ -52,6 +63,29 @@ services:
       --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
       --tls-cluster          yes
       --tls-replication      yes
+      --replica-announce-ip  node2
+    healthcheck:
+      test:
+        - "CMD"
+        - "redis-cli"
+        - "-h"
+        - "127.0.0.1"
+        - "-p"
+        - "6380"
+        - "--no-raw"
+        - "--tls"
+        - "--sni"
+        - "localhost"
+        - "--cert"
+        - "/etc/ssl/private/redis-rb-cert.crt"
+        - "--key"
+        - "/etc/ssl/private/redis-rb-cert.key"
+        - "--cacert"
+        - "/etc/ssl/private/redis-rb-ca.crt"
+        - "ping"
+      interval: "7s"
+      timeout: "5s"
+      retries: 10
     ports:
       - "6380:6380"
   node3:
@@ -71,6 +105,29 @@ services:
       --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
       --tls-cluster          yes
       --tls-replication      yes
+      --replica-announce-ip  node3
+    healthcheck:
+      test:
+        - "CMD"
+        - "redis-cli"
+        - "-h"
+        - "127.0.0.1"
+        - "-p"
+        - "6381"
+        - "--no-raw"
+        - "--tls"
+        - "--sni"
+        - "localhost"
+        - "--cert"
+        - "/etc/ssl/private/redis-rb-cert.crt"
+        - "--key"
+        - "/etc/ssl/private/redis-rb-cert.key"
+        - "--cacert"
+        - "/etc/ssl/private/redis-rb-ca.crt"
+        - "ping"
+      interval: "7s"
+      timeout: "5s"
+      retries: 10
     ports:
       - "6381:6381"
   node4:
@@ -90,6 +147,29 @@ services:
       --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
       --tls-cluster          yes
       --tls-replication      yes
+      --replica-announce-ip  node4
+    healthcheck:
+      test:
+        - "CMD"
+        - "redis-cli"
+        - "-h"
+        - "127.0.0.1"
+        - "-p"
+        - "6382"
+        - "--no-raw"
+        - "--tls"
+        - "--sni"
+        - "localhost"
+        - "--cert"
+        - "/etc/ssl/private/redis-rb-cert.crt"
+        - "--key"
+        - "/etc/ssl/private/redis-rb-cert.key"
+        - "--cacert"
+        - "/etc/ssl/private/redis-rb-ca.crt"
+        - "ping"
+      interval: "7s"
+      timeout: "5s"
+      retries: 10
     ports:
       - "6382:6382"
   node5:
@@ -109,6 +189,29 @@ services:
       --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
       --tls-cluster          yes
       --tls-replication      yes
+      --replica-announce-ip  node5
+    healthcheck:
+      test:
+        - "CMD"
+        - "redis-cli"
+        - "-h"
+        - "127.0.0.1"
+        - "-p"
+        - "6383"
+        - "--no-raw"
+        - "--tls"
+        - "--sni"
+        - "localhost"
+        - "--cert"
+        - "/etc/ssl/private/redis-rb-cert.crt"
+        - "--key"
+        - "/etc/ssl/private/redis-rb-cert.key"
+        - "--cacert"
+        - "/etc/ssl/private/redis-rb-ca.crt"
+        - "ping"
+      interval: "7s"
+      timeout: "5s"
+      retries: 10
     ports:
       - "6383:6383"
   node6:
@@ -128,6 +231,29 @@ services:
       --tls-ca-cert-file     /etc/ssl/private/redis-rb-ca.crt
       --tls-cluster          yes
       --tls-replication      yes
+      --replica-announce-ip  node6
+    healthcheck:
+      test:
+        - "CMD"
+        - "redis-cli"
+        - "-h"
+        - "127.0.0.1"
+        - "-p"
+        - "6384"
+        - "--no-raw"
+        - "--tls"
+        - "--sni"
+        - "localhost"
+        - "--cert"
+        - "/etc/ssl/private/redis-rb-cert.crt"
+        - "--key"
+        - "/etc/ssl/private/redis-rb-cert.key"
+        - "--cacert"
+        - "/etc/ssl/private/redis-rb-ca.crt"
+        - "ping"
+      interval: "7s"
+      timeout: "5s"
+      retries: 10
     ports:
       - "6384:6384"
   clustering:

@@ -9,10 +9,10 @@ set -o pipefail
 readonly NAME='redis-rb'
 readonly EXPIRATION_DAYS='109500'
 readonly SBJ='/C=US/ST=Georgia/L=Atlanta/O=redis-rb/OU=redis-cluster-client/CN=127.0.0.1'
-readonly SAN1='localhost'
-readonly SAN2='endpoint.example.com'
 readonly CERT_DIR="$(dirname $(realpath $0))/../test/ssl_certs"
 readonly WORK_DIR=$(mktemp -d)
+readonly SAN=(localhost node1 node2 node3 node4 node5 node6 node7 node8 node9)
+readonly SAN_TXT=$(echo ${SAN[@]} | sed -e 's# #,DNS:#g' | xargs -I{} echo "DNS:{}")
 
 cd ${WORK_DIR}
 mkdir -p ${CERT_DIR} ./demoCA ./demoCA/certs ./demoCA/crl ./demoCA/newcerts ./demoCA/private
@@ -32,7 +32,7 @@ openssl req\
   -sha256\
   -out ${CERT_DIR}/${NAME}-ca.crt\
   -subj "${SBJ}"\
-  -addext "subjectAltName = DNS:${SAN1},DNS:${SAN2}"
+  -addext "subjectAltName = ${SAN_TXT}"
 
 openssl x509\
   -in ${CERT_DIR}/${NAME}-ca.crt\
@@ -46,7 +46,7 @@ openssl req\
   -nodes\
   -out ./${NAME}-cert.req\
   -subj "${SBJ}"\
-  -addext "subjectAltName = DNS:${SAN1},DNS:${SAN2}"
+  -addext "subjectAltName = ${SAN_TXT}"
 
 openssl ca\
   -days ${EXPIRATION_DAYS}\
