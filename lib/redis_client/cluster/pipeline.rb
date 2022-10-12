@@ -200,7 +200,7 @@ class RedisClient
       def send_pipeline(client, pipeline)
         results = client.send(:ensure_connected, retryable: pipeline._retryable?) do |connection|
           commands = pipeline._commands
-          ::RedisClient::Middlewares.call_pipelined(commands, client.config) do
+          client.instance_variable_get(:@middlewares).call_pipelined(commands, client.config) do
             connection.call_pipelined_aware_of_redirection(commands, pipeline._timeouts)
           end
         end
