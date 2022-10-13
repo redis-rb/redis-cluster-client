@@ -239,16 +239,15 @@ jobs:
           ruby-version: '3.1'
           bundler-cache: true
       - name: Get IP address of host
-        id: host_ip_addr
         run: |
           host_ip_addr=$(ip a | grep eth0 | grep inet | awk '{print $2}' | cut -d'/' -f1)
-          echo "::set-output name=host_ip_addr::$host_ip_addr"
+          echo "HOST_IP_ADDR=$host_ip_addr" >> $GITHUB_ENV
       - name: Pull Docker images
         run: docker pull redis:$REDIS_VERSION
       - name: Run containers
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
         env:
-          HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
+          HOST_ADDR: ${{ env.HOST_IP_ADDR }}
       - name: Wait for nodes to be ready
         run: |
           node_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $3}' | tail -n +2 | wc -l)
@@ -276,7 +275,7 @@ jobs:
       - name: Build cluster
         run: bundle exec rake "build_cluster[$HOST_ADDR]"
         env:
-          HOST_ADDR: ${{ steps.host_ip_addr.outputs.host_ip_addr }}
+          HOST_ADDR: ${{ env.HOST_IP_ADDR }}
           DEBUG: "1"
       - name: Run minitest
         run: bundle exec rake test
