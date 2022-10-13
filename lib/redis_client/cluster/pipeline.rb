@@ -81,6 +81,14 @@ class RedisClient
         end
       end
 
+      ::RedisClient.class_eval do
+        attr_reader :middlewares
+
+        def ensure_connected_cluster_scoped(retryable: true, &block)
+          ensure_connected(retryable: retryable, &block)
+        end
+      end
+
       ReplySizeError = Class.new(::RedisClient::Error)
 
       class RedirectionNeeded < ::RedisClient::Error
@@ -198,9 +206,9 @@ class RedisClient
       end
 
       def send_pipeline(client, pipeline)
-        results = client.send(:ensure_connected, retryable: pipeline._retryable?) do |connection|
+        results = client.ensure_connected_cluster_scoped(retryable: pipeline._retryable?) do |connection|
           commands = pipeline._commands
-          client.instance_variable_get(:@middlewares).call_pipelined(commands, client.config) do
+          client.middlewares.call_pipelined(commands, client.config) do
             connection.call_pipelined_aware_of_redirection(commands, pipeline._timeouts)
           end
         end

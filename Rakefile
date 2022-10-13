@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 require 'rake/testtask'
+require 'rubocop/rake_task'
+
+RuboCop::RakeTask.new
 
 SLUGGISH_TEST_TYPES = %w[broken scale state].freeze
 
