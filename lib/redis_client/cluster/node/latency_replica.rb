@@ -48,7 +48,7 @@ class RedisClient
                 min = DUMMY_LATENCY_NSEC
                 MEASURE_ATTEMPT_COUNT.times do
                   starting = Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond)
-                  client.send(:call_once, 'PING')
+                  client.call_once('PING')
                   duration = Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond) - starting
                   min = duration if duration < min
                 end
