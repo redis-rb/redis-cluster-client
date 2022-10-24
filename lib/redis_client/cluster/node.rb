@@ -285,7 +285,7 @@ class RedisClient
 
       def call_multiple_nodes(clients, method, command, args, &block)
         results, errors = try_map(clients) do |_, client|
-          client.send(method, *args, command, &block)
+          client.public_send(method, *args, command, &block)
         end
 
         [results&.values, errors]

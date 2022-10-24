@@ -68,9 +68,9 @@ class RedisClient
       def try_send(node, method, command, args, retry_count: 3, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         if args.empty?
           # prevent memory allocation for variable-length args
-          node.send(method, command, &block)
+          node.public_send(method, command, &block)
         else
-          node.send(method, *args, command, &block)
+          node.public_send(method, *args, command, &block)
         end
       rescue ::RedisClient::CommandError => e
         raise if retry_count <= 0
@@ -101,7 +101,7 @@ class RedisClient
       end
 
       def try_delegate(node, method, *args, retry_count: 3, **kwargs, &block) # rubocop:disable Metrics/AbcSize
-        node.send(method, *args, **kwargs, &block)
+        node.public_send(method, *args, **kwargs, &block)
       rescue ::RedisClient::CommandError => e
         raise if retry_count <= 0
 
@@ -214,7 +214,7 @@ class RedisClient
         case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'resetstat', 'rewrite', 'set'
           @node.call_all(method, command, args, &block).first
-        else assign_node(command).send(method, *args, command, &block)
+        else assign_node(command).public_send(method, *args, command, &block)
         end
       end
 
@@ -222,7 +222,7 @@ class RedisClient
         case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'stats' then @node.call_all(method, command, args, &block)
         when 'purge' then @node.call_all(method, command, args, &block).first
-        else assign_node(command).send(method, *args, command, &block)
+        else assign_node(command).public_send(method, *args, command, &block)
         end
       end
 
@@ -231,7 +231,7 @@ class RedisClient
         when 'list' then @node.call_all(method, command, args, &block).flatten
         when 'pause', 'reply', 'setname'
           @node.call_all(method, command, args, &block).first
-        else assign_node(command).send(method, *args, command, &block)
+        else assign_node(command).public_send(method, *args, command, &block)
         end
       end
 
@@ -244,8 +244,8 @@ class RedisClient
         when 'getkeysinslot'
           raise ArgumentError, command.join(' ') if command.size != 4
 
-          find_node(@node.find_node_key_of_replica(command[2])).send(method, *args, command, &block)
-        else assign_node(command).send(method, *args, command, &block)
+          find_node(@node.find_node_key_of_replica(command[2])).public_send(method, *args, command, &block)
+        else assign_node(command).public_send(method, *args, command, &block)
         end
       end
 
@@ -255,7 +255,7 @@ class RedisClient
           @node.call_all(method, command, args, &block).first
         when 'flush', 'load'
           @node.call_primaries(method, command, args, &block).first
-        else assign_node(command).send(method, *args, command, &block)
+        else assign_node(command).public_send(method, *args, command, &block)
         end
       end
 
@@ -266,7 +266,7 @@ class RedisClient
           @node.call_all(method, command, args, &block).reject(&:empty?).map { |e| Hash[*e] }
                .reduce({}) { |a, e| a.merge(e) { |_, v1, v2| v1 + v2 } }
         when 'numpat' then @node.call_all(method, command, args, &block).select { |e| e.is_a?(Integer) }.sum
-        else assign_node(command).send(method, *args, command, &block)
+        else assign_node(command).public_send(method, *args, command, &block)
         end
       end
 
