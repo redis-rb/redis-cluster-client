@@ -12,11 +12,13 @@ module ProfMem
   SLICED_NUMBERS = Array.new(ATTEMPT_COUNT) { |i| i }.each_slice(MAX_PIPELINE_SIZE).freeze
   CLI_TYPES = %w[primary_only scale_read_random scale_read_latency pooled].freeze
   MODES = {
-    single: lambda do |cli|
+    single: lambda do |client_builder_method|
+      cli = send(client_builder_method)
       ATTEMPT_COUNT.times { |i| cli.call('SET', i, i) }
       ATTEMPT_COUNT.times { |i| cli.call('GET', i) }
     end,
-    excessive_pipelining: lambda do |cli|
+    excessive_pipelining: lambda do |client_builder_method|
+      cli = send(client_builder_method)
       cli.pipelined do |pi|
         ATTEMPT_COUNT.times { |i| pi.call('SET', i, i) }
       end
@@ -25,7 +27,8 @@ module ProfMem
         ATTEMPT_COUNT.times { |i| pi.call('GET', i) }
       end
     end,
-    pipelining_in_moderation: lambda do |cli|
+    pipelining_in_moderation: lambda do |client_builder_method|
+      cli = send(client_builder_method)
       SLICED_NUMBERS.each do |numbers|
         cli.pipelined do |pi|
           numbers.each { |i| pi.call('SET', i, i) }
@@ -45,8 +48,8 @@ module ProfMem
     CLI_TYPES.each do |cli_type|
       prepare
       print_letter(mode, cli_type)
-      client = send("new_#{cli_type}_client".to_sym)
-      profile { subject.call(client) }
+      client_builder_method = "new_#{cli_type}_client".to_sym
+      profile { subject.call(client_builder_method) }
     end
   end
 
