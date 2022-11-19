@@ -2,7 +2,7 @@
 
 module BenchmarkMixin
   MIN_THRESHOLD = 0.95
-  MAX_PIPELINE_SIZE = 30
+  MAX_PIPELINE_SIZE = 100
 
   def setup
     @client = new_test_client
