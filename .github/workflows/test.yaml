@@ -348,6 +348,8 @@ jobs:
     timeout-minutes: 15
     strategy:
       fail-fast: false
+      matrix:
+        mode: ['single', 'excessive_pipelining', 'pipelining_in_moderation']
     runs-on: ubuntu-latest
     env:
       REDIS_VERSION: '7.0.1'
@@ -370,5 +372,7 @@ jobs:
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Run memory profiler
         run: bundle exec rake prof
+        env:
+          MEMORY_PROFILE_MODE: ${{ matrix.mode }}
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
