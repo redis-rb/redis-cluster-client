@@ -2,6 +2,7 @@
 
 module BenchmarkMixin
   MIN_THRESHOLD = 0.95
+  MAX_PIPELINE_SIZE = 30
 
   def setup
     @client = new_test_client
@@ -41,9 +42,11 @@ module BenchmarkMixin
 
   def bench_pipeline_echo
     assert_performance_linear(MIN_THRESHOLD) do |n|
-      @client.pipelined do |pi|
-        n.times do
-          pi.call('ECHO', 'Hello world')
+      Array.new(n).each_slice(MAX_PIPELINE_SIZE) do |list|
+        @client.pipelined do |pi|
+          list.each do
+            pi.call('ECHO', 'Hello world')
+          end
         end
       end
     end
@@ -51,9 +54,11 @@ module BenchmarkMixin
 
   def bench_pipeline_set
     assert_performance_linear(MIN_THRESHOLD) do |n|
-      @client.pipelined do |pi|
-        n.times do |i|
-          pi.call('SET', "key#{i}", i)
+      Array.new(n).each_slice(MAX_PIPELINE_SIZE) do |list|
+        @client.pipelined do |pi|
+          list.each do |i|
+            pi.call('SET', "key#{i}", i)
+          end
         end
       end
     end
@@ -61,9 +66,11 @@ module BenchmarkMixin
 
   def bench_pipeline_get
     assert_performance_linear(MIN_THRESHOLD) do |n|
-      @client.pipelined do |pi|
-        n.times do |i|
-          pi.call('GET', "key#{i}")
+      Array.new(n).each_slice(MAX_PIPELINE_SIZE) do |list|
+        @client.pipelined do |pi|
+          list.each do |i|
+            pi.call('GET', "key#{i}")
+          end
         end
       end
     end
