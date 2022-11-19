@@ -42,7 +42,7 @@ module BenchmarkMixin
 
   def bench_pipeline_echo
     assert_performance_linear(MIN_THRESHOLD) do |n|
-      Array.new(n).each_slice(MAX_PIPELINE_SIZE) do |list|
+      (1..n).each_slice(MAX_PIPELINE_SIZE) do |list|
         @client.pipelined do |pi|
           list.each do
             pi.call('ECHO', 'Hello world')
@@ -54,7 +54,7 @@ module BenchmarkMixin
 
   def bench_pipeline_set
     assert_performance_linear(MIN_THRESHOLD) do |n|
-      Array.new(n).each_slice(MAX_PIPELINE_SIZE) do |list|
+      (1..n).each_slice(MAX_PIPELINE_SIZE) do |list|
         @client.pipelined do |pi|
           list.each do |i|
             pi.call('SET', "key#{i}", i)
@@ -66,7 +66,7 @@ module BenchmarkMixin
 
   def bench_pipeline_get
     assert_performance_linear(MIN_THRESHOLD) do |n|
-      Array.new(n).each_slice(MAX_PIPELINE_SIZE) do |list|
+      (1..n).each_slice(MAX_PIPELINE_SIZE) do |list|
         @client.pipelined do |pi|
           list.each do |i|
             pi.call('GET', "key#{i}")

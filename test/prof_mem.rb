@@ -9,7 +9,7 @@ module ProfMem
 
   ATTEMPT_COUNT = 1000
   MAX_PIPELINE_SIZE = 30
-  SLICED_NUMBERS = Array.new(ATTEMPT_COUNT) { |i| i }.each_slice(MAX_PIPELINE_SIZE).freeze
+  SLICED_NUMBERS = (1..ATTEMPT_COUNT).each_slice(MAX_PIPELINE_SIZE).freeze
   CLI_TYPES = %w[primary_only scale_read_random scale_read_latency pooled].freeze
   MODES = {
     single: lambda do |client_builder_method|
