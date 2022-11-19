@@ -8,7 +8,7 @@ module ProfMem
   module_function
 
   ATTEMPT_COUNT = 1000
-  MAX_PIPELINE_SIZE = 30
+  MAX_PIPELINE_SIZE = 100
   SLICED_NUMBERS = (1..ATTEMPT_COUNT).each_slice(MAX_PIPELINE_SIZE).freeze
   CLI_TYPES = %w[primary_only scale_read_random scale_read_latency pooled].freeze
   MODES = {
