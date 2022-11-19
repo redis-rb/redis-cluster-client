@@ -17,8 +17,8 @@ class TestAgainstClusterState < TestingWrapper
     end
 
     def teardown
-      @controller.close
-      @client.close
+      @controller&.close
+      @client&.close
     end
 
     def test_the_state_of_cluster_down

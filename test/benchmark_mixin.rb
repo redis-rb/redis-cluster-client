@@ -10,7 +10,7 @@ module BenchmarkMixin
   end
 
   def teardown
-    @client.call('FLUSHDB')
+    @client&.call('FLUSHDB')
     wait_for_replication
     @client&.close
   end
@@ -74,7 +74,7 @@ module BenchmarkMixin
   def wait_for_replication
     client_side_timeout = TEST_TIMEOUT_SEC + 1.0
     server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
-    @client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+    @client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
   end
 end
 
@@ -87,7 +87,7 @@ module BenchmarkMixinForProxy
   end
 
   def teardown
-    @cluster_client.call('FLUSHDB')
+    @cluster_client&.call('FLUSHDB')
     wait_for_replication
     @cluster_client&.close
     @client&.close
@@ -102,6 +102,6 @@ module BenchmarkMixinForProxy
   def wait_for_replication
     client_side_timeout = TEST_TIMEOUT_SEC + 1.0
     server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
-    @cluster_client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+    @cluster_client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
   end
 end
