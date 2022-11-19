@@ -20,8 +20,8 @@ class TestAgainstClusterBroken < TestingWrapper
   end
 
   def teardown
-    @client.close
-    @controller.close
+    @client&.close
+    @controller&.close
   end
 
   def test_a_replica_is_down

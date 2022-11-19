@@ -13,7 +13,7 @@ class TestConcurrency < TestingWrapper
   end
 
   def teardown
-    @client.close
+    @client&.close
   end
 
   def test_forking

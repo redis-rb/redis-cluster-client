@@ -8,25 +8,48 @@ module ProfMem
   module_function
 
   ATTEMPT_COUNT = 1000
+  MAX_PIPELINE_SIZE = 30
+  SLICED_NUMBERS = Array.new(ATTEMPT_COUNT) { |i| i }.each_slice(MAX_PIPELINE_SIZE).freeze
+  CLI_TYPES = %w[primary_only scale_read_random scale_read_latency pooled].freeze
+  MODES = {
+    single: lambda do |client_builder_method|
+      cli = send(client_builder_method)
+      ATTEMPT_COUNT.times { |i| cli.call('SET', i, i) }
+      ATTEMPT_COUNT.times { |i| cli.call('GET', i) }
+    end,
+    excessive_pipelining: lambda do |client_builder_method|
+      cli = send(client_builder_method)
+      cli.pipelined do |pi|
+        ATTEMPT_COUNT.times { |i| pi.call('SET', i, i) }
+      end
 
-  def run
-    %w[primary_only scale_read_random scale_read_latency pooled].each do |cli_type|
-      prepare
-      print_letter(cli_type, 'w/ pipelining')
-      profile do
-        send("new_#{cli_type}_client".to_sym).pipelined do |pi|
-          ATTEMPT_COUNT.times { |i| pi.call('SET', i, i) }
-          ATTEMPT_COUNT.times { |i| pi.call('GET', i) }
+      cli.pipelined do |pi|
+        ATTEMPT_COUNT.times { |i| pi.call('GET', i) }
+      end
+    end,
+    pipelining_in_moderation: lambda do |client_builder_method|
+      cli = send(client_builder_method)
+      SLICED_NUMBERS.each do |numbers|
+        cli.pipelined do |pi|
+          numbers.each { |i| pi.call('SET', i, i) }
+        end
+
+        cli.pipelined do |pi|
+          numbers.each { |i| pi.call('GET', i) }
         end
       end
+    end
+  }.freeze
 
+  def run
+    mode = ENV.fetch('MEMORY_PROFILE_MODE', :single).to_sym
+    subject = MODES.fetch(mode)
+
+    CLI_TYPES.each do |cli_type|
       prepare
-      print_letter(cli_type, 'w/o pipelining')
-      profile do
-        cli = send("new_#{cli_type}_client".to_sym)
-        ATTEMPT_COUNT.times { |i| cli.call('SET', i, i) }
-        ATTEMPT_COUNT.times { |i| cli.call('GET', i) }
-      end
+      print_letter(mode, cli_type)
+      client_builder_method = "new_#{cli_type}_client".to_sym
+      profile { subject.call(client_builder_method) }
     end
   end
 

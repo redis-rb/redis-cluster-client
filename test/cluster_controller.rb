@@ -253,7 +253,7 @@ class ClusterController
     clients.each do |c|
       c.call('FLUSHALL')
       print_debug("#{c.config.host}:#{c.config.port} ... FLUSHALL")
-    rescue ::RedisClient::CommandError
+    rescue ::RedisClient::CommandError, ::RedisClient::ReadOnlyError
       # READONLY You can't write against a read only replica.
       nil
     end

@@ -11,7 +11,7 @@ class RedisClient
       end
 
       def teardown
-        @subject.clear
+        @subject&.clear
       end
 
       def test_get_by_command
