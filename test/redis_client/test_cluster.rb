@@ -168,7 +168,7 @@ class RedisClient
         results.each_with_index { |got, i| assert_equal(i.to_s, got) }
       end
 
-      def test_pubsub
+      def test_global_pubsub
         10.times do |i|
           pubsub = @client.pubsub
           pubsub.call('SUBSCRIBE', "channel#{i}")
@@ -187,6 +187,28 @@ class RedisClient
         channel = sub.resume(@client)
         @client.call('PUBLISH', channel, 'hello world')
         assert_equal(['message', channel, 'hello world'], sub.resume)
+      end
+
+      def test_sharded_pubsub
+        if TEST_REDIS_MAJOR_VERSION < 7
+          skip('Sharded Pub/Sub is supported by Redis 7+.')
+          return
+        end
+
+        10.times do |i|
+          sub = Fiber.new do |client|
+            channel = "my-channel-#{i}"
+            pubsub = client.pubsub
+            pubsub.call('SSUBSCRIBE', channel)
+            assert_equal(['ssubscribe', channel, 1], pubsub.next_event(TEST_TIMEOUT_SEC))
+            Fiber.yield(channel)
+            Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
+          end
+
+          channel = sub.resume(@client)
+          @client.call('SPUBLISH', channel, 'hello world')
+          assert_equal(['smessage', channel, 'hello world'], sub.resume)
+        end
       end
 
       def test_close
