@@ -206,8 +206,8 @@ class RedisClient
           end
 
           channel = sub.resume(@client)
-          @client.call('SPUBLISH', channel, 'hello world')
-          assert_equal(['smessage', channel, 'hello world'], sub.resume)
+          @client.call('SPUBLISH', channel, "hello world #{i}")
+          assert_equal(['smessage', channel, "hello world #{i}"], sub.resume)
         end
       end
 
