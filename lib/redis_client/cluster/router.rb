@@ -263,7 +263,7 @@ class RedisClient
           loop do
             i += 1
             break if responses[i].nil?
-            final_response << (responses.map{|r| r[i]}.all?{|r| r.eql?(1)} ? 1 : 0)
+            final_response << (responses.all?{|r| r[i].eql?(1)} ? 1 : 0)
           end
           
           final_response
