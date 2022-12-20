@@ -260,7 +260,7 @@ class RedisClient
           i = -1
           loop do
             i += 1
-            break if responses[i].nil?
+            break if responses[0][i].nil?
 
             final_response << (responses.all? { |r| r[i].eql?(1) } ? 1 : 0)
           end
