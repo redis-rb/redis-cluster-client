@@ -253,6 +253,20 @@ class RedisClient
         case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'debug', 'kill'
           @node.call_all(method, command, args, &block).first
+        when 'exists'
+          # check for existence on all nodes
+          responses = @node.call_all(method, command, args, &block)
+          
+          final_response = []
+          
+          i = -1
+          loop do
+            i += 1
+            break if responses[i].nil?
+            final_response << (responses.map{|r| r[i]}.all?{|r| r.eql?(1)} ? 1 : 0)
+          end
+          
+          final_response
         when 'flush', 'load'
           @node.call_primaries(method, command, args, &block).first
         else assign_node(command).public_send(method, *args, command, &block)
