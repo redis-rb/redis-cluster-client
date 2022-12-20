@@ -242,6 +242,7 @@ class RedisClient
           { command: %w[SCRIPT DEBUG NO], want: 'OK' },
           { command: %w[SCRIPT FLUSH], want: 'OK' },
           { command: %w[SCRIPT EXISTS b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c], want: [0] },
+          { command: %w[SCRIPT EXISTS 31b6de18e43fe980ed07d8b0f5a8cabe 5b9fb3410653a731f8ddfeff39a0c061], want: [0, 0] },
           { command: %w[PUBSUB CHANNELS test-channel*], want: [] },
           { command: %w[PUBSUB NUMSUB test-channel], want: { 'test-channel' => 0 } },
           { command: %w[PUBSUB NUMPAT], want: 0 },
