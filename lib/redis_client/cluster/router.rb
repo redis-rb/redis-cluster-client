@@ -249,7 +249,7 @@ class RedisClient
         end
       end
 
-      def send_script_command(method, command, args, &block) # rubocop:disable Metrics/AbcSize
+      def send_script_command(method, command, args, &block)
         case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'debug', 'kill'
           @node.call_all(method, command, args, &block).first
