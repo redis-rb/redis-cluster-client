@@ -255,6 +255,8 @@ class RedisClient
           @node.call_all(method, command, args, &block).first
         when 'flush', 'load'
           @node.call_primaries(method, command, args, &block).first
+        when 'exists'
+          @node.call_all(method, command, args, &block).transpose.map { |arr| arr.any?(&:zero?) ? 0 : 1 }
         else assign_node(command).public_send(method, *args, command, &block)
         end
       end
