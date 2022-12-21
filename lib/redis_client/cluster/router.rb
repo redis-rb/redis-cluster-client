@@ -255,16 +255,7 @@ class RedisClient
           @node.call_all(method, command, args, &block).first
         when 'exists'
           # check for existence on all nodes
-          responses = @node.call_all(method, command, args, &block)
-          final_response = []
-          i = -1
-          loop do
-            i += 1
-            break if responses[0][i].nil?
-
-            final_response << (responses.all? { |r| r[i].eql?(1) } ? 1 : 0)
-          end
-          final_response
+          @node.call_all(method, command, args, &block).transpose.map { |arr| arr.any?(&:zero?) ? 0 : 1 }
         when 'flush', 'load'
           @node.call_primaries(method, command, args, &block).first
         else assign_node(command).public_send(method, *args, command, &block)
