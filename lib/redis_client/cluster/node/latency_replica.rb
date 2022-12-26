@@ -61,7 +61,7 @@ class RedisClient
 
             threads.each do |t|
               t.join
-              acc[t.thread_variable_get(:node_key)] = t.thread_variable_get(:latency)
+              acc[t[:node_key]] = t[:latency]
             end
           end
         end

@@ -99,10 +99,10 @@ class RedisClient
               t.join
               if t.thread_variable?(:info)
                 node_info_list ||= Array.new(startup_size)
-                node_info_list[t.thread_variable_get(:index)] = t.thread_variable_get(:info)
+                node_info_list[t[:index]] = t[:info]
               elsif t.thread_variable?(:error)
                 errors ||= Array.new(startup_size)
-                errors[t.thread_variable_get(:index)] = t.thread_variable_get(:error)
+                errors[t[:index]] = t[:error]
               end
             end
           end
@@ -315,10 +315,10 @@ class RedisClient
             t.join
             if t.thread_variable?(:result)
               results ||= {}
-              results[t.thread_variable_get(:node_key)] = t.thread_variable_get(:result)
+              results[t[:node_key]] = t[:result]
             elsif t.thread_variable?(:error)
               errors ||= {}
-              errors[t.thread_variable_get(:node_key)] = t.thread_variable_get(:error)
+              errors[t[:node_key]] = t[:error]
             end
           end
         end

@@ -81,7 +81,7 @@ class RedisClient
 
         threads.each do |t|
           t.join
-          attempts[t.thread_variable_get(:index)] = t.thread_variable_get(:got)
+          attempts[t[:index]] = t[:got]
         end
 
         attempts.each { |got| assert_equal('set', got) }

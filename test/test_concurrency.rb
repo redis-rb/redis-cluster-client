@@ -61,7 +61,7 @@ class TestConcurrency < TestingWrapper
     end
 
     threads.each(&:join)
-    threads.each { |t| assert_nil(t.thread_variable_get(:error)) }
+    threads.each { |t| assert_nil(t[:error]) }
     MAX_THREADS.times { |i| assert_equal(WANT, @client.call('GET', "key#{i}")) }
   end
 
@@ -76,7 +76,7 @@ class TestConcurrency < TestingWrapper
     end
 
     threads.each(&:join)
-    threads.each { |t| assert_nil(t.thread_variable_get(:error)) }
+    threads.each { |t| assert_nil(t[:error]) }
     MAX_THREADS.times { |i| assert_equal(WANT, @client.call('GET', "key#{i}")) }
   end
 
