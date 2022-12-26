@@ -85,11 +85,11 @@ class RedisClient
           startup_nodes.each_slice(MAX_THREADS).with_index do |chuncked_startup_nodes, chuncked_idx|
             threads = chuncked_startup_nodes.each_with_index.map do |raw_client, idx|
               Thread.new(raw_client, (MAX_THREADS * chuncked_idx) + idx) do |cli, i|
-                Thread.current.thread_variable_set(:index, i)
+                Thread.current[:index] = i
                 reply = cli.call('CLUSTER', 'NODES')
-                Thread.current.thread_variable_set(:info, parse_cluster_node_reply(reply))
+                Thread.current[:info] = parse_cluster_node_reply(reply)
               rescue StandardError => e
-                Thread.current.thread_variable_set(:error, e)
+                Thread.current[:error] = e
               ensure
                 cli&.close
               end
@@ -97,12 +97,12 @@ class RedisClient
 
             threads.each do |t|
               t.join
-              if t.thread_variable?(:info)
+              if t.key?(:info)
                 node_info_list ||= Array.new(startup_size)
-                node_info_list[t.thread_variable_get(:index)] = t.thread_variable_get(:info)
-              elsif t.thread_variable?(:error)
+                node_info_list[t[:index]] = t[:info]
+              elsif t.key?(:error)
                 errors ||= Array.new(startup_size)
-                errors[t.thread_variable_get(:index)] = t.thread_variable_get(:error)
+                errors[t[:index]] = t[:error]
               end
             end
           end
@@ -303,22 +303,22 @@ class RedisClient
         clients.each_slice(MAX_THREADS) do |chuncked_clients|
           threads = chuncked_clients.map do |k, v|
             Thread.new(k, v) do |node_key, client|
-              Thread.current.thread_variable_set(:node_key, node_key)
+              Thread.current[:node_key] = node_key
               reply = yield(node_key, client)
-              Thread.current.thread_variable_set(:result, reply)
+              Thread.current[:result] = reply
             rescue StandardError => e
-              Thread.current.thread_variable_set(:error, e)
+              Thread.current[:error] = e
             end
           end
 
           threads.each do |t|
             t.join
-            if t.thread_variable?(:result)
+            if t.key?(:result)
               results ||= {}
-              results[t.thread_variable_get(:node_key)] = t.thread_variable_get(:result)
-            elsif t.thread_variable?(:error)
+              results[t[:node_key]] = t[:result]
+            elsif t.key?(:error)
               errors ||= {}
-              errors[t.thread_variable_get(:node_key)] = t.thread_variable_get(:error)
+              errors[t[:node_key]] = t[:error]
             end
           end
         end

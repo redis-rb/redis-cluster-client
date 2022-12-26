@@ -67,21 +67,21 @@ class RedisClient
 
         threads = attempts.each_with_index.map do |_, i|
           Thread.new do
-            Thread.current.thread_variable_set(:index, i)
+            Thread.current[:index] = i
             got = if i.even?
                     @subject.get_by_command(%w[SET foo bar])
                   else
                     @subject.clear ? 'set' : 'clear failed'
                   end
-            Thread.current.thread_variable_set(:got, got)
+            Thread.current[:got] = got
           rescue StandardError => e
-            Thread.current.thread_variable_set(:got, "#{e.class.name}: #{e.message}")
+            Thread.current[:got] = "#{e.class.name}: #{e.message}"
           end
         end
 
         threads.each do |t|
           t.join
-          attempts[t.thread_variable_get(:index)] = t.thread_variable_get(:got)
+          attempts[t[:index]] = t[:got]
         end
 
         attempts.each { |got| assert_equal('set', got) }

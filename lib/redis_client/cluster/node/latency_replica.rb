@@ -43,7 +43,7 @@ class RedisClient
           clients.each_slice(::RedisClient::Cluster::Node::MAX_THREADS).each_with_object({}) do |chuncked_clients, acc|
             threads = chuncked_clients.map do |k, v|
               Thread.new(k, v) do |node_key, client|
-                Thread.current.thread_variable_set(:node_key, node_key)
+                Thread.current[:node_key] = node_key
 
                 min = DUMMY_LATENCY_NSEC
                 MEASURE_ATTEMPT_COUNT.times do
@@ -53,15 +53,15 @@ class RedisClient
                   min = duration if duration < min
                 end
 
-                Thread.current.thread_variable_set(:latency, min)
+                Thread.current[:latency] = min
               rescue StandardError
-                Thread.current.thread_variable_set(:latency, DUMMY_LATENCY_NSEC)
+                Thread.current[:latency] = DUMMY_LATENCY_NSEC
               end
             end
 
             threads.each do |t|
               t.join
-              acc[t.thread_variable_get(:node_key)] = t.thread_variable_get(:latency)
+              acc[t[:node_key]] = t[:latency]
             end
           end
         end

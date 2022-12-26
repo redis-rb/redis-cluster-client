@@ -150,34 +150,34 @@ class RedisClient
         @pipelines&.each_slice(MAX_THREADS) do |chuncked_pipelines|
           threads = chuncked_pipelines.map do |node_key, pipeline|
             Thread.new(node_key, pipeline) do |nk, pl|
-              Thread.current.thread_variable_set(:node_key, nk)
+              Thread.current[:node_key] = nk
               replies = do_pipelining(@router.find_node(nk), pl)
               raise ReplySizeError, "commands: #{pl._size}, replies: #{replies.size}" if pl._size != replies.size
 
-              Thread.current.thread_variable_set(:replies, replies)
+              Thread.current[:replies] = replies
             rescue ::RedisClient::Cluster::Pipeline::RedirectionNeeded => e
-              Thread.current.thread_variable_set(:redirection_needed, e)
+              Thread.current[:redirection_needed] = e
             rescue StandardError => e
-              Thread.current.thread_variable_set(:error, e)
+              Thread.current[:error] = e
             end
           end
 
           threads.each(&:join)
           threads.each do |t|
-            if t.thread_variable?(:replies)
+            if t.key?(:replies)
               all_replies ||= Array.new(@size)
-              @pipelines[t.thread_variable_get(:node_key)]
+              @pipelines[t[:node_key]]
                 .outer_indices
-                .each_with_index { |outer, inner| all_replies[outer] = t.thread_variable_get(:replies)[inner] }
-            elsif t.thread_variable?(:redirection_needed)
+                .each_with_index { |outer, inner| all_replies[outer] = t[:replies][inner] }
+            elsif t.key?(:redirection_needed)
               all_replies ||= Array.new(@size)
-              pipeline = @pipelines[t.thread_variable_get(:node_key)]
-              err = t.thread_variable_get(:redirection_needed)
+              pipeline = @pipelines[t[:node_key]]
+              err = t[:redirection_needed]
               err.indices.each { |i| err.replies[i] = handle_redirection(err.replies[i], pipeline, i) }
               pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = err.replies[inner] }
-            elsif t.thread_variable?(:error)
+            elsif t.key?(:error)
               errors ||= {}
-              errors[t.thread_variable_get(:node_key)] = t.thread_variable_get(:error)
+              errors[t[:node_key]] = t[:error]
             end
           end
         end
