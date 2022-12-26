@@ -97,10 +97,10 @@ class RedisClient
 
             threads.each do |t|
               t.join
-              if t.thread_variable?(:info)
+              if t.key?(:info)
                 node_info_list ||= Array.new(startup_size)
                 node_info_list[t[:index]] = t[:info]
-              elsif t.thread_variable?(:error)
+              elsif t.key?(:error)
                 errors ||= Array.new(startup_size)
                 errors[t[:index]] = t[:error]
               end
@@ -313,10 +313,10 @@ class RedisClient
 
           threads.each do |t|
             t.join
-            if t.thread_variable?(:result)
+            if t.key?(:result)
               results ||= {}
               results[t[:node_key]] = t[:result]
-            elsif t.thread_variable?(:error)
+            elsif t.key?(:error)
               errors ||= {}
               errors[t[:node_key]] = t[:error]
             end
