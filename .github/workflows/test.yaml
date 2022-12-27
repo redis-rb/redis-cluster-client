@@ -81,9 +81,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      include:
-        - {redis: '7.0.5', ruby: '3.2', compose: compose.replica.yaml, replica: 2}
-        - {redis: '5.0.14', ruby: '2.7', compose: compose.yaml, replica: 1}
+      matrix:
+        include:
+          - {redis: '7.0.5', ruby: '3.2', compose: compose.replica.yaml, replica: 2}
+          - {redis: '5.0.14', ruby: '2.7', compose: compose.yaml, replica: 1}
     env:
       REDIS_VERSION: ${{ matrix.redis }}
       DOCKER_COMPOSE_FILE: ${{ matrix.compose }}
