@@ -145,6 +145,8 @@ class ClusterController
       raise if e.message != 'ERR Please use SETSLOT only with masters.'
       # how weird, ignore
     end
+
+    wait_replication_delay(@clients, replica_size: @replica_size, timeout: @timeout)
   end
 
   def scale_out(primary_url:, replica_url:) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
