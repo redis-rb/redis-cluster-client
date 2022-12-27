@@ -363,7 +363,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: ['single', 'excessive_pipelining', 'pipelining_in_moderation']
+        mode:
+          - single
+          - excessive_pipelining
+          - pipelining_in_moderation
     runs-on: ubuntu-latest
     env:
       REDIS_VERSION: '7.0.5'
