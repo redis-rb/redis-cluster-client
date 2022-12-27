@@ -116,13 +116,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        redis:
+          - '7.0.5'
+          - '6.2.7'
         include:
           - {task: state, compose: compose.replica.yaml, replica: 2, restart: always}
           - {task: broken, compose: compose.yaml, replica: 1, restart: 'no'}
           - {task: scale, compose: compose.scale.yaml, replica: 1, restart: always}
-        redis:
-          - '7.0.5'
-          - '6.2.7'
     env:
       REDIS_VERSION: ${{ matrix.redis }}
       DOCKER_COMPOSE_FILE: ${{ matrix.compose }}
