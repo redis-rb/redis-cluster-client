@@ -40,7 +40,7 @@ class RedisClient
         BASE = ''
         PADDING = '0'
 
-        def initialize(size:, elements:)
+        def initialize(size, elements)
           @elements = elements
           @string = String.new(BASE, encoding: Encoding::BINARY, capacity: size)
           size.times { @string << PADDING }
@@ -277,7 +277,7 @@ class RedisClient
         return Array.new(SLOT_SIZE) if node_info_list.count(&:primary?) > 256
 
         primary_node_keys = node_info_list.select(&:primary?).map(&:node_key)
-        ::RedisClient::Cluster::Node::CharArray.new(size: SLOT_SIZE, elements: primary_node_keys)
+        ::RedisClient::Cluster::Node::CharArray.new(SLOT_SIZE, primary_node_keys)
       end
 
       def build_replication_mappings(node_info_list) # rubocop:disable Metrics/AbcSize
