@@ -18,7 +18,6 @@ class RedisClient
       MAX_STARTUP_SAMPLE = 37
       MAX_THREADS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
       IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
-      SLOT_OPTIMIZATION_STRING = '0' * SLOT_SIZE
 
       ReloadNeeded = Class.new(::RedisClient::Error)
 
@@ -37,27 +36,36 @@ class RedisClient
         end
       end
 
-      Slot = Struct.new('StringArray', :string, :elements, keyword_init: true) do
+      class CharArray
+        BASE = ''
+        PADDING = '0'
+
+        def initialize(size:, elements:)
+          @elements = elements
+          @string = String.new(BASE, encoding: Encoding::BINARY, capacity: size)
+          size.times { @string << PADDING }
+        end
+
         def [](index)
           raise IndexError if index < 0
-          return if index >= string.bytesize
+          return if index >= @string.bytesize
 
-          elements[string.getbyte(index)]
+          @elements[@string.getbyte(index)]
         end
 
         def []=(index, element)
           raise IndexError if index < 0
-          return if index >= string.bytesize
+          return if index >= @string.bytesize
 
-          pos = elements.find_index(element) # O(N)
+          pos = @elements.find_index(element) # O(N)
           if pos.nil?
-            raise(RangeError, 'full of elements') if elements.size >= 256
+            raise(RangeError, 'full of elements') if @elements.size >= 256
 
-            pos = elements.size
-            elements << element
+            pos = @elements.size
+            @elements << element
           end
 
-          string.setbyte(index, pos)
+          @string.setbyte(index, pos)
         end
       end
 
@@ -268,10 +276,8 @@ class RedisClient
       def make_array_for_slot_node_mappings(node_info_list)
         return Array.new(SLOT_SIZE) if node_info_list.count(&:primary?) > 256
 
-        ::RedisClient::Cluster::Node::Slot.new(
-          string: String.new(SLOT_OPTIMIZATION_STRING, encoding: Encoding::BINARY, capacity: SLOT_SIZE),
-          elements: node_info_list.select(&:primary?).map(&:node_key)
-        )
+        primary_node_keys = node_info_list.select(&:primary?).map(&:node_key)
+        ::RedisClient::Cluster::Node::CharArray.new(size: SLOT_SIZE, elements: primary_node_keys)
       end
 
       def build_replication_mappings(node_info_list) # rubocop:disable Metrics/AbcSize
