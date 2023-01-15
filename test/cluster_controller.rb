@@ -476,7 +476,7 @@ class ClusterController
 
   def take_replicas(clients, shard_size:)
     replicas = clients.select { |cli| replica_client?(cli) }
-    replicas.size.zero? ? clients[shard_size..] : replicas
+    replicas.empty? ? clients[shard_size..] : replicas
   end
 
   def primary_client?(client)

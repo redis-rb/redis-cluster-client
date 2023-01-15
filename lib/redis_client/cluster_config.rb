@@ -98,7 +98,7 @@ class RedisClient
 
     def build_node_configs(addrs)
       configs = Array[addrs].flatten.filter_map { |addr| parse_node_addr(addr) }
-      raise InvalidClientConfigError, '`nodes` option is empty' if configs.size.zero?
+      raise InvalidClientConfigError, '`nodes` option is empty' if configs.empty?
 
       configs
     end
@@ -150,7 +150,7 @@ class RedisClient
     end
 
     def merge_generic_config(client_config, node_configs)
-      return client_config if node_configs.size.zero?
+      return client_config if node_configs.empty?
 
       cfg = node_configs.first
       MERGE_CONFIG_KEYS.each { |k| client_config[k] = cfg[k] if cfg.key?(k) }
