@@ -69,15 +69,7 @@ class RedisClient
         server_side_timeout = TEST_REDIS_MAJOR_VERSION < 6 ? '1' : '0.5'
 
         assert_equal(%w[foo world], @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 1st')
-
-        # FIXME: too flaky case, workaround
-        got = nil
-        5.times do
-          got = @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout)
-          break unless got.nil?
-        end
-        assert_equal(%w[foo hello], got, 'Case: 2nd')
-
+        assert_equal(%w[foo hello], @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 2nd')
         assert_nil(@client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 3rd')
         assert_raises(::RedisClient::ReadTimeoutError, 'Case: 4th') { @client.blocking_call(0.1, 'BRPOP', 'foo', 0) }
       end

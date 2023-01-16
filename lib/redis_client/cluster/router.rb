@@ -100,7 +100,7 @@ class RedisClient
           raise
         end
       rescue ::RedisClient::ConnectionError => e
-        raise if METHODS_FOR_BLOCKING_CMD.include?(method) && e.is_a?(RedisClient::ReadTimeoutError)
+        raise if METHODS_FOR_BLOCKING_CMD.include?(method)
         raise if retry_count <= 0
 
         update_cluster_info!
