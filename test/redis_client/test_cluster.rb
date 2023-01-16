@@ -66,7 +66,6 @@ class RedisClient
         client_side_timeout = TEST_REDIS_MAJOR_VERSION < 6 ? 2.0 : 1.5
         server_side_timeout = TEST_REDIS_MAJOR_VERSION < 6 ? '1' : '0.5'
         assert_equal(%w[foo world], @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 1st')
-        # FIXME: flaky on hiredis and ssl pattern
         assert_equal(%w[foo hello], @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 2nd')
         assert_nil(@client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 3rd')
         assert_raises(::RedisClient::ReadTimeoutError, 'Case: 4th') { @client.blocking_call(0.1, 'BRPOP', 'foo', 0) }
