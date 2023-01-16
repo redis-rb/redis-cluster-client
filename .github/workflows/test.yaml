@@ -41,8 +41,8 @@ jobs:
       max-parallel: 4
       matrix:
         redis:
-          - '7.0.5'
-          - '6.2.7'
+          - '7.0'
+          - '6.2'
         ruby:
           - '3.2'
         driver:
@@ -83,8 +83,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {redis: '7.0.5', ruby: '3.2', compose: compose.replica.yaml, replica: 2}
-          - {redis: '5.0.14', ruby: '2.7', compose: compose.yaml, replica: 1}
+          - {redis: '7.0', ruby: '3.2', compose: compose.replica.yaml, replica: 2}
+          - {redis: '5.0', ruby: '2.7', compose: compose.yaml, replica: 1}
     env:
       REDIS_VERSION: ${{ matrix.redis }}
       DOCKER_COMPOSE_FILE: ${{ matrix.compose }}
@@ -117,12 +117,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {redis: '7.0.5', task: state, compose: compose.replica.yaml, replica: 2, restart: always}
-          - {redis: '6.2.7', task: state, compose: compose.replica.yaml, replica: 2, restart: always}
-          - {redis: '7.0.5', task: broken, compose: compose.yaml, replica: 1, restart: 'no'}
-          - {redis: '6.2.7', task: broken, compose: compose.yaml, replica: 1, restart: 'no'}
-          - {redis: '7.0.5', task: scale, compose: compose.scale.yaml, replica: 1, restart: always}
-          - {redis: '6.2.7', task: scale, compose: compose.scale.yaml, replica: 1, restart: always}
+          - {redis: '7.0', task: state, compose: compose.replica.yaml, replica: 2, restart: always}
+          - {redis: '6.2', task: state, compose: compose.replica.yaml, replica: 2, restart: always}
+          - {redis: '7.0', task: broken, compose: compose.yaml, replica: 1, restart: 'no'}
+          - {redis: '6.2', task: broken, compose: compose.yaml, replica: 1, restart: 'no'}
+          - {redis: '7.0', task: scale, compose: compose.scale.yaml, replica: 1, restart: always}
+          - {redis: '6.2', task: scale, compose: compose.scale.yaml, replica: 1, restart: always}
     env:
       REDIS_VERSION: ${{ matrix.redis }}
       DOCKER_COMPOSE_FILE: ${{ matrix.compose }}
@@ -153,7 +153,7 @@ jobs:
     timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
-      REDIS_VERSION: '7.0.5'
+      REDIS_VERSION: '7.0'
       DOCKER_COMPOSE_FILE: 'compose.nat.yaml'
     steps:
       - name: Check out code
@@ -175,7 +175,7 @@ jobs:
           HOST_ADDR: ${{ env.HOST_IP_ADDR }}
       - name: Wait for nodes to be ready
         run: |
-          node_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $3}' | tail -n +2 | wc -l)
+          node_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | tail -n +2 | wc -l)
           i=0
           while :
           do
@@ -184,7 +184,7 @@ jobs:
               echo "Max attempts exceeded: $i times"
               exit 1
             fi
-            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $5}' | (grep '(healthy)' || true) | wc -l)
+            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps --format json | jq .[].Status | (grep healthy || true) | wc -l)
             if [[ $healthy_cnt -eq $node_cnt ]]
             then
               break
@@ -211,7 +211,7 @@ jobs:
     timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
-      REDIS_VERSION: '7.0.5'
+      REDIS_VERSION: '7.0'
       DOCKER_COMPOSE_FILE: 'compose.latency.yaml'
       REDIS_REPLICA_SIZE: '2'
       REDIS_CLIENT_MAX_THREADS: '5'
@@ -278,7 +278,7 @@ jobs:
           - excessive_pipelining
           - pipelining_in_moderation
     env:
-      REDIS_VERSION: '7.0.5'
+      REDIS_VERSION: '7.0'
       DOCKER_COMPOSE_FILE: 'compose.yaml'
     steps:
       - name: Check out code

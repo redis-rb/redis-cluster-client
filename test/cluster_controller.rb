@@ -257,7 +257,8 @@ class ClusterController
       print_debug("#{c.config.host}:#{c.config.port} ... FLUSHALL")
     rescue ::RedisClient::CommandError, ::RedisClient::ReadOnlyError
       # READONLY You can't write against a read only replica.
-      nil
+    rescue ::RedisClient::CannotConnectError => e
+      print_debug("#{c.config.host}:#{c.config.port} ... FLUSHALL: #{e.class}: #{e.message}")
     end
   end
 
@@ -265,6 +266,8 @@ class ClusterController
     clients.each do |c|
       c.call('CLUSTER', 'RESET', 'HARD')
       print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER RESET HARD")
+    rescue ::RedisClient::CannotConnectError => e
+      print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER RESET HARD: #{e.class}: #{e.message}")
     end
   end
 
@@ -476,7 +479,7 @@ class ClusterController
 
   def take_replicas(clients, shard_size:)
     replicas = clients.select { |cli| replica_client?(cli) }
-    replicas.size.zero? ? clients[shard_size..] : replicas
+    replicas.empty? ? clients[shard_size..] : replicas
   end
 
   def primary_client?(client)

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'redis_client'
+require 'redis_client/circuit_breaker'
 require 'redis_client/cluster/command'
 require 'redis_client/cluster/errors'
 require 'redis_client/cluster/key_slot_converter'
@@ -54,13 +55,18 @@ class RedisClient
           node = assign_node(command)
           try_send(node, method, command, args, &block)
         end
+      rescue ::RedisClient::CircuitBreaker::OpenCircuitError
+        raise
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
         update_cluster_info!
         raise ::RedisClient::Cluster::NodeMightBeDown
       rescue ::RedisClient::Cluster::ErrorCollection => e
+        raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
+
         update_cluster_info! if e.errors.values.any? do |err|
           err.message.start_with?('CLUSTERDOWN Hash slot not served')
         end
+
         raise
       end
 
@@ -72,6 +78,8 @@ class RedisClient
         else
           node.public_send(method, *args, command, &block)
         end
+      rescue ::RedisClient::CircuitBreaker::OpenCircuitError
+        raise
       rescue ::RedisClient::CommandError => e
         raise if retry_count <= 0
 
@@ -102,6 +110,8 @@ class RedisClient
 
       def try_delegate(node, method, *args, retry_count: 3, **kwargs, &block) # rubocop:disable Metrics/AbcSize
         node.public_send(method, *args, **kwargs, &block)
+      rescue ::RedisClient::CircuitBreaker::OpenCircuitError
+        raise
       rescue ::RedisClient::CommandError => e
         raise if retry_count <= 0
 
@@ -197,9 +207,10 @@ class RedisClient
 
       private
 
-      def send_wait_command(method, command, args, retry_count: 3, &block)
+      def send_wait_command(method, command, args, retry_count: 3, &block) # rubocop:disable Metrics/AbcSize
         @node.call_primaries(method, command, args, &block).select { |r| r.is_a?(Integer) }.sum
       rescue ::RedisClient::Cluster::ErrorCollection => e
+        raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
         raise if retry_count <= 0
         raise if e.errors.values.none? do |err|
           err.message.include?('WAIT cannot be used with replica instances')
