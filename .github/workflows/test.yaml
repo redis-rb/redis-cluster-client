@@ -175,7 +175,7 @@ jobs:
           HOST_ADDR: ${{ env.HOST_IP_ADDR }}
       - name: Wait for nodes to be ready
         run: |
-          node_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $3}' | tail -n +2 | wc -l)
+          node_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | tail -n +2 | wc -l)
           i=0
           while :
           do
@@ -184,7 +184,7 @@ jobs:
               echo "Max attempts exceeded: $i times"
               exit 1
             fi
-            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | awk '{print $5}' | (grep '(healthy)' || true) | wc -l)
+            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps --format json | jq.[].Status | (grep healthy || true) | wc -l)
             if [[ $healthy_cnt -eq $node_cnt ]]
             then
               break
