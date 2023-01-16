@@ -61,9 +61,12 @@ class RedisClient
         update_cluster_info!
         raise ::RedisClient::Cluster::NodeMightBeDown
       rescue ::RedisClient::Cluster::ErrorCollection => e
+        raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
+
         update_cluster_info! if e.errors.values.any? do |err|
           err.message.start_with?('CLUSTERDOWN Hash slot not served')
         end
+
         raise
       end
 

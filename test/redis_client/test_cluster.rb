@@ -271,6 +271,25 @@ class RedisClient
         assert_raises(NoMethodError) { @client.densaugeo('1m') }
       end
 
+      def test_circuit_breakers
+        cli = ::RedisClient.cluster(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS.merge(
+            circuit_breaker: {
+              error_threshold: 1,
+              error_timeout: 60,
+              success_threshold: 10
+            }
+          )
+        ).new_client
+
+        assert_raises(::RedisClient::ReadTimeoutError) { cli.blocking_call(0.1, 'BRPOP', 'foo', 0) }
+        assert_raises(::RedisClient::CircuitBreaker::OpenCircuitError) { cli.blocking_call(0.1, 'BRPOP', 'foo', 0) }
+
+        cli&.close
+      end
+
       private
 
       def wait_for_replication
