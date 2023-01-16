@@ -36,7 +36,7 @@ begin
 rescue ::RedisClient::UnsupportedServer
   _base_opts.merge!(protocol: 2)
 rescue ::RedisClient::ConnectionError => e
-  raise e if e.message != 'Connection reset by peer'
+  raise unless e.message.include?('Connection reset by peer') || e.message.include?('EOFError')
 
   _redis_scheme = 'rediss'
 ensure
