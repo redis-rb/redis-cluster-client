@@ -73,7 +73,7 @@ class RedisClient
         # FIXME: too flaky, just a workaround
         got = @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout)
         if got.nil?
-          assert_nil(%w[foo hello], got, 'Case: 2nd')
+          assert_nil(got, 'Case: 2nd')
         else
           assert_equal(%w[foo hello], got, 'Case: 2nd')
         end
