@@ -254,6 +254,16 @@ class RedisClient
           { command: %w[SCRIPT FLUSH], want: 'OK' },
           { command: %w[SCRIPT EXISTS b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c], want: [0] },
           { command: %w[SCRIPT EXISTS 5b9fb3410653a731f8ddfeff39a0c061 31b6de18e43fe980ed07d8b0f5a8cabe], want: [0, 0] },
+          {
+            command: %w[SCRIPT EXISTS b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c],
+            blk: ->(reply) { reply.map { |r| !r.zero? } },
+            want: [false]
+          },
+          {
+            command: %w[SCRIPT EXISTS 5b9fb3410653a731f8ddfeff39a0c061 31b6de18e43fe980ed07d8b0f5a8cabe],
+            blk: ->(reply) { reply.map { |r| !r.zero? } },
+            want: [false, false]
+          },
           { command: %w[PUBSUB CHANNELS test-channel*], want: [] },
           { command: %w[PUBSUB NUMSUB test-channel], want: { 'test-channel' => 0 } },
           { command: %w[PUBSUB NUMPAT], want: 0 },
@@ -264,7 +274,7 @@ class RedisClient
           next if c.key?(:supported_redis_version) && TEST_REDIS_MAJOR_VERSION < c[:supported_redis_version]
 
           msg = "Case: #{c[:command].join(' ')}"
-          got = -> { @client.call(*c[:command]) }
+          got = -> { @client.call_v(c[:command], &c[:blk]) }
           if c.key?(:error)
             assert_raises(c[:error], msg, &got)
           elsif c.key?(:is_a)
