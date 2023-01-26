@@ -42,18 +42,18 @@ jobs:
           - {task: test_cluster_scale,  redis: '7.0', compose: compose.scale.yaml}
           - {task: test_cluster_scale,  redis: '6.2', compose: compose.scale.yaml}
     env:
-      REDIS_VERSION: ${{ matrix.redis || "7.0" }}
-      DOCKER_COMPOSE_FILE: ${{ matrix.compose || "compose.yaml" }}
-      REDIS_CONNECTION_DRIVER: ${{ matrix.driver || "ruby" }}
-      REDIS_REPLICA_SIZE: ${{ matrix.replica || "1" }}
-      RESTART_POLICY: ${{ matrix.restart || "always" }}
+      REDIS_VERSION: ${{ matrix.redis || '7.0' }}
+      DOCKER_COMPOSE_FILE: ${{ matrix.compose || 'compose.yaml' }}
+      REDIS_CONNECTION_DRIVER: ${{ matrix.driver || 'ruby' }}
+      REDIS_REPLICA_SIZE: ${{ matrix.replica || '1' }}
+      RESTART_POLICY: ${{ matrix.restart || 'always' }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby || "3.2" }}
+          ruby-version: ${{ matrix.ruby || '3.2' }}
           bundler-cache: true
       - name: Pull Docker images
         run: docker pull redis:$REDIS_VERSION
@@ -64,7 +64,7 @@ jobs:
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Run minitest
-        run: bundle exec rake ${{ matrix.task || "test" }}
+        run: bundle exec rake ${{ matrix.task || 'test' }}
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
   nat-ted-env:
@@ -154,7 +154,7 @@ jobs:
       - name: Rebuild cluster for balancing of replicas
         run: bundle exec rake build_cluster_for_bench
         env:
-          DEBUG: "1"
+          DEBUG: '1'
       - name: Print topology
         run: |
           for i in {1..9}
