@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 16
       matrix:
         include:
           - {redis: '7.0', ruby: '3.2'}
@@ -125,6 +125,20 @@ jobs:
         run: bundle exec rake test
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
+  lint:
+    name: Lint
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+      - name: Run rubocop
+        run: bundle exec rubocop
   benchmark:
     name: Benchmark
     timeout-minutes: 10
@@ -221,17 +235,3 @@ jobs:
           MEMORY_PROFILE_MODE: ${{ matrix.mode }}
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
-  lint:
-    name: Lint
-    timeout-minutes: 5
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-          bundler-cache: true
-      - name: Run rubocop
-        run: bundle exec rubocop
