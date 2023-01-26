@@ -18,84 +18,42 @@ defaults:
   run:
     shell: bash
 jobs:
-  lint:
-    name: Lint
-    timeout-minutes: 5
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-          bundler-cache: true
-      - name: Run rubocop
-        run: bundle exec rubocop
   main:
     name: Main
-    timeout-minutes: 5
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 4
-      matrix:
-        redis:
-          - '7.0'
-          - '6.2'
-        ruby:
-          - '3.2'
-        driver:
-          - 'ruby'
-          - 'hiredis'
-        docker:
-          - 'compose.yaml'
-          - 'compose.ssl.yaml'
-    env:
-      REDIS_VERSION: ${{ matrix.redis }}
-      REDIS_CONNECTION_DRIVER: ${{ matrix.driver }}
-      DOCKER_COMPOSE_FILE: ${{ matrix.docker }}
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ matrix.ruby }}
-          bundler-cache: true
-      - name: Pull Docker images
-        run: docker pull redis:$REDIS_VERSION
-      - name: Run containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE up -d
-      - name: Wait for Redis cluster to be ready
-        run: bundle exec rake wait
-      - name: Print containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE ps
-      - name: Run minitest
-        run: bundle exec rake test
-      - name: Stop containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE down
-  sub:
-    name: Sub
-    timeout-minutes: 5
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
+      max-parallel: 16
       matrix:
         include:
-          - {redis: '7.0', ruby: '3.2', compose: compose.replica.yaml, replica: 2}
-          - {redis: '5.0', ruby: '2.7', compose: compose.yaml, replica: 1}
+          - {redis: '7.0', ruby: '3.2'}
+          - {redis: '7.0', ruby: '3.2', compose: compose.ssl.yaml}
+          - {redis: '7.0', ruby: '3.2', driver: 'hiredis'}
+          - {redis: '7.0', ruby: '3.2', driver: 'hiredis', compose: compose.ssl.yaml}
+          - {redis: '7.0', ruby: '3.2', replica: '2', compose: compose.replica.yaml}
+          - {redis: '6.2', ruby: '3.1'}
+          - {redis: '6.2', ruby: '3.0'}
+          - {redis: '5.0', ruby: '2.7'}
+          - {task: test_cluster_state,  redis: '7.0', replica: '2', compose: compose.replica.yaml}
+          - {task: test_cluster_state,  redis: '6.2', replica: '2', compose: compose.replica.yaml}
+          - {task: test_cluster_broken, redis: '7.0', restart: 'no'}
+          - {task: test_cluster_broken, redis: '6.2', restart: 'no'}
+          - {task: test_cluster_scale,  redis: '7.0', compose: compose.scale.yaml}
+          - {task: test_cluster_scale,  redis: '6.2', compose: compose.scale.yaml}
     env:
-      REDIS_VERSION: ${{ matrix.redis }}
-      DOCKER_COMPOSE_FILE: ${{ matrix.compose }}
-      REDIS_REPLICA_SIZE: ${{ matrix.replica }}
+      REDIS_VERSION: ${{ matrix.redis || '7.0' }}
+      DOCKER_COMPOSE_FILE: ${{ matrix.compose || 'compose.yaml' }}
+      REDIS_CONNECTION_DRIVER: ${{ matrix.driver || 'ruby' }}
+      REDIS_REPLICA_SIZE: ${{ matrix.replica || '1' }}
+      RESTART_POLICY: ${{ matrix.restart || 'always' }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby }}
+          ruby-version: ${{ matrix.ruby || '3.2' }}
           bundler-cache: true
       - name: Pull Docker images
         run: docker pull redis:$REDIS_VERSION
@@ -106,51 +64,12 @@ jobs:
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Run minitest
-        run: bundle exec rake test
-      - name: Stop containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE down
-  cluster-health:
-    name: Cluster Health
-    timeout-minutes: 15
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {redis: '7.0', task: state, compose: compose.replica.yaml, replica: 2, restart: always}
-          - {redis: '6.2', task: state, compose: compose.replica.yaml, replica: 2, restart: always}
-          - {redis: '7.0', task: broken, compose: compose.yaml, replica: 1, restart: 'no'}
-          - {redis: '6.2', task: broken, compose: compose.yaml, replica: 1, restart: 'no'}
-          - {redis: '7.0', task: scale, compose: compose.scale.yaml, replica: 1, restart: always}
-          - {redis: '6.2', task: scale, compose: compose.scale.yaml, replica: 1, restart: always}
-    env:
-      REDIS_VERSION: ${{ matrix.redis }}
-      DOCKER_COMPOSE_FILE: ${{ matrix.compose }}
-      REDIS_REPLICA_SIZE: ${{ matrix.replica }}
-      RESTART_POLICY: ${{ matrix.restart }}
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-          bundler-cache: true
-      - name: Pull Docker images
-        run: docker pull redis:$REDIS_VERSION
-      - name: Run containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE up -d
-      - name: Wait for Redis cluster to be ready
-        run: bundle exec rake wait
-      - name: Print containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE ps
-      - name: Run minitest
-        run: bundle exec rake test_cluster_${{ matrix.task }}
+        run: bundle exec rake ${{ matrix.task || 'test' }}
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
   nat-ted-env:
     name: NAT-ted Environments
-    timeout-minutes: 15
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     env:
       REDIS_VERSION: '7.0'
@@ -206,9 +125,23 @@ jobs:
         run: bundle exec rake test
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
+  lint:
+    name: Lint
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+      - name: Run rubocop
+        run: bundle exec rubocop
   benchmark:
     name: Benchmark
-    timeout-minutes: 15
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
       REDIS_VERSION: '7.0'
@@ -235,7 +168,7 @@ jobs:
       - name: Rebuild cluster for balancing of replicas
         run: bundle exec rake build_cluster_for_bench
         env:
-          DEBUG: "1"
+          DEBUG: '1'
       - name: Print topology
         run: |
           for i in {1..9}
@@ -266,9 +199,9 @@ jobs:
           done
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
-  memory-profile:
-    name: Memory Profile
-    timeout-minutes: 15
+  profiling:
+    name: Profiling
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
