@@ -40,54 +40,19 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        redis:
-          - '7.0'
-          - '6.2'
-        ruby:
-          - '3.2'
-        driver:
-          - 'ruby'
-          - 'hiredis'
-        docker:
-          - 'compose.yaml'
-          - 'compose.ssl.yaml'
-    env:
-      REDIS_VERSION: ${{ matrix.redis }}
-      REDIS_CONNECTION_DRIVER: ${{ matrix.driver }}
-      DOCKER_COMPOSE_FILE: ${{ matrix.docker }}
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ matrix.ruby }}
-          bundler-cache: true
-      - name: Pull Docker images
-        run: docker pull redis:$REDIS_VERSION
-      - name: Run containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE up -d
-      - name: Wait for Redis cluster to be ready
-        run: bundle exec rake wait
-      - name: Print containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE ps
-      - name: Run minitest
-        run: bundle exec rake test
-      - name: Stop containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE down
-  sub:
-    name: Sub
-    timeout-minutes: 5
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
         include:
-          - {redis: '7.0', ruby: '3.2', compose: compose.replica.yaml, replica: 2}
-          - {redis: '5.0', ruby: '2.7', compose: compose.yaml, replica: 1}
+          - {redis: '7.0', ruby: '3.2', compose: compose.yaml, driver: 'ruby', replica: 1}
+          - {redis: '7.0', ruby: '3.2', compose: compose.yaml, driver: 'hiredis', replica: 1}
+          - {redis: '7.0', ruby: '3.2', compose: compose.ssl.yaml, driver: 'ruby', replica: 1}
+          - {redis: '7.0', ruby: '3.2', compose: compose.ssl.yaml, driver: 'hiredis', replica: 1}
+          - {redis: '7.0', ruby: '3.2', compose: compose.replica.yaml, driver: 'ruby', replica: 2}
+          - {redis: '6.2', ruby: '3.1', compose: compose.yaml, driver: 'ruby', replica: 1}
+          - {redis: '6.2', ruby: '3.0', compose: compose.yaml, driver: 'ruby', replica: 1}
+          - {redis: '5.0', ruby: '2.7', compose: compose.yaml, driver: 'ruby', replica: 1}
     env:
       REDIS_VERSION: ${{ matrix.redis }}
       DOCKER_COMPOSE_FILE: ${{ matrix.compose }}
+      REDIS_CONNECTION_DRIVER: ${{ matrix.driver }}
       REDIS_REPLICA_SIZE: ${{ matrix.replica }}
     steps:
       - name: Check out code
@@ -109,8 +74,8 @@ jobs:
         run: bundle exec rake test
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
-  cluster-health:
-    name: Cluster Health
+  availability:
+    name: Availability
     timeout-minutes: 15
     runs-on: ubuntu-latest
     strategy:
@@ -266,8 +231,8 @@ jobs:
           done
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
-  memory-profile:
-    name: Memory Profile
+  profiling:
+    name: Profiling
     timeout-minutes: 15
     runs-on: ubuntu-latest
     strategy:
