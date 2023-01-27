@@ -203,7 +203,7 @@ jobs:
         run: docker compose -f $DOCKER_COMPOSE_FILE down
   profiling:
     name: Profiling
-    timeout-minutes: 10
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -214,7 +214,7 @@ jobs:
           - pipelining_in_moderation
     env:
       REDIS_VERSION: '7.0'
-      DOCKER_COMPOSE_FILE: 'compose.large.yaml'
+      DOCKER_COMPOSE_FILE: 'compose.yaml'
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -235,5 +235,32 @@ jobs:
         run: bundle exec rake prof
         env:
           MEMORY_PROFILE_MODE: ${{ matrix.mode }}
+      - name: Stop containers
+        run: docker compose -f $DOCKER_COMPOSE_FILE down
+  large:
+    name: Large
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    env:
+      REDIS_VERSION: '7.0'
+      DOCKER_COMPOSE_FILE: 'compose.large.yaml'
+      REDIS_SHARD_SIZE: '50'
+      REDIS_REPLICA_SIZE: '4'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+      - name: Pull Docker images
+        run: docker pull redis:$REDIS_VERSION
+      - name: Run containers
+        run: docker compose -f $DOCKER_COMPOSE_FILE up -d
+      - name: Wait for Redis cluster to be ready
+        run: bundle exec rake wait
+      - name: Print containers
+        run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
