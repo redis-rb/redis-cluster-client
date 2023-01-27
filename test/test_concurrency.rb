@@ -17,6 +17,8 @@ class TestConcurrency < TestingWrapper
   end
 
   def test_forking
+    skip("fork is not available on #{RUBY_ENGINE}") if %w[jruby].include?(RUBY_ENGINE)
+
     pids = Array.new(MAX_THREADS) do
       Process.fork do
         ATTEMPTS.times { MAX_THREADS.times { |i| @client.call('INCR', "key#{i}") } }
@@ -34,6 +36,8 @@ class TestConcurrency < TestingWrapper
   end
 
   def test_forking_with_pipelining
+    skip("fork is not available on #{RUBY_ENGINE}") if %w[jruby].include?(RUBY_ENGINE)
+
     pids = Array.new(MAX_THREADS) do
       Process.fork do
         @client.pipelined { |pi| ATTEMPTS.times { MAX_THREADS.times { |i| pi.call('INCR', "key#{i}") } } }
