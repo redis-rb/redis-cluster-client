@@ -17,7 +17,7 @@ class TestConcurrency < TestingWrapper
   end
 
   def test_forking
-    skip("fork is not available on #{RUBY_ENGINE}") if %w[jruby].include?(RUBY_ENGINE)
+    skip("fork is not available on #{RUBY_ENGINE}") if %w[jruby truffleruby].include?(RUBY_ENGINE)
 
     pids = Array.new(MAX_THREADS) do
       Process.fork do
@@ -36,7 +36,7 @@ class TestConcurrency < TestingWrapper
   end
 
   def test_forking_with_pipelining
-    skip("fork is not available on #{RUBY_ENGINE}") if %w[jruby].include?(RUBY_ENGINE)
+    skip("fork is not available on #{RUBY_ENGINE}") if %w[jruby truffleruby].include?(RUBY_ENGINE)
 
     pids = Array.new(MAX_THREADS) do
       Process.fork do
