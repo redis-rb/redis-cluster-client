@@ -266,7 +266,7 @@ jobs:
           sudo sysctl -w net.ipv4.tcp_window_scaling=1         # scale the network window
           sudo sysctl -w net.ipv4.tcp_congestion_control=cubic # better congestion algorithm
           sudo sysctl -w net.ipv4.tcp_syncookies=1             # enable syn cookies
-          sudo sysctl -w net.ipv4.tcp_tw_recycle=1             # recycle sockets quickly
+          sudo sysctl -w net.ipv4.tcp_tw_reuse=1               # reuse sockets quickly
           sudo sysctl -w net.ipv4.tcp_max_syn_backlog=4096     # backlog setting
           sudo sysctl -w net.core.somaxconn=4096               # up the number of connections per port
           sudo sysctl -w net.core.rmem_max=212992              # up the receive buffer size
