@@ -259,8 +259,6 @@ jobs:
       - name: Tune kernel params for redis
         run: |
           # https://developer.redis.com/operate/redis-at-scale/talking-to-redis/initial-tuning/
-          sudo echo 'never' > /sys/kernel/mm/transparent_hugepage/enabled
-          sudo echo '3' > /sys/class/net/eth1/queues/rx-0/rps_cpus
           sudo sysctl -w fs.file-max=4096
           sudo sysctl -w vm.swappiness=0                       # turn off swapping
           sudo sysctl -w net.ipv4.tcp_sack=1                   # enable selective acknowledgements
