@@ -314,6 +314,7 @@ class ClusterController
   def wait_meeting(clients, max_attempts:)
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       info = hashify_cluster_info(client)
+      print_debug("#{client.config.host}:#{client.config.port} ... #{info['cluster_known_nodes']}")
       info['cluster_known_nodes'].to_s == clients.size.to_s
     rescue ::RedisClient::ConnectionError
       true
@@ -356,6 +357,7 @@ class ClusterController
   def wait_cluster_building(clients, max_attempts:)
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       info = hashify_cluster_info(client)
+      print_debug("#{client.config.host}:#{client.config.port} ... #{info['cluster_state']}")
       info['cluster_state'] == 'ok'
     rescue ::RedisClient::ConnectionError
       true
