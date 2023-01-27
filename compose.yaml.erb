@@ -1,16 +1,23 @@
 ---
 # bin/render_compose > compose.large.yaml
+#
+# https://developer.redis.com/operate/redis-at-scale/talking-to-redis/initial-tuning/
+# https://github.com/redis/redis/blob/unstable/redis.conf
 services:
   node001: &node
     image: "redis:${REDIS_VERSION:-7}"
     command: >
       redis-server
-      --maxmemory            4mb
-      --maxmemory-policy     allkeys-lru
-      --appendonly           yes
-      --cluster-enabled      yes
-      --cluster-config-file  nodes.conf
-      --cluster-node-timeout 5000
+      --maxmemory                32mb
+      --maxmemory-policy         allkeys-lru
+      --maxclients               128
+      --tcp-backlog              4096
+      --replica-serve-stale-data yes
+      --replica-read-only        yes
+      --appendonly               yes
+      --cluster-enabled          yes
+      --cluster-config-file      nodes.conf
+      --cluster-node-timeout     5000
     restart: "${RESTART_POLICY:-always}"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
