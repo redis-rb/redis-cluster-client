@@ -244,8 +244,8 @@ jobs:
     env:
       REDIS_VERSION: '7.0'
       DOCKER_COMPOSE_FILE: 'compose.large.yaml'
-      REDIS_SHARD_SIZE: '50'
-      REDIS_REPLICA_SIZE: '4'
+      REDIS_SHARD_SIZE: '33'
+      REDIS_REPLICA_SIZE: '2'
     steps:
       - name: Check out code
         uses: actions/checkout@v3

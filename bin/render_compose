@@ -8,8 +8,8 @@ content = File.read(path)
 template = ERB.new(content, trim_mode: '<>')
 
 # rubocop:disable Lint/UselessAssignment
-n = 250
-shards = 50
+n = 99
+shards = 33
 port = 6379
 # rubocop:enable Lint/UselessAssignment
 
