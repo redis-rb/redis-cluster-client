@@ -35,6 +35,7 @@ jobs:
           - {redis: '6.2', ruby: '3.1'}
           - {redis: '6.2', ruby: '3.0'}
           - {redis: '5.0', ruby: '2.7'}
+          - {ruby: 'jruby'}
           - {task: test_cluster_state,  redis: '7.0', replica: '2', compose: compose.replica.yaml}
           - {task: test_cluster_state,  redis: '6.2', replica: '2', compose: compose.replica.yaml}
           - {task: test_cluster_broken, redis: '7.0', restart: 'no'}
