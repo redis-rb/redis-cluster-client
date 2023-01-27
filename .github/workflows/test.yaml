@@ -260,6 +260,8 @@ jobs:
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
       - name: Wait for Redis cluster to be ready
         run: bundle exec rake wait
+        env:
+          DEBUG: '1'
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Stop containers
