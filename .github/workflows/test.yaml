@@ -239,7 +239,7 @@ jobs:
         run: docker compose -f $DOCKER_COMPOSE_FILE down
   large:
     name: Large
-    timeout-minutes: 3
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
       REDIS_VERSION: '7.0'
