@@ -53,9 +53,13 @@ class ClusterController
   end
 
   def wait_for_cluster_to_be_ready
+    print_debug('wait for nodes to be recognized...')
     wait_meeting(@clients, max_attempts: @max_attempts)
+    print_debug('wait for the cluster state to be ok...')
     wait_cluster_building(@clients, max_attempts: @max_attempts)
+    print_debug('wait for the replication to be established...')
     wait_replication(@clients, number_of_replicas: @number_of_replicas, max_attempts: @max_attempts)
+    print_debug('wait for commands to be accepted...')
     wait_cluster_recovering(@clients, max_attempts: @max_attempts)
   end
 
