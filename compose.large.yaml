@@ -8,9 +8,9 @@ services:
     image: "redis:${REDIS_VERSION:-7}"
     command: >
       redis-server
-      --maxmemory                32mb
+      --maxmemory                16mb
       --maxmemory-policy         allkeys-lru
-      --maxclients               128
+      --maxclients               256
       --tcp-backlog              4096
       --replica-serve-stale-data yes
       --replica-read-only        yes

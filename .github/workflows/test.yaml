@@ -256,6 +256,20 @@ jobs:
           bundler-cache: true
       - name: Print user limits
         run: ulimit -a
+      - name: Print kernel params
+        run: |
+          sysctl fs.file-max
+          sysctl vm.swappiness
+          sysctl net.ipv4.tcp_sack
+          sysctl net.ipv4.tcp_timestamps
+          sysctl net.ipv4.tcp_window_scaling
+          sysctl net.ipv4.tcp_congestion_control
+          sysctl net.ipv4.tcp_syncookies
+          sysctl net.ipv4.tcp_tw_reuse
+          sysctl net.ipv4.tcp_max_syn_backlog
+          sysctl net.core.somaxconn
+          sysctl net.core.rmem_max
+          sysctl net.core.wmem_max
       - name: Tune kernel params for redis
         run: |
           # https://developer.redis.com/operate/redis-at-scale/talking-to-redis/initial-tuning/
