@@ -1,0 +1,1776 @@
+---
+# bin/render_compose > compose.large.yaml
+services:
+  node001: &node
+    image: "redis:${REDIS_VERSION:-7}"
+    command: >
+      redis-server
+      --maxmemory            4mb
+      --maxmemory-policy     allkeys-lru
+      --appendonly           yes
+      --cluster-enabled      yes
+      --cluster-config-file  nodes.conf
+      --cluster-node-timeout 5000
+    restart: "${RESTART_POLICY:-always}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: "7s"
+      timeout: "5s"
+      retries: 10
+    ports:
+      - "6379:6379"
+  node002:
+    <<: *node
+    ports:
+      - "6380:6379"
+  node003:
+    <<: *node
+    ports:
+      - "6381:6379"
+  node004:
+    <<: *node
+    ports:
+      - "6382:6379"
+  node005:
+    <<: *node
+    ports:
+      - "6383:6379"
+  node006:
+    <<: *node
+    ports:
+      - "6384:6379"
+  node007:
+    <<: *node
+    ports:
+      - "6385:6379"
+  node008:
+    <<: *node
+    ports:
+      - "6386:6379"
+  node009:
+    <<: *node
+    ports:
+      - "6387:6379"
+  node010:
+    <<: *node
+    ports:
+      - "6388:6379"
+  node011:
+    <<: *node
+    ports:
+      - "6389:6379"
+  node012:
+    <<: *node
+    ports:
+      - "6390:6379"
+  node013:
+    <<: *node
+    ports:
+      - "6391:6379"
+  node014:
+    <<: *node
+    ports:
+      - "6392:6379"
+  node015:
+    <<: *node
+    ports:
+      - "6393:6379"
+  node016:
+    <<: *node
+    ports:
+      - "6394:6379"
+  node017:
+    <<: *node
+    ports:
+      - "6395:6379"
+  node018:
+    <<: *node
+    ports:
+      - "6396:6379"
+  node019:
+    <<: *node
+    ports:
+      - "6397:6379"
+  node020:
+    <<: *node
+    ports:
+      - "6398:6379"
+  node021:
+    <<: *node
+    ports:
+      - "6399:6379"
+  node022:
+    <<: *node
+    ports:
+      - "6400:6379"
+  node023:
+    <<: *node
+    ports:
+      - "6401:6379"
+  node024:
+    <<: *node
+    ports:
+      - "6402:6379"
+  node025:
+    <<: *node
+    ports:
+      - "6403:6379"
+  node026:
+    <<: *node
+    ports:
+      - "6404:6379"
+  node027:
+    <<: *node
+    ports:
+      - "6405:6379"
+  node028:
+    <<: *node
+    ports:
+      - "6406:6379"
+  node029:
+    <<: *node
+    ports:
+      - "6407:6379"
+  node030:
+    <<: *node
+    ports:
+      - "6408:6379"
+  node031:
+    <<: *node
+    ports:
+      - "6409:6379"
+  node032:
+    <<: *node
+    ports:
+      - "6410:6379"
+  node033:
+    <<: *node
+    ports:
+      - "6411:6379"
+  node034:
+    <<: *node
+    ports:
+      - "6412:6379"
+  node035:
+    <<: *node
+    ports:
+      - "6413:6379"
+  node036:
+    <<: *node
+    ports:
+      - "6414:6379"
+  node037:
+    <<: *node
+    ports:
+      - "6415:6379"
+  node038:
+    <<: *node
+    ports:
+      - "6416:6379"
+  node039:
+    <<: *node
+    ports:
+      - "6417:6379"
+  node040:
+    <<: *node
+    ports:
+      - "6418:6379"
+  node041:
+    <<: *node
+    ports:
+      - "6419:6379"
+  node042:
+    <<: *node
+    ports:
+      - "6420:6379"
+  node043:
+    <<: *node
+    ports:
+      - "6421:6379"
+  node044:
+    <<: *node
+    ports:
+      - "6422:6379"
+  node045:
+    <<: *node
+    ports:
+      - "6423:6379"
+  node046:
+    <<: *node
+    ports:
+      - "6424:6379"
+  node047:
+    <<: *node
+    ports:
+      - "6425:6379"
+  node048:
+    <<: *node
+    ports:
+      - "6426:6379"
+  node049:
+    <<: *node
+    ports:
+      - "6427:6379"
+  node050:
+    <<: *node
+    ports:
+      - "6428:6379"
+  node051:
+    <<: *node
+    ports:
+      - "6429:6379"
+  node052:
+    <<: *node
+    ports:
+      - "6430:6379"
+  node053:
+    <<: *node
+    ports:
+      - "6431:6379"
+  node054:
+    <<: *node
+    ports:
+      - "6432:6379"
+  node055:
+    <<: *node
+    ports:
+      - "6433:6379"
+  node056:
+    <<: *node
+    ports:
+      - "6434:6379"
+  node057:
+    <<: *node
+    ports:
+      - "6435:6379"
+  node058:
+    <<: *node
+    ports:
+      - "6436:6379"
+  node059:
+    <<: *node
+    ports:
+      - "6437:6379"
+  node060:
+    <<: *node
+    ports:
+      - "6438:6379"
+  node061:
+    <<: *node
+    ports:
+      - "6439:6379"
+  node062:
+    <<: *node
+    ports:
+      - "6440:6379"
+  node063:
+    <<: *node
+    ports:
+      - "6441:6379"
+  node064:
+    <<: *node
+    ports:
+      - "6442:6379"
+  node065:
+    <<: *node
+    ports:
+      - "6443:6379"
+  node066:
+    <<: *node
+    ports:
+      - "6444:6379"
+  node067:
+    <<: *node
+    ports:
+      - "6445:6379"
+  node068:
+    <<: *node
+    ports:
+      - "6446:6379"
+  node069:
+    <<: *node
+    ports:
+      - "6447:6379"
+  node070:
+    <<: *node
+    ports:
+      - "6448:6379"
+  node071:
+    <<: *node
+    ports:
+      - "6449:6379"
+  node072:
+    <<: *node
+    ports:
+      - "6450:6379"
+  node073:
+    <<: *node
+    ports:
+      - "6451:6379"
+  node074:
+    <<: *node
+    ports:
+      - "6452:6379"
+  node075:
+    <<: *node
+    ports:
+      - "6453:6379"
+  node076:
+    <<: *node
+    ports:
+      - "6454:6379"
+  node077:
+    <<: *node
+    ports:
+      - "6455:6379"
+  node078:
+    <<: *node
+    ports:
+      - "6456:6379"
+  node079:
+    <<: *node
+    ports:
+      - "6457:6379"
+  node080:
+    <<: *node
+    ports:
+      - "6458:6379"
+  node081:
+    <<: *node
+    ports:
+      - "6459:6379"
+  node082:
+    <<: *node
+    ports:
+      - "6460:6379"
+  node083:
+    <<: *node
+    ports:
+      - "6461:6379"
+  node084:
+    <<: *node
+    ports:
+      - "6462:6379"
+  node085:
+    <<: *node
+    ports:
+      - "6463:6379"
+  node086:
+    <<: *node
+    ports:
+      - "6464:6379"
+  node087:
+    <<: *node
+    ports:
+      - "6465:6379"
+  node088:
+    <<: *node
+    ports:
+      - "6466:6379"
+  node089:
+    <<: *node
+    ports:
+      - "6467:6379"
+  node090:
+    <<: *node
+    ports:
+      - "6468:6379"
+  node091:
+    <<: *node
+    ports:
+      - "6469:6379"
+  node092:
+    <<: *node
+    ports:
+      - "6470:6379"
+  node093:
+    <<: *node
+    ports:
+      - "6471:6379"
+  node094:
+    <<: *node
+    ports:
+      - "6472:6379"
+  node095:
+    <<: *node
+    ports:
+      - "6473:6379"
+  node096:
+    <<: *node
+    ports:
+      - "6474:6379"
+  node097:
+    <<: *node
+    ports:
+      - "6475:6379"
+  node098:
+    <<: *node
+    ports:
+      - "6476:6379"
+  node099:
+    <<: *node
+    ports:
+      - "6477:6379"
+  node100:
+    <<: *node
+    ports:
+      - "6478:6379"
+  node101:
+    <<: *node
+    ports:
+      - "6479:6379"
+  node102:
+    <<: *node
+    ports:
+      - "6480:6379"
+  node103:
+    <<: *node
+    ports:
+      - "6481:6379"
+  node104:
+    <<: *node
+    ports:
+      - "6482:6379"
+  node105:
+    <<: *node
+    ports:
+      - "6483:6379"
+  node106:
+    <<: *node
+    ports:
+      - "6484:6379"
+  node107:
+    <<: *node
+    ports:
+      - "6485:6379"
+  node108:
+    <<: *node
+    ports:
+      - "6486:6379"
+  node109:
+    <<: *node
+    ports:
+      - "6487:6379"
+  node110:
+    <<: *node
+    ports:
+      - "6488:6379"
+  node111:
+    <<: *node
+    ports:
+      - "6489:6379"
+  node112:
+    <<: *node
+    ports:
+      - "6490:6379"
+  node113:
+    <<: *node
+    ports:
+      - "6491:6379"
+  node114:
+    <<: *node
+    ports:
+      - "6492:6379"
+  node115:
+    <<: *node
+    ports:
+      - "6493:6379"
+  node116:
+    <<: *node
+    ports:
+      - "6494:6379"
+  node117:
+    <<: *node
+    ports:
+      - "6495:6379"
+  node118:
+    <<: *node
+    ports:
+      - "6496:6379"
+  node119:
+    <<: *node
+    ports:
+      - "6497:6379"
+  node120:
+    <<: *node
+    ports:
+      - "6498:6379"
+  node121:
+    <<: *node
+    ports:
+      - "6499:6379"
+  node122:
+    <<: *node
+    ports:
+      - "6500:6379"
+  node123:
+    <<: *node
+    ports:
+      - "6501:6379"
+  node124:
+    <<: *node
+    ports:
+      - "6502:6379"
+  node125:
+    <<: *node
+    ports:
+      - "6503:6379"
+  node126:
+    <<: *node
+    ports:
+      - "6504:6379"
+  node127:
+    <<: *node
+    ports:
+      - "6505:6379"
+  node128:
+    <<: *node
+    ports:
+      - "6506:6379"
+  node129:
+    <<: *node
+    ports:
+      - "6507:6379"
+  node130:
+    <<: *node
+    ports:
+      - "6508:6379"
+  node131:
+    <<: *node
+    ports:
+      - "6509:6379"
+  node132:
+    <<: *node
+    ports:
+      - "6510:6379"
+  node133:
+    <<: *node
+    ports:
+      - "6511:6379"
+  node134:
+    <<: *node
+    ports:
+      - "6512:6379"
+  node135:
+    <<: *node
+    ports:
+      - "6513:6379"
+  node136:
+    <<: *node
+    ports:
+      - "6514:6379"
+  node137:
+    <<: *node
+    ports:
+      - "6515:6379"
+  node138:
+    <<: *node
+    ports:
+      - "6516:6379"
+  node139:
+    <<: *node
+    ports:
+      - "6517:6379"
+  node140:
+    <<: *node
+    ports:
+      - "6518:6379"
+  node141:
+    <<: *node
+    ports:
+      - "6519:6379"
+  node142:
+    <<: *node
+    ports:
+      - "6520:6379"
+  node143:
+    <<: *node
+    ports:
+      - "6521:6379"
+  node144:
+    <<: *node
+    ports:
+      - "6522:6379"
+  node145:
+    <<: *node
+    ports:
+      - "6523:6379"
+  node146:
+    <<: *node
+    ports:
+      - "6524:6379"
+  node147:
+    <<: *node
+    ports:
+      - "6525:6379"
+  node148:
+    <<: *node
+    ports:
+      - "6526:6379"
+  node149:
+    <<: *node
+    ports:
+      - "6527:6379"
+  node150:
+    <<: *node
+    ports:
+      - "6528:6379"
+  node151:
+    <<: *node
+    ports:
+      - "6529:6379"
+  node152:
+    <<: *node
+    ports:
+      - "6530:6379"
+  node153:
+    <<: *node
+    ports:
+      - "6531:6379"
+  node154:
+    <<: *node
+    ports:
+      - "6532:6379"
+  node155:
+    <<: *node
+    ports:
+      - "6533:6379"
+  node156:
+    <<: *node
+    ports:
+      - "6534:6379"
+  node157:
+    <<: *node
+    ports:
+      - "6535:6379"
+  node158:
+    <<: *node
+    ports:
+      - "6536:6379"
+  node159:
+    <<: *node
+    ports:
+      - "6537:6379"
+  node160:
+    <<: *node
+    ports:
+      - "6538:6379"
+  node161:
+    <<: *node
+    ports:
+      - "6539:6379"
+  node162:
+    <<: *node
+    ports:
+      - "6540:6379"
+  node163:
+    <<: *node
+    ports:
+      - "6541:6379"
+  node164:
+    <<: *node
+    ports:
+      - "6542:6379"
+  node165:
+    <<: *node
+    ports:
+      - "6543:6379"
+  node166:
+    <<: *node
+    ports:
+      - "6544:6379"
+  node167:
+    <<: *node
+    ports:
+      - "6545:6379"
+  node168:
+    <<: *node
+    ports:
+      - "6546:6379"
+  node169:
+    <<: *node
+    ports:
+      - "6547:6379"
+  node170:
+    <<: *node
+    ports:
+      - "6548:6379"
+  node171:
+    <<: *node
+    ports:
+      - "6549:6379"
+  node172:
+    <<: *node
+    ports:
+      - "6550:6379"
+  node173:
+    <<: *node
+    ports:
+      - "6551:6379"
+  node174:
+    <<: *node
+    ports:
+      - "6552:6379"
+  node175:
+    <<: *node
+    ports:
+      - "6553:6379"
+  node176:
+    <<: *node
+    ports:
+      - "6554:6379"
+  node177:
+    <<: *node
+    ports:
+      - "6555:6379"
+  node178:
+    <<: *node
+    ports:
+      - "6556:6379"
+  node179:
+    <<: *node
+    ports:
+      - "6557:6379"
+  node180:
+    <<: *node
+    ports:
+      - "6558:6379"
+  node181:
+    <<: *node
+    ports:
+      - "6559:6379"
+  node182:
+    <<: *node
+    ports:
+      - "6560:6379"
+  node183:
+    <<: *node
+    ports:
+      - "6561:6379"
+  node184:
+    <<: *node
+    ports:
+      - "6562:6379"
+  node185:
+    <<: *node
+    ports:
+      - "6563:6379"
+  node186:
+    <<: *node
+    ports:
+      - "6564:6379"
+  node187:
+    <<: *node
+    ports:
+      - "6565:6379"
+  node188:
+    <<: *node
+    ports:
+      - "6566:6379"
+  node189:
+    <<: *node
+    ports:
+      - "6567:6379"
+  node190:
+    <<: *node
+    ports:
+      - "6568:6379"
+  node191:
+    <<: *node
+    ports:
+      - "6569:6379"
+  node192:
+    <<: *node
+    ports:
+      - "6570:6379"
+  node193:
+    <<: *node
+    ports:
+      - "6571:6379"
+  node194:
+    <<: *node
+    ports:
+      - "6572:6379"
+  node195:
+    <<: *node
+    ports:
+      - "6573:6379"
+  node196:
+    <<: *node
+    ports:
+      - "6574:6379"
+  node197:
+    <<: *node
+    ports:
+      - "6575:6379"
+  node198:
+    <<: *node
+    ports:
+      - "6576:6379"
+  node199:
+    <<: *node
+    ports:
+      - "6577:6379"
+  node200:
+    <<: *node
+    ports:
+      - "6578:6379"
+  node201:
+    <<: *node
+    ports:
+      - "6579:6379"
+  node202:
+    <<: *node
+    ports:
+      - "6580:6379"
+  node203:
+    <<: *node
+    ports:
+      - "6581:6379"
+  node204:
+    <<: *node
+    ports:
+      - "6582:6379"
+  node205:
+    <<: *node
+    ports:
+      - "6583:6379"
+  node206:
+    <<: *node
+    ports:
+      - "6584:6379"
+  node207:
+    <<: *node
+    ports:
+      - "6585:6379"
+  node208:
+    <<: *node
+    ports:
+      - "6586:6379"
+  node209:
+    <<: *node
+    ports:
+      - "6587:6379"
+  node210:
+    <<: *node
+    ports:
+      - "6588:6379"
+  node211:
+    <<: *node
+    ports:
+      - "6589:6379"
+  node212:
+    <<: *node
+    ports:
+      - "6590:6379"
+  node213:
+    <<: *node
+    ports:
+      - "6591:6379"
+  node214:
+    <<: *node
+    ports:
+      - "6592:6379"
+  node215:
+    <<: *node
+    ports:
+      - "6593:6379"
+  node216:
+    <<: *node
+    ports:
+      - "6594:6379"
+  node217:
+    <<: *node
+    ports:
+      - "6595:6379"
+  node218:
+    <<: *node
+    ports:
+      - "6596:6379"
+  node219:
+    <<: *node
+    ports:
+      - "6597:6379"
+  node220:
+    <<: *node
+    ports:
+      - "6598:6379"
+  node221:
+    <<: *node
+    ports:
+      - "6599:6379"
+  node222:
+    <<: *node
+    ports:
+      - "6600:6379"
+  node223:
+    <<: *node
+    ports:
+      - "6601:6379"
+  node224:
+    <<: *node
+    ports:
+      - "6602:6379"
+  node225:
+    <<: *node
+    ports:
+      - "6603:6379"
+  node226:
+    <<: *node
+    ports:
+      - "6604:6379"
+  node227:
+    <<: *node
+    ports:
+      - "6605:6379"
+  node228:
+    <<: *node
+    ports:
+      - "6606:6379"
+  node229:
+    <<: *node
+    ports:
+      - "6607:6379"
+  node230:
+    <<: *node
+    ports:
+      - "6608:6379"
+  node231:
+    <<: *node
+    ports:
+      - "6609:6379"
+  node232:
+    <<: *node
+    ports:
+      - "6610:6379"
+  node233:
+    <<: *node
+    ports:
+      - "6611:6379"
+  node234:
+    <<: *node
+    ports:
+      - "6612:6379"
+  node235:
+    <<: *node
+    ports:
+      - "6613:6379"
+  node236:
+    <<: *node
+    ports:
+      - "6614:6379"
+  node237:
+    <<: *node
+    ports:
+      - "6615:6379"
+  node238:
+    <<: *node
+    ports:
+      - "6616:6379"
+  node239:
+    <<: *node
+    ports:
+      - "6617:6379"
+  node240:
+    <<: *node
+    ports:
+      - "6618:6379"
+  node241:
+    <<: *node
+    ports:
+      - "6619:6379"
+  node242:
+    <<: *node
+    ports:
+      - "6620:6379"
+  node243:
+    <<: *node
+    ports:
+      - "6621:6379"
+  node244:
+    <<: *node
+    ports:
+      - "6622:6379"
+  node245:
+    <<: *node
+    ports:
+      - "6623:6379"
+  node246:
+    <<: *node
+    ports:
+      - "6624:6379"
+  node247:
+    <<: *node
+    ports:
+      - "6625:6379"
+  node248:
+    <<: *node
+    ports:
+      - "6626:6379"
+  node249:
+    <<: *node
+    ports:
+      - "6627:6379"
+  node250:
+    <<: *node
+    ports:
+      - "6628:6379"
+  clustering:
+    image: "redis:${REDIS_VERSION:-7}"
+    command: >
+      bash -c "apt-get update > /dev/null
+      && apt-get install --no-install-recommends --no-install-suggests -y dnsutils > /dev/null
+      && rm -rf /var/lib/apt/lists/*
+      && yes yes | redis-cli --cluster create
+      $$(dig node001 +short):6379
+      $$(dig node002 +short):6379
+      $$(dig node003 +short):6379
+      $$(dig node004 +short):6379
+      $$(dig node005 +short):6379
+      $$(dig node006 +short):6379
+      $$(dig node007 +short):6379
+      $$(dig node008 +short):6379
+      $$(dig node009 +short):6379
+      $$(dig node010 +short):6379
+      $$(dig node011 +short):6379
+      $$(dig node012 +short):6379
+      $$(dig node013 +short):6379
+      $$(dig node014 +short):6379
+      $$(dig node015 +short):6379
+      $$(dig node016 +short):6379
+      $$(dig node017 +short):6379
+      $$(dig node018 +short):6379
+      $$(dig node019 +short):6379
+      $$(dig node020 +short):6379
+      $$(dig node021 +short):6379
+      $$(dig node022 +short):6379
+      $$(dig node023 +short):6379
+      $$(dig node024 +short):6379
+      $$(dig node025 +short):6379
+      $$(dig node026 +short):6379
+      $$(dig node027 +short):6379
+      $$(dig node028 +short):6379
+      $$(dig node029 +short):6379
+      $$(dig node030 +short):6379
+      $$(dig node031 +short):6379
+      $$(dig node032 +short):6379
+      $$(dig node033 +short):6379
+      $$(dig node034 +short):6379
+      $$(dig node035 +short):6379
+      $$(dig node036 +short):6379
+      $$(dig node037 +short):6379
+      $$(dig node038 +short):6379
+      $$(dig node039 +short):6379
+      $$(dig node040 +short):6379
+      $$(dig node041 +short):6379
+      $$(dig node042 +short):6379
+      $$(dig node043 +short):6379
+      $$(dig node044 +short):6379
+      $$(dig node045 +short):6379
+      $$(dig node046 +short):6379
+      $$(dig node047 +short):6379
+      $$(dig node048 +short):6379
+      $$(dig node049 +short):6379
+      $$(dig node050 +short):6379
+      $$(dig node051 +short):6379
+      $$(dig node052 +short):6379
+      $$(dig node053 +short):6379
+      $$(dig node054 +short):6379
+      $$(dig node055 +short):6379
+      $$(dig node056 +short):6379
+      $$(dig node057 +short):6379
+      $$(dig node058 +short):6379
+      $$(dig node059 +short):6379
+      $$(dig node060 +short):6379
+      $$(dig node061 +short):6379
+      $$(dig node062 +short):6379
+      $$(dig node063 +short):6379
+      $$(dig node064 +short):6379
+      $$(dig node065 +short):6379
+      $$(dig node066 +short):6379
+      $$(dig node067 +short):6379
+      $$(dig node068 +short):6379
+      $$(dig node069 +short):6379
+      $$(dig node070 +short):6379
+      $$(dig node071 +short):6379
+      $$(dig node072 +short):6379
+      $$(dig node073 +short):6379
+      $$(dig node074 +short):6379
+      $$(dig node075 +short):6379
+      $$(dig node076 +short):6379
+      $$(dig node077 +short):6379
+      $$(dig node078 +short):6379
+      $$(dig node079 +short):6379
+      $$(dig node080 +short):6379
+      $$(dig node081 +short):6379
+      $$(dig node082 +short):6379
+      $$(dig node083 +short):6379
+      $$(dig node084 +short):6379
+      $$(dig node085 +short):6379
+      $$(dig node086 +short):6379
+      $$(dig node087 +short):6379
+      $$(dig node088 +short):6379
+      $$(dig node089 +short):6379
+      $$(dig node090 +short):6379
+      $$(dig node091 +short):6379
+      $$(dig node092 +short):6379
+      $$(dig node093 +short):6379
+      $$(dig node094 +short):6379
+      $$(dig node095 +short):6379
+      $$(dig node096 +short):6379
+      $$(dig node097 +short):6379
+      $$(dig node098 +short):6379
+      $$(dig node099 +short):6379
+      $$(dig node100 +short):6379
+      $$(dig node101 +short):6379
+      $$(dig node102 +short):6379
+      $$(dig node103 +short):6379
+      $$(dig node104 +short):6379
+      $$(dig node105 +short):6379
+      $$(dig node106 +short):6379
+      $$(dig node107 +short):6379
+      $$(dig node108 +short):6379
+      $$(dig node109 +short):6379
+      $$(dig node110 +short):6379
+      $$(dig node111 +short):6379
+      $$(dig node112 +short):6379
+      $$(dig node113 +short):6379
+      $$(dig node114 +short):6379
+      $$(dig node115 +short):6379
+      $$(dig node116 +short):6379
+      $$(dig node117 +short):6379
+      $$(dig node118 +short):6379
+      $$(dig node119 +short):6379
+      $$(dig node120 +short):6379
+      $$(dig node121 +short):6379
+      $$(dig node122 +short):6379
+      $$(dig node123 +short):6379
+      $$(dig node124 +short):6379
+      $$(dig node125 +short):6379
+      $$(dig node126 +short):6379
+      $$(dig node127 +short):6379
+      $$(dig node128 +short):6379
+      $$(dig node129 +short):6379
+      $$(dig node130 +short):6379
+      $$(dig node131 +short):6379
+      $$(dig node132 +short):6379
+      $$(dig node133 +short):6379
+      $$(dig node134 +short):6379
+      $$(dig node135 +short):6379
+      $$(dig node136 +short):6379
+      $$(dig node137 +short):6379
+      $$(dig node138 +short):6379
+      $$(dig node139 +short):6379
+      $$(dig node140 +short):6379
+      $$(dig node141 +short):6379
+      $$(dig node142 +short):6379
+      $$(dig node143 +short):6379
+      $$(dig node144 +short):6379
+      $$(dig node145 +short):6379
+      $$(dig node146 +short):6379
+      $$(dig node147 +short):6379
+      $$(dig node148 +short):6379
+      $$(dig node149 +short):6379
+      $$(dig node150 +short):6379
+      $$(dig node151 +short):6379
+      $$(dig node152 +short):6379
+      $$(dig node153 +short):6379
+      $$(dig node154 +short):6379
+      $$(dig node155 +short):6379
+      $$(dig node156 +short):6379
+      $$(dig node157 +short):6379
+      $$(dig node158 +short):6379
+      $$(dig node159 +short):6379
+      $$(dig node160 +short):6379
+      $$(dig node161 +short):6379
+      $$(dig node162 +short):6379
+      $$(dig node163 +short):6379
+      $$(dig node164 +short):6379
+      $$(dig node165 +short):6379
+      $$(dig node166 +short):6379
+      $$(dig node167 +short):6379
+      $$(dig node168 +short):6379
+      $$(dig node169 +short):6379
+      $$(dig node170 +short):6379
+      $$(dig node171 +short):6379
+      $$(dig node172 +short):6379
+      $$(dig node173 +short):6379
+      $$(dig node174 +short):6379
+      $$(dig node175 +short):6379
+      $$(dig node176 +short):6379
+      $$(dig node177 +short):6379
+      $$(dig node178 +short):6379
+      $$(dig node179 +short):6379
+      $$(dig node180 +short):6379
+      $$(dig node181 +short):6379
+      $$(dig node182 +short):6379
+      $$(dig node183 +short):6379
+      $$(dig node184 +short):6379
+      $$(dig node185 +short):6379
+      $$(dig node186 +short):6379
+      $$(dig node187 +short):6379
+      $$(dig node188 +short):6379
+      $$(dig node189 +short):6379
+      $$(dig node190 +short):6379
+      $$(dig node191 +short):6379
+      $$(dig node192 +short):6379
+      $$(dig node193 +short):6379
+      $$(dig node194 +short):6379
+      $$(dig node195 +short):6379
+      $$(dig node196 +short):6379
+      $$(dig node197 +short):6379
+      $$(dig node198 +short):6379
+      $$(dig node199 +short):6379
+      $$(dig node200 +short):6379
+      $$(dig node201 +short):6379
+      $$(dig node202 +short):6379
+      $$(dig node203 +short):6379
+      $$(dig node204 +short):6379
+      $$(dig node205 +short):6379
+      $$(dig node206 +short):6379
+      $$(dig node207 +short):6379
+      $$(dig node208 +short):6379
+      $$(dig node209 +short):6379
+      $$(dig node210 +short):6379
+      $$(dig node211 +short):6379
+      $$(dig node212 +short):6379
+      $$(dig node213 +short):6379
+      $$(dig node214 +short):6379
+      $$(dig node215 +short):6379
+      $$(dig node216 +short):6379
+      $$(dig node217 +short):6379
+      $$(dig node218 +short):6379
+      $$(dig node219 +short):6379
+      $$(dig node220 +short):6379
+      $$(dig node221 +short):6379
+      $$(dig node222 +short):6379
+      $$(dig node223 +short):6379
+      $$(dig node224 +short):6379
+      $$(dig node225 +short):6379
+      $$(dig node226 +short):6379
+      $$(dig node227 +short):6379
+      $$(dig node228 +short):6379
+      $$(dig node229 +short):6379
+      $$(dig node230 +short):6379
+      $$(dig node231 +short):6379
+      $$(dig node232 +short):6379
+      $$(dig node233 +short):6379
+      $$(dig node234 +short):6379
+      $$(dig node235 +short):6379
+      $$(dig node236 +short):6379
+      $$(dig node237 +short):6379
+      $$(dig node238 +short):6379
+      $$(dig node239 +short):6379
+      $$(dig node240 +short):6379
+      $$(dig node241 +short):6379
+      $$(dig node242 +short):6379
+      $$(dig node243 +short):6379
+      $$(dig node244 +short):6379
+      $$(dig node245 +short):6379
+      $$(dig node246 +short):6379
+      $$(dig node247 +short):6379
+      $$(dig node248 +short):6379
+      $$(dig node249 +short):6379
+      $$(dig node250 +short):6379
+      --cluster-replicas 4"
+    depends_on:
+      node001:
+        condition: service_healthy
+      node002:
+        condition: service_healthy
+      node003:
+        condition: service_healthy
+      node004:
+        condition: service_healthy
+      node005:
+        condition: service_healthy
+      node006:
+        condition: service_healthy
+      node007:
+        condition: service_healthy
+      node008:
+        condition: service_healthy
+      node009:
+        condition: service_healthy
+      node010:
+        condition: service_healthy
+      node011:
+        condition: service_healthy
+      node012:
+        condition: service_healthy
+      node013:
+        condition: service_healthy
+      node014:
+        condition: service_healthy
+      node015:
+        condition: service_healthy
+      node016:
+        condition: service_healthy
+      node017:
+        condition: service_healthy
+      node018:
+        condition: service_healthy
+      node019:
+        condition: service_healthy
+      node020:
+        condition: service_healthy
+      node021:
+        condition: service_healthy
+      node022:
+        condition: service_healthy
+      node023:
+        condition: service_healthy
+      node024:
+        condition: service_healthy
+      node025:
+        condition: service_healthy
+      node026:
+        condition: service_healthy
+      node027:
+        condition: service_healthy
+      node028:
+        condition: service_healthy
+      node029:
+        condition: service_healthy
+      node030:
+        condition: service_healthy
+      node031:
+        condition: service_healthy
+      node032:
+        condition: service_healthy
+      node033:
+        condition: service_healthy
+      node034:
+        condition: service_healthy
+      node035:
+        condition: service_healthy
+      node036:
+        condition: service_healthy
+      node037:
+        condition: service_healthy
+      node038:
+        condition: service_healthy
+      node039:
+        condition: service_healthy
+      node040:
+        condition: service_healthy
+      node041:
+        condition: service_healthy
+      node042:
+        condition: service_healthy
+      node043:
+        condition: service_healthy
+      node044:
+        condition: service_healthy
+      node045:
+        condition: service_healthy
+      node046:
+        condition: service_healthy
+      node047:
+        condition: service_healthy
+      node048:
+        condition: service_healthy
+      node049:
+        condition: service_healthy
+      node050:
+        condition: service_healthy
+      node051:
+        condition: service_healthy
+      node052:
+        condition: service_healthy
+      node053:
+        condition: service_healthy
+      node054:
+        condition: service_healthy
+      node055:
+        condition: service_healthy
+      node056:
+        condition: service_healthy
+      node057:
+        condition: service_healthy
+      node058:
+        condition: service_healthy
+      node059:
+        condition: service_healthy
+      node060:
+        condition: service_healthy
+      node061:
+        condition: service_healthy
+      node062:
+        condition: service_healthy
+      node063:
+        condition: service_healthy
+      node064:
+        condition: service_healthy
+      node065:
+        condition: service_healthy
+      node066:
+        condition: service_healthy
+      node067:
+        condition: service_healthy
+      node068:
+        condition: service_healthy
+      node069:
+        condition: service_healthy
+      node070:
+        condition: service_healthy
+      node071:
+        condition: service_healthy
+      node072:
+        condition: service_healthy
+      node073:
+        condition: service_healthy
+      node074:
+        condition: service_healthy
+      node075:
+        condition: service_healthy
+      node076:
+        condition: service_healthy
+      node077:
+        condition: service_healthy
+      node078:
+        condition: service_healthy
+      node079:
+        condition: service_healthy
+      node080:
+        condition: service_healthy
+      node081:
+        condition: service_healthy
+      node082:
+        condition: service_healthy
+      node083:
+        condition: service_healthy
+      node084:
+        condition: service_healthy
+      node085:
+        condition: service_healthy
+      node086:
+        condition: service_healthy
+      node087:
+        condition: service_healthy
+      node088:
+        condition: service_healthy
+      node089:
+        condition: service_healthy
+      node090:
+        condition: service_healthy
+      node091:
+        condition: service_healthy
+      node092:
+        condition: service_healthy
+      node093:
+        condition: service_healthy
+      node094:
+        condition: service_healthy
+      node095:
+        condition: service_healthy
+      node096:
+        condition: service_healthy
+      node097:
+        condition: service_healthy
+      node098:
+        condition: service_healthy
+      node099:
+        condition: service_healthy
+      node100:
+        condition: service_healthy
+      node101:
+        condition: service_healthy
+      node102:
+        condition: service_healthy
+      node103:
+        condition: service_healthy
+      node104:
+        condition: service_healthy
+      node105:
+        condition: service_healthy
+      node106:
+        condition: service_healthy
+      node107:
+        condition: service_healthy
+      node108:
+        condition: service_healthy
+      node109:
+        condition: service_healthy
+      node110:
+        condition: service_healthy
+      node111:
+        condition: service_healthy
+      node112:
+        condition: service_healthy
+      node113:
+        condition: service_healthy
+      node114:
+        condition: service_healthy
+      node115:
+        condition: service_healthy
+      node116:
+        condition: service_healthy
+      node117:
+        condition: service_healthy
+      node118:
+        condition: service_healthy
+      node119:
+        condition: service_healthy
+      node120:
+        condition: service_healthy
+      node121:
+        condition: service_healthy
+      node122:
+        condition: service_healthy
+      node123:
+        condition: service_healthy
+      node124:
+        condition: service_healthy
+      node125:
+        condition: service_healthy
+      node126:
+        condition: service_healthy
+      node127:
+        condition: service_healthy
+      node128:
+        condition: service_healthy
+      node129:
+        condition: service_healthy
+      node130:
+        condition: service_healthy
+      node131:
+        condition: service_healthy
+      node132:
+        condition: service_healthy
+      node133:
+        condition: service_healthy
+      node134:
+        condition: service_healthy
+      node135:
+        condition: service_healthy
+      node136:
+        condition: service_healthy
+      node137:
+        condition: service_healthy
+      node138:
+        condition: service_healthy
+      node139:
+        condition: service_healthy
+      node140:
+        condition: service_healthy
+      node141:
+        condition: service_healthy
+      node142:
+        condition: service_healthy
+      node143:
+        condition: service_healthy
+      node144:
+        condition: service_healthy
+      node145:
+        condition: service_healthy
+      node146:
+        condition: service_healthy
+      node147:
+        condition: service_healthy
+      node148:
+        condition: service_healthy
+      node149:
+        condition: service_healthy
+      node150:
+        condition: service_healthy
+      node151:
+        condition: service_healthy
+      node152:
+        condition: service_healthy
+      node153:
+        condition: service_healthy
+      node154:
+        condition: service_healthy
+      node155:
+        condition: service_healthy
+      node156:
+        condition: service_healthy
+      node157:
+        condition: service_healthy
+      node158:
+        condition: service_healthy
+      node159:
+        condition: service_healthy
+      node160:
+        condition: service_healthy
+      node161:
+        condition: service_healthy
+      node162:
+        condition: service_healthy
+      node163:
+        condition: service_healthy
+      node164:
+        condition: service_healthy
+      node165:
+        condition: service_healthy
+      node166:
+        condition: service_healthy
+      node167:
+        condition: service_healthy
+      node168:
+        condition: service_healthy
+      node169:
+        condition: service_healthy
+      node170:
+        condition: service_healthy
+      node171:
+        condition: service_healthy
+      node172:
+        condition: service_healthy
+      node173:
+        condition: service_healthy
+      node174:
+        condition: service_healthy
+      node175:
+        condition: service_healthy
+      node176:
+        condition: service_healthy
+      node177:
+        condition: service_healthy
+      node178:
+        condition: service_healthy
+      node179:
+        condition: service_healthy
+      node180:
+        condition: service_healthy
+      node181:
+        condition: service_healthy
+      node182:
+        condition: service_healthy
+      node183:
+        condition: service_healthy
+      node184:
+        condition: service_healthy
+      node185:
+        condition: service_healthy
+      node186:
+        condition: service_healthy
+      node187:
+        condition: service_healthy
+      node188:
+        condition: service_healthy
+      node189:
+        condition: service_healthy
+      node190:
+        condition: service_healthy
+      node191:
+        condition: service_healthy
+      node192:
+        condition: service_healthy
+      node193:
+        condition: service_healthy
+      node194:
+        condition: service_healthy
+      node195:
+        condition: service_healthy
+      node196:
+        condition: service_healthy
+      node197:
+        condition: service_healthy
+      node198:
+        condition: service_healthy
+      node199:
+        condition: service_healthy
+      node200:
+        condition: service_healthy
+      node201:
+        condition: service_healthy
+      node202:
+        condition: service_healthy
+      node203:
+        condition: service_healthy
+      node204:
+        condition: service_healthy
+      node205:
+        condition: service_healthy
+      node206:
+        condition: service_healthy
+      node207:
+        condition: service_healthy
+      node208:
+        condition: service_healthy
+      node209:
+        condition: service_healthy
+      node210:
+        condition: service_healthy
+      node211:
+        condition: service_healthy
+      node212:
+        condition: service_healthy
+      node213:
+        condition: service_healthy
+      node214:
+        condition: service_healthy
+      node215:
+        condition: service_healthy
+      node216:
+        condition: service_healthy
+      node217:
+        condition: service_healthy
+      node218:
+        condition: service_healthy
+      node219:
+        condition: service_healthy
+      node220:
+        condition: service_healthy
+      node221:
+        condition: service_healthy
+      node222:
+        condition: service_healthy
+      node223:
+        condition: service_healthy
+      node224:
+        condition: service_healthy
+      node225:
+        condition: service_healthy
+      node226:
+        condition: service_healthy
+      node227:
+        condition: service_healthy
+      node228:
+        condition: service_healthy
+      node229:
+        condition: service_healthy
+      node230:
+        condition: service_healthy
+      node231:
+        condition: service_healthy
+      node232:
+        condition: service_healthy
+      node233:
+        condition: service_healthy
+      node234:
+        condition: service_healthy
+      node235:
+        condition: service_healthy
+      node236:
+        condition: service_healthy
+      node237:
+        condition: service_healthy
+      node238:
+        condition: service_healthy
+      node239:
+        condition: service_healthy
+      node240:
+        condition: service_healthy
+      node241:
+        condition: service_healthy
+      node242:
+        condition: service_healthy
+      node243:
+        condition: service_healthy
+      node244:
+        condition: service_healthy
+      node245:
+        condition: service_healthy
+      node246:
+        condition: service_healthy
+      node247:
+        condition: service_healthy
+      node248:
+        condition: service_healthy
+      node249:
+        condition: service_healthy
+      node250:
+        condition: service_healthy

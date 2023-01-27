@@ -203,7 +203,7 @@ jobs:
         run: docker compose -f $DOCKER_COMPOSE_FILE down
   profiling:
     name: Profiling
-    timeout-minutes: 5
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -214,7 +214,7 @@ jobs:
           - pipelining_in_moderation
     env:
       REDIS_VERSION: '7.0'
-      DOCKER_COMPOSE_FILE: 'compose.yaml'
+      DOCKER_COMPOSE_FILE: 'compose.large.yaml'
     steps:
       - name: Check out code
         uses: actions/checkout@v3
