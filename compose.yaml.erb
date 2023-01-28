@@ -1,0 +1,73 @@
+---
+# bin/render_compose > compose.large.yaml
+#
+# https://developer.redis.com/operate/redis-at-scale/talking-to-redis/initial-tuning/
+# https://github.com/redis/redis/blob/unstable/redis.conf
+services:
+  node001: &node
+    image: "redis:${REDIS_VERSION:-7}"
+    command: >
+      redis-server
+      --maxmemory                       32mb
+      --maxmemory-policy                allkeys-lru
+      --maxmemory-clients               32%
+      --maxclients                      256
+      --tcp-backlog                     1024
+      --timeout                         0
+      --tcp-keepalive                   300
+      --save                            ""
+      --rdb-del-sync-files              no
+      --replica-serve-stale-data        yes
+      --replica-read-only               yes
+      --repl-backlog-size               2mb
+      --repl-backlog-ttl                0
+      --repl-disable-tcp-nodelay        yes
+      --repl-diskless-sync              yes
+      --repl-diskless-sync-delay        0
+      --repl-diskless-sync-max-replicas 0
+      --repl-diskless-load              on-empty-db
+      --repl-ping-replica-period        60
+      --repl-timeout                    300
+      --min-replicas-to-write           0
+      --min-replicas-max-lag            0
+      --shutdown-timeout                0
+      --shutdown-on-sigint              nosave force now
+      --shutdown-on-sigterm             nosave force now
+      --client-output-buffer-limit      replica 0 0 0
+      --client-query-buffer-limit       4mb
+      --appendonly                      no
+      --appendfsync                     no
+      --cluster-enabled                 yes
+      --cluster-config-file             nodes.conf
+      --cluster-node-timeout            300000
+      --cluster-replica-validity-factor 5
+    restart: "${RESTART_POLICY:-always}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: "7s"
+      timeout: "5s"
+      retries: 10
+    ports:
+      - "<%= port %>:<%= port %>"
+<% (2..n).each do |i| %>
+  node<%= sprintf('%03d', i) %>:
+    <<: *node
+    ports:
+      - "<%= port + i - 1 %>:<%= port %>"
+<% end %>
+  clustering:
+    image: "redis:${REDIS_VERSION:-7}"
+    command: >
+      bash -c "apt-get update > /dev/null
+      && apt-get install --no-install-recommends --no-install-suggests -y dnsutils > /dev/null
+      && rm -rf /var/lib/apt/lists/*
+      && yes yes | redis-cli --cluster create
+<% n.times do |i| %>
+      $$(dig node<%= sprintf('%03d', i + 1) %> +short):<%= port %>
+<% end %>
+      --cluster-replicas <%= (n - shards) / shards %>"
+    depends_on:
+<% n.times do |i| %>
+      node<%= sprintf('%03d', i + 1) %>:
+        condition: service_healthy
+<% end %>

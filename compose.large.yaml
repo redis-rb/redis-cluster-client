@@ -1,0 +1,266 @@
+---
+# bin/render_compose > compose.large.yaml
+#
+# https://developer.redis.com/operate/redis-at-scale/talking-to-redis/initial-tuning/
+# https://github.com/redis/redis/blob/unstable/redis.conf
+services:
+  node001: &node
+    image: "redis:${REDIS_VERSION:-7}"
+    command: >
+      redis-server
+      --maxmemory                       32mb
+      --maxmemory-policy                allkeys-lru
+      --maxmemory-clients               32%
+      --maxclients                      256
+      --tcp-backlog                     1024
+      --timeout                         0
+      --tcp-keepalive                   300
+      --save                            ""
+      --rdb-del-sync-files              no
+      --replica-serve-stale-data        yes
+      --replica-read-only               yes
+      --repl-backlog-size               2mb
+      --repl-backlog-ttl                0
+      --repl-disable-tcp-nodelay        yes
+      --repl-diskless-sync              yes
+      --repl-diskless-sync-delay        0
+      --repl-diskless-sync-max-replicas 0
+      --repl-diskless-load              on-empty-db
+      --repl-ping-replica-period        60
+      --repl-timeout                    300
+      --min-replicas-to-write           0
+      --min-replicas-max-lag            0
+      --shutdown-timeout                0
+      --shutdown-on-sigint              nosave force now
+      --shutdown-on-sigterm             nosave force now
+      --client-output-buffer-limit      replica 0 0 0
+      --client-query-buffer-limit       4mb
+      --appendonly                      no
+      --appendfsync                     no
+      --cluster-enabled                 yes
+      --cluster-config-file             nodes.conf
+      --cluster-node-timeout            300000
+      --cluster-replica-validity-factor 5
+    restart: "${RESTART_POLICY:-always}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: "7s"
+      timeout: "5s"
+      retries: 10
+    ports:
+      - "6379:6379"
+  node002:
+    <<: *node
+    ports:
+      - "6380:6379"
+  node003:
+    <<: *node
+    ports:
+      - "6381:6379"
+  node004:
+    <<: *node
+    ports:
+      - "6382:6379"
+  node005:
+    <<: *node
+    ports:
+      - "6383:6379"
+  node006:
+    <<: *node
+    ports:
+      - "6384:6379"
+  node007:
+    <<: *node
+    ports:
+      - "6385:6379"
+  node008:
+    <<: *node
+    ports:
+      - "6386:6379"
+  node009:
+    <<: *node
+    ports:
+      - "6387:6379"
+  node010:
+    <<: *node
+    ports:
+      - "6388:6379"
+  node011:
+    <<: *node
+    ports:
+      - "6389:6379"
+  node012:
+    <<: *node
+    ports:
+      - "6390:6379"
+  node013:
+    <<: *node
+    ports:
+      - "6391:6379"
+  node014:
+    <<: *node
+    ports:
+      - "6392:6379"
+  node015:
+    <<: *node
+    ports:
+      - "6393:6379"
+  node016:
+    <<: *node
+    ports:
+      - "6394:6379"
+  node017:
+    <<: *node
+    ports:
+      - "6395:6379"
+  node018:
+    <<: *node
+    ports:
+      - "6396:6379"
+  node019:
+    <<: *node
+    ports:
+      - "6397:6379"
+  node020:
+    <<: *node
+    ports:
+      - "6398:6379"
+  node021:
+    <<: *node
+    ports:
+      - "6399:6379"
+  node022:
+    <<: *node
+    ports:
+      - "6400:6379"
+  node023:
+    <<: *node
+    ports:
+      - "6401:6379"
+  node024:
+    <<: *node
+    ports:
+      - "6402:6379"
+  node025:
+    <<: *node
+    ports:
+      - "6403:6379"
+  node026:
+    <<: *node
+    ports:
+      - "6404:6379"
+  node027:
+    <<: *node
+    ports:
+      - "6405:6379"
+  node028:
+    <<: *node
+    ports:
+      - "6406:6379"
+  node029:
+    <<: *node
+    ports:
+      - "6407:6379"
+  node030:
+    <<: *node
+    ports:
+      - "6408:6379"
+  clustering:
+    image: "redis:${REDIS_VERSION:-7}"
+    command: >
+      bash -c "apt-get update > /dev/null
+      && apt-get install --no-install-recommends --no-install-suggests -y dnsutils > /dev/null
+      && rm -rf /var/lib/apt/lists/*
+      && yes yes | redis-cli --cluster create
+      $$(dig node001 +short):6379
+      $$(dig node002 +short):6379
+      $$(dig node003 +short):6379
+      $$(dig node004 +short):6379
+      $$(dig node005 +short):6379
+      $$(dig node006 +short):6379
+      $$(dig node007 +short):6379
+      $$(dig node008 +short):6379
+      $$(dig node009 +short):6379
+      $$(dig node010 +short):6379
+      $$(dig node011 +short):6379
+      $$(dig node012 +short):6379
+      $$(dig node013 +short):6379
+      $$(dig node014 +short):6379
+      $$(dig node015 +short):6379
+      $$(dig node016 +short):6379
+      $$(dig node017 +short):6379
+      $$(dig node018 +short):6379
+      $$(dig node019 +short):6379
+      $$(dig node020 +short):6379
+      $$(dig node021 +short):6379
+      $$(dig node022 +short):6379
+      $$(dig node023 +short):6379
+      $$(dig node024 +short):6379
+      $$(dig node025 +short):6379
+      $$(dig node026 +short):6379
+      $$(dig node027 +short):6379
+      $$(dig node028 +short):6379
+      $$(dig node029 +short):6379
+      $$(dig node030 +short):6379
+      --cluster-replicas 2"
+    depends_on:
+      node001:
+        condition: service_healthy
+      node002:
+        condition: service_healthy
+      node003:
+        condition: service_healthy
+      node004:
+        condition: service_healthy
+      node005:
+        condition: service_healthy
+      node006:
+        condition: service_healthy
+      node007:
+        condition: service_healthy
+      node008:
+        condition: service_healthy
+      node009:
+        condition: service_healthy
+      node010:
+        condition: service_healthy
+      node011:
+        condition: service_healthy
+      node012:
+        condition: service_healthy
+      node013:
+        condition: service_healthy
+      node014:
+        condition: service_healthy
+      node015:
+        condition: service_healthy
+      node016:
+        condition: service_healthy
+      node017:
+        condition: service_healthy
+      node018:
+        condition: service_healthy
+      node019:
+        condition: service_healthy
+      node020:
+        condition: service_healthy
+      node021:
+        condition: service_healthy
+      node022:
+        condition: service_healthy
+      node023:
+        condition: service_healthy
+      node024:
+        condition: service_healthy
+      node025:
+        condition: service_healthy
+      node026:
+        condition: service_healthy
+      node027:
+        condition: service_healthy
+      node028:
+        condition: service_healthy
+      node029:
+        condition: service_healthy
+      node030:
+        condition: service_healthy

@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'erb'
+
+path = File.join(File.expand_path('..', __dir__), 'compose.yaml.erb')
+content = File.read(path)
+template = ERB.new(content, trim_mode: '<>')
+
+# rubocop:disable Lint/UselessAssignment
+shards = ENV.fetch('REDIS_SHARD_SIZE', '10').to_i
+n = shards + shards * ENV.fetch('REDIS_REPLICA_SIZE', '2').to_i
+port = 6379
+# rubocop:enable Lint/UselessAssignment
+
+template.run

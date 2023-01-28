@@ -53,9 +53,13 @@ class ClusterController
   end
 
   def wait_for_cluster_to_be_ready
+    print_debug('wait for nodes to be recognized...')
     wait_meeting(@clients, max_attempts: @max_attempts)
+    print_debug('wait for the cluster state to be ok...')
     wait_cluster_building(@clients, max_attempts: @max_attempts)
+    print_debug('wait for the replication to be established...')
     wait_replication(@clients, number_of_replicas: @number_of_replicas, max_attempts: @max_attempts)
+    print_debug('wait for commands to be accepted...')
     wait_cluster_recovering(@clients, max_attempts: @max_attempts)
   end
 
@@ -310,6 +314,7 @@ class ClusterController
   def wait_meeting(clients, max_attempts:)
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       info = hashify_cluster_info(client)
+      print_debug("#{client.config.host}:#{client.config.port} ... #{info['cluster_known_nodes']}")
       info['cluster_known_nodes'].to_s == clients.size.to_s
     rescue ::RedisClient::ConnectionError
       true
@@ -352,6 +357,7 @@ class ClusterController
   def wait_cluster_building(clients, max_attempts:)
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       info = hashify_cluster_info(client)
+      print_debug("#{client.config.host}:#{client.config.port} ... #{info['cluster_state']}")
       info['cluster_state'] == 'ok'
     rescue ::RedisClient::ConnectionError
       true
@@ -362,6 +368,7 @@ class ClusterController
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       rows = fetch_cluster_nodes(client)
       rows = parse_cluster_nodes(rows)
+      print_debug("#{client.config.host}:#{client.config.port} ... #{rows.count(&:replica?)}")
       rows.count(&:replica?) == number_of_replicas
     rescue ::RedisClient::ConnectionError
       true
@@ -393,6 +400,7 @@ class ClusterController
   def wait_cluster_recovering(clients, max_attempts:)
     key = 0
     wait_for_state(clients, max_attempts: max_attempts) do |client|
+      print_debug("#{client.config.host}:#{client.config.port} ... GET #{key}")
       client.call('GET', key) if primary_client?(client)
       true
     rescue ::RedisClient::CommandError => e

@@ -52,6 +52,7 @@ task :wait do
   require 'cluster_controller'
   ::ClusterController.new(
     TEST_NODE_URIS,
+    shard_size: TEST_SHARD_SIZE,
     replica_size: TEST_REPLICA_SIZE,
     **TEST_GENERIC_OPTIONS
   ).wait_for_cluster_to_be_ready
