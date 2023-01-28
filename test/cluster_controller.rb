@@ -368,6 +368,7 @@ class ClusterController
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       rows = fetch_cluster_nodes(client)
       rows = parse_cluster_nodes(rows)
+      print_debug("#{client.config.host}:#{client.config.port} ... #{rows.count(&:replica?)}")
       rows.count(&:replica?) == number_of_replicas
     rescue ::RedisClient::ConnectionError
       true
@@ -399,6 +400,7 @@ class ClusterController
   def wait_cluster_recovering(clients, max_attempts:)
     key = 0
     wait_for_state(clients, max_attempts: max_attempts) do |client|
+      print_debug("#{client.config.host}:#{client.config.port} ... GET #{key}")
       client.call('GET', key) if primary_client?(client)
       true
     rescue ::RedisClient::CommandError => e
