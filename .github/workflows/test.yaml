@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 16
+      max-parallel: 8
       matrix:
         include:
           - {redis: '7.0', ruby: '3.2'}
@@ -237,8 +237,8 @@ jobs:
           MEMORY_PROFILE_MODE: ${{ matrix.mode }}
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
-  large:
-    name: Large
+  massive:
+    name: Massive Cluster
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
