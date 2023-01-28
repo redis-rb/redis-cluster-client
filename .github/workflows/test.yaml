@@ -243,7 +243,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REDIS_VERSION: '7.0'
-      DOCKER_COMPOSE_FILE: 'compose.large.yaml'
+      DOCKER_COMPOSE_FILE: 'compose.massive.yaml'
       REDIS_SHARD_SIZE: '10'
       REDIS_REPLICA_SIZE: '2'
     steps:
@@ -274,10 +274,10 @@ jobs:
       - name: Tune kernel params for redis
         run: |
           # https://developer.redis.com/operate/redis-at-scale/talking-to-redis/initial-tuning/
+          sudo sysctl -w vm.overcommit_memory=1
           sudo sysctl -w net.ipv4.tcp_tw_reuse=1           # reuse sockets quickly
           sudo sysctl -w net.ipv4.tcp_max_syn_backlog=1024 # backlog setting
           sudo sysctl -w net.core.somaxconn=1024           # up the number of connections per port
-          sudo sysctl -w vm.overcommit_memory=1
       - name: Pull Docker images
         run: docker pull redis:$REDIS_VERSION
       - name: Run containers
