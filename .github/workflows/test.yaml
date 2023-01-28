@@ -244,7 +244,7 @@ jobs:
     env:
       REDIS_VERSION: '7.0'
       DOCKER_COMPOSE_FILE: 'compose.large.yaml'
-      REDIS_SHARD_SIZE: '33'
+      REDIS_SHARD_SIZE: '10'
       REDIS_REPLICA_SIZE: '2'
     steps:
       - name: Check out code
@@ -260,6 +260,7 @@ jobs:
         run: |
           sysctl fs.file-max
           sysctl vm.swappiness
+          sysctl vm.overcommit_memory
           sysctl net.ipv4.tcp_sack
           sysctl net.ipv4.tcp_timestamps
           sysctl net.ipv4.tcp_window_scaling
@@ -276,6 +277,7 @@ jobs:
           sudo sysctl -w net.ipv4.tcp_tw_reuse=1           # reuse sockets quickly
           sudo sysctl -w net.ipv4.tcp_max_syn_backlog=1024 # backlog setting
           sudo sysctl -w net.core.somaxconn=1024           # up the number of connections per port
+          sudo sysctl -w vm.overcommit_memory=1
       - name: Pull Docker images
         run: docker pull redis:$REDIS_VERSION
       - name: Run containers

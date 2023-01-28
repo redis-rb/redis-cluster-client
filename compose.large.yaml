@@ -8,16 +8,39 @@ services:
     image: "redis:${REDIS_VERSION:-7}"
     command: >
       redis-server
-      --maxmemory                8mb
-      --maxmemory-policy         allkeys-lru
-      --maxclients               256
-      --tcp-backlog              1024
-      --replica-serve-stale-data yes
-      --replica-read-only        yes
-      --appendonly               yes
-      --cluster-enabled          yes
-      --cluster-config-file      nodes.conf
-      --cluster-node-timeout     5000
+      --maxmemory                       32mb
+      --maxmemory-policy                allkeys-lru
+      --maxmemory-clients               32%
+      --maxclients                      256
+      --tcp-backlog                     1024
+      --timeout                         0
+      --tcp-keepalive                   300
+      --save                            ""
+      --rdb-del-sync-files              no
+      --replica-serve-stale-data        yes
+      --replica-read-only               yes
+      --repl-backlog-size               2mb
+      --repl-backlog-ttl                0
+      --repl-disable-tcp-nodelay        yes
+      --repl-diskless-sync              yes
+      --repl-diskless-sync-delay        0
+      --repl-diskless-sync-max-replicas 0
+      --repl-diskless-load              on-empty-db
+      --repl-ping-replica-period        60
+      --repl-timeout                    300
+      --min-replicas-to-write           0
+      --min-replicas-max-lag            0
+      --shutdown-timeout                0
+      --shutdown-on-sigint              nosave force now
+      --shutdown-on-sigterm             nosave force now
+      --client-output-buffer-limit      replica 0 0 0
+      --client-query-buffer-limit       4mb
+      --appendonly                      no
+      --appendfsync                     no
+      --cluster-enabled                 yes
+      --cluster-config-file             nodes.conf
+      --cluster-node-timeout            300000
+      --cluster-replica-validity-factor 5
     restart: "${RESTART_POLICY:-always}"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -142,282 +165,6 @@ services:
     <<: *node
     ports:
       - "6408:6379"
-  node031:
-    <<: *node
-    ports:
-      - "6409:6379"
-  node032:
-    <<: *node
-    ports:
-      - "6410:6379"
-  node033:
-    <<: *node
-    ports:
-      - "6411:6379"
-  node034:
-    <<: *node
-    ports:
-      - "6412:6379"
-  node035:
-    <<: *node
-    ports:
-      - "6413:6379"
-  node036:
-    <<: *node
-    ports:
-      - "6414:6379"
-  node037:
-    <<: *node
-    ports:
-      - "6415:6379"
-  node038:
-    <<: *node
-    ports:
-      - "6416:6379"
-  node039:
-    <<: *node
-    ports:
-      - "6417:6379"
-  node040:
-    <<: *node
-    ports:
-      - "6418:6379"
-  node041:
-    <<: *node
-    ports:
-      - "6419:6379"
-  node042:
-    <<: *node
-    ports:
-      - "6420:6379"
-  node043:
-    <<: *node
-    ports:
-      - "6421:6379"
-  node044:
-    <<: *node
-    ports:
-      - "6422:6379"
-  node045:
-    <<: *node
-    ports:
-      - "6423:6379"
-  node046:
-    <<: *node
-    ports:
-      - "6424:6379"
-  node047:
-    <<: *node
-    ports:
-      - "6425:6379"
-  node048:
-    <<: *node
-    ports:
-      - "6426:6379"
-  node049:
-    <<: *node
-    ports:
-      - "6427:6379"
-  node050:
-    <<: *node
-    ports:
-      - "6428:6379"
-  node051:
-    <<: *node
-    ports:
-      - "6429:6379"
-  node052:
-    <<: *node
-    ports:
-      - "6430:6379"
-  node053:
-    <<: *node
-    ports:
-      - "6431:6379"
-  node054:
-    <<: *node
-    ports:
-      - "6432:6379"
-  node055:
-    <<: *node
-    ports:
-      - "6433:6379"
-  node056:
-    <<: *node
-    ports:
-      - "6434:6379"
-  node057:
-    <<: *node
-    ports:
-      - "6435:6379"
-  node058:
-    <<: *node
-    ports:
-      - "6436:6379"
-  node059:
-    <<: *node
-    ports:
-      - "6437:6379"
-  node060:
-    <<: *node
-    ports:
-      - "6438:6379"
-  node061:
-    <<: *node
-    ports:
-      - "6439:6379"
-  node062:
-    <<: *node
-    ports:
-      - "6440:6379"
-  node063:
-    <<: *node
-    ports:
-      - "6441:6379"
-  node064:
-    <<: *node
-    ports:
-      - "6442:6379"
-  node065:
-    <<: *node
-    ports:
-      - "6443:6379"
-  node066:
-    <<: *node
-    ports:
-      - "6444:6379"
-  node067:
-    <<: *node
-    ports:
-      - "6445:6379"
-  node068:
-    <<: *node
-    ports:
-      - "6446:6379"
-  node069:
-    <<: *node
-    ports:
-      - "6447:6379"
-  node070:
-    <<: *node
-    ports:
-      - "6448:6379"
-  node071:
-    <<: *node
-    ports:
-      - "6449:6379"
-  node072:
-    <<: *node
-    ports:
-      - "6450:6379"
-  node073:
-    <<: *node
-    ports:
-      - "6451:6379"
-  node074:
-    <<: *node
-    ports:
-      - "6452:6379"
-  node075:
-    <<: *node
-    ports:
-      - "6453:6379"
-  node076:
-    <<: *node
-    ports:
-      - "6454:6379"
-  node077:
-    <<: *node
-    ports:
-      - "6455:6379"
-  node078:
-    <<: *node
-    ports:
-      - "6456:6379"
-  node079:
-    <<: *node
-    ports:
-      - "6457:6379"
-  node080:
-    <<: *node
-    ports:
-      - "6458:6379"
-  node081:
-    <<: *node
-    ports:
-      - "6459:6379"
-  node082:
-    <<: *node
-    ports:
-      - "6460:6379"
-  node083:
-    <<: *node
-    ports:
-      - "6461:6379"
-  node084:
-    <<: *node
-    ports:
-      - "6462:6379"
-  node085:
-    <<: *node
-    ports:
-      - "6463:6379"
-  node086:
-    <<: *node
-    ports:
-      - "6464:6379"
-  node087:
-    <<: *node
-    ports:
-      - "6465:6379"
-  node088:
-    <<: *node
-    ports:
-      - "6466:6379"
-  node089:
-    <<: *node
-    ports:
-      - "6467:6379"
-  node090:
-    <<: *node
-    ports:
-      - "6468:6379"
-  node091:
-    <<: *node
-    ports:
-      - "6469:6379"
-  node092:
-    <<: *node
-    ports:
-      - "6470:6379"
-  node093:
-    <<: *node
-    ports:
-      - "6471:6379"
-  node094:
-    <<: *node
-    ports:
-      - "6472:6379"
-  node095:
-    <<: *node
-    ports:
-      - "6473:6379"
-  node096:
-    <<: *node
-    ports:
-      - "6474:6379"
-  node097:
-    <<: *node
-    ports:
-      - "6475:6379"
-  node098:
-    <<: *node
-    ports:
-      - "6476:6379"
-  node099:
-    <<: *node
-    ports:
-      - "6477:6379"
   clustering:
     image: "redis:${REDIS_VERSION:-7}"
     command: >
@@ -455,75 +202,6 @@ services:
       $$(dig node028 +short):6379
       $$(dig node029 +short):6379
       $$(dig node030 +short):6379
-      $$(dig node031 +short):6379
-      $$(dig node032 +short):6379
-      $$(dig node033 +short):6379
-      $$(dig node034 +short):6379
-      $$(dig node035 +short):6379
-      $$(dig node036 +short):6379
-      $$(dig node037 +short):6379
-      $$(dig node038 +short):6379
-      $$(dig node039 +short):6379
-      $$(dig node040 +short):6379
-      $$(dig node041 +short):6379
-      $$(dig node042 +short):6379
-      $$(dig node043 +short):6379
-      $$(dig node044 +short):6379
-      $$(dig node045 +short):6379
-      $$(dig node046 +short):6379
-      $$(dig node047 +short):6379
-      $$(dig node048 +short):6379
-      $$(dig node049 +short):6379
-      $$(dig node050 +short):6379
-      $$(dig node051 +short):6379
-      $$(dig node052 +short):6379
-      $$(dig node053 +short):6379
-      $$(dig node054 +short):6379
-      $$(dig node055 +short):6379
-      $$(dig node056 +short):6379
-      $$(dig node057 +short):6379
-      $$(dig node058 +short):6379
-      $$(dig node059 +short):6379
-      $$(dig node060 +short):6379
-      $$(dig node061 +short):6379
-      $$(dig node062 +short):6379
-      $$(dig node063 +short):6379
-      $$(dig node064 +short):6379
-      $$(dig node065 +short):6379
-      $$(dig node066 +short):6379
-      $$(dig node067 +short):6379
-      $$(dig node068 +short):6379
-      $$(dig node069 +short):6379
-      $$(dig node070 +short):6379
-      $$(dig node071 +short):6379
-      $$(dig node072 +short):6379
-      $$(dig node073 +short):6379
-      $$(dig node074 +short):6379
-      $$(dig node075 +short):6379
-      $$(dig node076 +short):6379
-      $$(dig node077 +short):6379
-      $$(dig node078 +short):6379
-      $$(dig node079 +short):6379
-      $$(dig node080 +short):6379
-      $$(dig node081 +short):6379
-      $$(dig node082 +short):6379
-      $$(dig node083 +short):6379
-      $$(dig node084 +short):6379
-      $$(dig node085 +short):6379
-      $$(dig node086 +short):6379
-      $$(dig node087 +short):6379
-      $$(dig node088 +short):6379
-      $$(dig node089 +short):6379
-      $$(dig node090 +short):6379
-      $$(dig node091 +short):6379
-      $$(dig node092 +short):6379
-      $$(dig node093 +short):6379
-      $$(dig node094 +short):6379
-      $$(dig node095 +short):6379
-      $$(dig node096 +short):6379
-      $$(dig node097 +short):6379
-      $$(dig node098 +short):6379
-      $$(dig node099 +short):6379
       --cluster-replicas 2"
     depends_on:
       node001:
@@ -585,142 +263,4 @@ services:
       node029:
         condition: service_healthy
       node030:
-        condition: service_healthy
-      node031:
-        condition: service_healthy
-      node032:
-        condition: service_healthy
-      node033:
-        condition: service_healthy
-      node034:
-        condition: service_healthy
-      node035:
-        condition: service_healthy
-      node036:
-        condition: service_healthy
-      node037:
-        condition: service_healthy
-      node038:
-        condition: service_healthy
-      node039:
-        condition: service_healthy
-      node040:
-        condition: service_healthy
-      node041:
-        condition: service_healthy
-      node042:
-        condition: service_healthy
-      node043:
-        condition: service_healthy
-      node044:
-        condition: service_healthy
-      node045:
-        condition: service_healthy
-      node046:
-        condition: service_healthy
-      node047:
-        condition: service_healthy
-      node048:
-        condition: service_healthy
-      node049:
-        condition: service_healthy
-      node050:
-        condition: service_healthy
-      node051:
-        condition: service_healthy
-      node052:
-        condition: service_healthy
-      node053:
-        condition: service_healthy
-      node054:
-        condition: service_healthy
-      node055:
-        condition: service_healthy
-      node056:
-        condition: service_healthy
-      node057:
-        condition: service_healthy
-      node058:
-        condition: service_healthy
-      node059:
-        condition: service_healthy
-      node060:
-        condition: service_healthy
-      node061:
-        condition: service_healthy
-      node062:
-        condition: service_healthy
-      node063:
-        condition: service_healthy
-      node064:
-        condition: service_healthy
-      node065:
-        condition: service_healthy
-      node066:
-        condition: service_healthy
-      node067:
-        condition: service_healthy
-      node068:
-        condition: service_healthy
-      node069:
-        condition: service_healthy
-      node070:
-        condition: service_healthy
-      node071:
-        condition: service_healthy
-      node072:
-        condition: service_healthy
-      node073:
-        condition: service_healthy
-      node074:
-        condition: service_healthy
-      node075:
-        condition: service_healthy
-      node076:
-        condition: service_healthy
-      node077:
-        condition: service_healthy
-      node078:
-        condition: service_healthy
-      node079:
-        condition: service_healthy
-      node080:
-        condition: service_healthy
-      node081:
-        condition: service_healthy
-      node082:
-        condition: service_healthy
-      node083:
-        condition: service_healthy
-      node084:
-        condition: service_healthy
-      node085:
-        condition: service_healthy
-      node086:
-        condition: service_healthy
-      node087:
-        condition: service_healthy
-      node088:
-        condition: service_healthy
-      node089:
-        condition: service_healthy
-      node090:
-        condition: service_healthy
-      node091:
-        condition: service_healthy
-      node092:
-        condition: service_healthy
-      node093:
-        condition: service_healthy
-      node094:
-        condition: service_healthy
-      node095:
-        condition: service_healthy
-      node096:
-        condition: service_healthy
-      node097:
-        condition: service_healthy
-      node098:
-        condition: service_healthy
-      node099:
         condition: service_healthy
