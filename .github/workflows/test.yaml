@@ -290,5 +290,9 @@ jobs:
           DEBUG: '1'
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
+      - name: Run memory profiler
+        run: bundle exec rake prof
+        env:
+          MEMORY_PROFILE_MODE: pipelining_in_moderation
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down
