@@ -18,6 +18,15 @@ class RedisClient
       MAX_STARTUP_SAMPLE = 37
       MAX_THREADS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
       IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
+      CLUSTER_NODE_REPLY_DELIMITER = "\n"
+      CLUSTER_NODE_REPLY_FIELD_DELIMITER = ' '
+      CLUSTER_NODE_REPLY_NODE_KEY_DELIMITER = '@'
+      CLUSTER_NODE_REPLY_FLAGS_DELIMITER = ','
+      CLUSTER_NODE_LINK_STATE_CONNECTED = 'connected'
+      CLUSTER_NODE_DEAD_FLAGS = %w[fail? fail handshake noaddr noflags].freeze
+      CLUSTER_NODE_ROLE_FLAGS = %w[master slave].freeze
+      CLUSTER_NODE_SLOT_PREFIX_IN_RESHARDING = '['
+      CLUSTER_NODE_SLOT_RANGE_DELIMITER = '-'
 
       ReloadNeeded = Class.new(::RedisClient::Error)
 
@@ -132,26 +141,49 @@ class RedisClient
         # @see https://redis.io/commands/cluster-nodes/
         # @see https://github.com/redis/redis/blob/78960ad57b8a5e6af743d789ed8fd767e37d42b8/src/cluster.c#L4660-L4683
         def parse_cluster_node_reply(reply) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-          rows = reply.split("\n").map(&:split)
-          rows.each { |arr| arr[2] = arr[2].split(',') }
-          rows.select! { |arr| arr[7] == 'connected' && (arr[2] & %w[fail? fail handshake noaddr noflags]).empty? }
-          rows.each do |arr|
-            arr[1] = arr[1].split('@').first
-            arr[2] = (arr[2] & %w[master slave]).first
-            if arr[8].nil?
-              arr[8] = []
-              next
-            end
-            arr[8] = arr[8..].filter_map { |str| str.start_with?('[') ? nil : str.split('-').map { |s| Integer(s) } }
-                             .map { |a| a.size == 1 ? a << a.first : a }.map(&:sort)
-          end
+          # This implementation is intentionally procedural for reducing memory allocation against massive cluster.
+          nodes = Array.new(reply.count(CLUSTER_NODE_REPLY_DELIMITER))
 
-          rows.map do |arr|
-            ::RedisClient::Cluster::Node::Info.new(
-              id: arr[0], node_key: arr[1], role: arr[2], primary_id: arr[3], ping_sent: arr[4],
-              pong_recv: arr[5], config_epoch: arr[6], link_state: arr[7], slots: arr[8]
+          reply.each_line(CLUSTER_NODE_REPLY_DELIMITER, chomp: true) do |line|
+            fields = line.each_line(CLUSTER_NODE_REPLY_FIELD_DELIMITER, chomp: true)
+            id = fields.next
+            node_key = fields.next.each_line(CLUSTER_NODE_REPLY_NODE_KEY_DELIMITER, chomp: true).next
+
+            role = nil
+            is_dead = false
+            fields.next.each_line(CLUSTER_NODE_REPLY_FLAGS_DELIMITER, chomp: true) do |flag|
+              role = flag if CLUSTER_NODE_ROLE_FLAGS.include?(flag)
+              is_dead = true if CLUSTER_NODE_DEAD_FLAGS.include?(flag)
+            end
+
+            primary_id = fields.next
+            ping_sent = fields.next
+            pong_recv = fields.next
+            config_epoch = fields.next
+            link_state = fields.next
+            next if link_state != CLUSTER_NODE_LINK_STATE_CONNECTED || is_dead
+
+            slots = []
+
+            loop do
+              slot = fields.next
+              next if slot.start_with?(CLUSTER_NODE_SLOT_PREFIX_IN_RESHARDING)
+
+              slots << slot.each_line(CLUSTER_NODE_SLOT_RANGE_DELIMITER, chomp: true)
+                           .map { |s| Integer(s) }
+                           .then { |a| a.size == 1 ? a << a.first : a }
+                           .then(&:sort)
+            rescue StopIteration
+              break
+            end
+
+            nodes << ::RedisClient::Cluster::Node::Info.new(
+              id: id, node_key: node_key, role: role, primary_id: primary_id, ping_sent: ping_sent,
+              pong_recv: pong_recv, config_epoch: config_epoch, link_state: link_state, slots: slots
             )
           end
+
+          nodes.compact
         end
       end
 
