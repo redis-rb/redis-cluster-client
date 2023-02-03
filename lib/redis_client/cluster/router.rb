@@ -14,7 +14,7 @@ class RedisClient
     class Router
       ZERO_CURSOR_FOR_SCAN = '0'
       METHODS_FOR_BLOCKING_CMD = %i[blocking_call_v blocking_call].freeze
-      TSF = ->(b, s) { b.nil? ? s : b.call(s) }.curry
+      TSF = ->(f, x) { f.nil? ? x : f.call(x) }.curry
 
       attr_reader :node
 
@@ -240,7 +240,7 @@ class RedisClient
 
       def send_client_command(method, command, args, &block)
         case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
-        when 'list' then @node.call_all(method, command, args).flatten.then(&TSF.call(block))
+        when 'list' then @node.call_all(method, command, args, &block).flatten
         when 'pause', 'reply', 'setname'
           @node.call_all(method, command, args).first.then(&TSF.call(block))
         else assign_node(command).public_send(method, *args, command, &block)

@@ -241,7 +241,11 @@ class RedisClient
           { command: %w[ROLE], is_a: Array },
           { command: %w[CONFIG RESETSTAT], want: 'OK' },
           { command: %w[CONFIG GET maxmemory], is_a: TEST_REDIS_MAJOR_VERSION < 6 ? Array : Hash },
-          { command: %w[CLIENT LIST], is_a: Array },
+          {
+            command: %w[CLIENT LIST],
+            blk: ->(r) { r.lines("\n", chomp: true).map(&:split).map { |e| Hash[e.map { |x| x.split('=') }] } },
+            is_a: Array
+          },
           { command: %w[CLIENT PAUSE 100], want: 'OK' },
           { command: %w[CLIENT INFO], is_a: String, supported_redis_version: 6 },
           { command: %w[CLUSTER SET-CONFIG-EPOCH 0], error: ::RedisClient::Cluster::OrchestrationCommandNotSupported },
