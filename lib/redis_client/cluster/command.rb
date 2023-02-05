@@ -10,6 +10,7 @@ class RedisClient
       EMPTY_STRING = ''
       LEFT_BRACKET = '{'
       RIGHT_BRACKET = '}'
+      EMPTY_HASH = {}.freeze
 
       Detail = Struct.new(
         'RedisCommand',
@@ -41,16 +42,15 @@ class RedisClient
         private
 
         def parse_command_reply(rows)
-          rows&.reject { |row| row[0].nil? }.to_h do |row|
-            [
-              row[0].downcase,
-              ::RedisClient::Cluster::Command::Detail.new(
-                first_key_position: row[3],
-                write?: row[2].include?('write'),
-                readonly?: row[2].include?('readonly')
-              )
-            ]
-          end
+          rows&.each_with_object({}) do |row, acc|
+            next if row[0].nil?
+
+            acc[row[0].downcase] = ::RedisClient::Cluster::Command::Detail.new(
+              first_key_position: row[3],
+              write?: row[2].include?('write'),
+              readonly?: row[2].include?('readonly')
+            )
+          end || EMPTY_HASH
         end
       end
 
