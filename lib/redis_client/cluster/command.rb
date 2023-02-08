@@ -22,15 +22,15 @@ class RedisClient
 
       class << self
         def load(nodes)
-          errors = []
-          cmd = nil
-          nodes&.each do |node|
-            break unless cmd.nil?
+          cmd = errors = nil
 
+          nodes&.each do |node|
             reply = node.call('COMMAND')
             commands = parse_command_reply(reply)
             cmd = ::RedisClient::Cluster::Command.new(commands)
+            break
           rescue ::RedisClient::Error => e
+            errors ||= []
             errors << e
           end
 

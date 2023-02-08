@@ -121,10 +121,10 @@ class RedisClient
           raise ::RedisClient::Cluster::InitialSetupError, errors if node_info_list.nil?
 
           grouped = node_info_list.compact.group_by do |info_list|
-            info_list
-              .sort_by(&:id)
-              .map { |i| "#{i.id}#{i.node_key}#{i.role}#{i.primary_id}#{i.config_epoch}" }
-              .join
+            info_list.sort_by!(&:id)
+            info_list.each_with_object(String.new(capacity: 128 * info_list.size)) do |e, a|
+              a << e.id << e.node_key << e.role << e.primary_id << e.config_epoch
+            end
           end
 
           grouped.max_by { |_, v| v.size }[1].first
