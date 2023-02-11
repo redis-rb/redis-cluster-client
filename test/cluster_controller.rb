@@ -501,6 +501,6 @@ class ClusterController
   def print_debug(msg)
     return unless @debug == '1'
 
-    p msg
+    p msg # rubocop:disable Lint/Debugger
   end
 end

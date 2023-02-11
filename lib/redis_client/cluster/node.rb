@@ -127,7 +127,7 @@ class RedisClient
             end
           end
 
-          grouped.max_by { |_, v| v.size }[1].first
+          grouped.max_by { |_, v| v.size }[1].first.freeze
         end
 
         private

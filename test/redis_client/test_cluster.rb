@@ -277,7 +277,7 @@ class RedisClient
           { command: %w[MULTI], error: ::RedisClient::Cluster::AmbiguousNodeError },
           { command: %w[FLUSHDB], want: 'OK' }
         ].each do |c|
-          next if c.key?(:supported_redis_version) && TEST_REDIS_MAJOR_VERSION < c[:supported_redis_version]
+          next if c.key?(:supported_redis_version) && c[:supported_redis_version] > TEST_REDIS_MAJOR_VERSION
 
           msg = "Case: #{c[:command].join(' ')}"
           got = -> { @client.call_v(c[:command], &c[:blk]) }

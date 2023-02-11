@@ -52,7 +52,8 @@ class TestAgainstClusterScale < TestingWrapper
     rescue ::RedisClient::CommandError => e
       raise unless e.message.start_with?('CLUSTERDOWN Hash slot not served')
 
-      p "key#{i}" # FIXME: Why does the error occur?
+      # FIXME: Why does the error occur?
+      p "key#{i}" # rubocop:disable Lint/Debugger
     end
 
     want = TEST_NODE_URIS.size

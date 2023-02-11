@@ -50,12 +50,12 @@ class RedisClient
               write?: row[2].include?('write'),
               readonly?: row[2].include?('readonly')
             )
-          end || EMPTY_HASH
+          end.freeze || EMPTY_HASH
         end
       end
 
       def initialize(commands)
-        @commands = commands || {}
+        @commands = commands || EMPTY_HASH
       end
 
       def extract_first_key(command)
