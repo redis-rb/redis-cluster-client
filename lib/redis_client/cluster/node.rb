@@ -151,7 +151,7 @@ class RedisClient
 
             ::RedisClient::Cluster::Node::Info.new(
               id: fields[0],
-              node_key: fields[1].split('@').first,
+              node_key: parse_node_key(fields[1]),
               role: (flags & ROLE_FLAGS).first,
               primary_id: fields[3],
               ping_sent: fields[4],
@@ -161,6 +161,20 @@ class RedisClient
               slots: slots
             )
           end
+        end
+
+        # As redirection node_key is dependent on `cluster-preferred-endpoint-type` config,
+        # node_key should use hostname if present in CLUSTER NODES output.
+        #
+        # See https://redis.io/commands/cluster-nodes/ for details on the output format.
+        # node_address matches fhe format: <ip:port@cport[,hostname[,auxiliary_field=value]*]>
+        def parse_node_key(node_address)
+          ip_chunk, hostname, _auxiliaries = node_address.split(',')
+          ip_port_string = ip_chunk.split('@').first
+          return ip_port_string if hostname.nil? || hostname.empty?
+
+          port = ip_port_string.split(':')[1]
+          "#{hostname}:#{port}"
         end
       end
 

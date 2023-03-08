@@ -53,7 +53,7 @@ class TestAgainstClusterScale < TestingWrapper
       raise unless e.message.start_with?('CLUSTERDOWN Hash slot not served')
 
       # FIXME: Why does the error occur?
-      p "key#{i}" # rubocop:disable Lint/Debugger
+      p "key#{i}"
     end
 
     want = TEST_NODE_URIS.size
