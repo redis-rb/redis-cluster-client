@@ -39,6 +39,10 @@ rescue ::RedisClient::ConnectionError => e
   raise unless e.message.include?('Connection reset by peer') || e.message.include?('EOFError')
 
   _redis_scheme = 'rediss'
+rescue ::RedisClient::CommandError => e
+  raise unless e.message.include?('NOAUTH')
+
+  _base_opts.merge!(password: '!&<123-abc>')
 ensure
   _tmp_cli&.close
 end
