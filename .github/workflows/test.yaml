@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 10
       matrix:
         include:
           - {redis: '7.0', ruby: '3.2'}
@@ -32,6 +32,7 @@ jobs:
           - {redis: '7.0', ruby: '3.2', driver: 'hiredis'}
           - {redis: '7.0', ruby: '3.2', driver: 'hiredis', compose: compose.ssl.yaml}
           - {redis: '7.0', ruby: '3.2', replica: '2', compose: compose.replica.yaml}
+          - {redis: '7.0', ruby: '3.2', compose: compose.auth.yaml}
           - {redis: '6.2', ruby: '3.1'}
           - {redis: '6.2', ruby: '3.0'}
           - {redis: '5.0', ruby: '2.7'}
