@@ -10,7 +10,7 @@ class RedisClient
 
         attr_reader :replica_clients
 
-        DUMMY_LATENCY_NSEC = 100 * 1000 * 1000 * 1000
+        DUMMY_LATENCY_MSEC = 100 * 1000 * 1000
         MEASURE_ATTEMPT_COUNT = 10
 
         def initialize(replications, options, pool, **kwargs)
@@ -45,7 +45,7 @@ class RedisClient
               Thread.new(k, v) do |node_key, client|
                 Thread.current[:node_key] = node_key
 
-                min = DUMMY_LATENCY_NSEC
+                min = DUMMY_LATENCY_MSEC
                 MEASURE_ATTEMPT_COUNT.times do
                   starting = Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond)
                   client.call_once('PING')
@@ -55,7 +55,7 @@ class RedisClient
 
                 Thread.current[:latency] = min
               rescue StandardError
-                Thread.current[:latency] = DUMMY_LATENCY_NSEC
+                Thread.current[:latency] = DUMMY_LATENCY_MSEC
               end
             end
 
