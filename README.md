@@ -223,7 +223,7 @@ $ bundle exec rake test
 You can see more information in the YAML file for GItHub actions.
 
 ## Migration
-This library might help you if you want to migrate Redis from a standalone server to a cluster.
+This library might help you if you want to migrate your Redis from a standalone server to a cluster.
 
 ```ruby
 # frozen_string_literal: true
