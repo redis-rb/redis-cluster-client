@@ -222,7 +222,42 @@ $ bundle exec rake test
 
 You can see more information in the YAML file for GItHub actions.
 
+## Migration
+This library might help you if you want to migrate Redis from a standalone server to a cluster.
+
+```ruby
+# frozen_string_literal: true
+
+require 'bundler/inline'
+
+gemfile do
+  source 'https://rubygems.org'
+  gem 'redis-cluster-client'
+end
+
+src = RedisClient.config(host: '127.0.0.1', port: 6378).new_client
+dest = RedisClient.cluster(host: '127.0.0.1', port: 6379).new_client
+node = dest.instance_variable_get(:@router).instance_variable_get(:@node)
+
+src.scan do |key|
+  slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
+  node_key = node.find_node_key_of_primary(slot)
+  host, port = ::RedisClient::Cluster::NodeKey.split(node_key)
+  print "WARN: host=#{host}, port=#{port}, key=#{key}: could not get the destination node\n" if host.nil? || port.nil? || key.nil?
+  src.blocking_call(10, 'MIGRATE', host, port, key, 0, 7, 'COPY', 'REPLACE')
+rescue StandardError => e
+  print "ERROR: host=#{host}, port=#{port}, key=#{key}: (#{e.class}) #{e.message}\n"
+end
+```
+
+The above tool is too naive.
+It may not work in the production environment that has tons of keys.
+Since `MIGRATE` command does locking internally, we can use `DUMP` and `RESTORE` commands instead.
+
 ## See also
+* https://redis.io/docs/reference/cluster-spec/
 * https://github.com/redis/redis-rb/issues/1070
 * https://github.com/redis/redis/issues/8948
 * https://github.com/antirez/redis-rb-cluster
+* https://www.youtube.com/@antirez
+* https://www.twitch.tv/thetrueantirez/
