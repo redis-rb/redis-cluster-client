@@ -236,8 +236,8 @@ gemfile do
   gem 'redis-cluster-client'
 end
 
-src = RedisClient.config(host: ENV.fetch('REDIS_HOST'), port: ENV.fetch('REDIS_PORT')).new_client
-dest = RedisClient.cluster(host: ENV.fetch('REDIS_CLUSTER_HOST'), port: ENV.fetch('REDIS_CLUSTER_PORT')).new_client
+src = RedisClient.config(url: ENV.fetch('REDIS_URL')).new_client
+dest = RedisClient.cluster(nodes: ENV.fetch('REDIS_CLUSTER_URL')).new_client
 node = dest.instance_variable_get(:@router).instance_variable_get(:@node)
 
 src.scan do |key|
