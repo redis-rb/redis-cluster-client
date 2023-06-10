@@ -224,6 +224,7 @@ You can see more information in the YAML file for GItHub actions.
 
 ## Migration
 This library might help you if you want to migrate your Redis from a standalone server to a cluster.
+Here is an example code.
 
 ```ruby
 # frozen_string_literal: true
@@ -235,38 +236,20 @@ gemfile do
   gem 'redis-cluster-client'
 end
 
-src = RedisClient.config(
-  host: ENV.fetch('REDIS_HOST'),
-  port: ENV.fetch('REDIS_PORT')
-).new_client
-
-dest = RedisClient.cluster(
-  host: ENV.fetch('REDIS_CLUSTER_HOST'),
-  port: ENV.fetch('REDIS_CLUSTER_PORT')
-).new_client
-
-node = dest.instance_variable_get(:@router)
-           .instance_variable_get(:@node)
+src = RedisClient.config(host: ENV.fetch('REDIS_HOST'), port: ENV.fetch('REDIS_PORT')).new_client
+dest = RedisClient.cluster(host: ENV.fetch('REDIS_CLUSTER_HOST'), port: ENV.fetch('REDIS_CLUSTER_PORT')).new_client
+node = dest.instance_variable_get(:@router).instance_variable_get(:@node)
 
 src.scan do |key|
   slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
   node_key = node.find_node_key_of_primary(slot)
   host, port = ::RedisClient::Cluster::NodeKey.split(node_key)
-
-  if host.nil? || port.nil? || key.nil?
-    print "WARN: host=#{host}, port=#{port}, key=#{key}: could not get the destination node\n"
-    next
-  end
-
   src.blocking_call(10, 'MIGRATE', host, port, key, 0, 7, 'COPY', 'REPLACE')
-rescue ::RedisClient::Error => e
-  print "ERROR: host=#{host}, port=#{port}, key=#{key}: (#{e.class}) #{e.message}\n"
 end
 ```
 
-The above example is too naive.
-It may not be enough performance in the production environment that has tons of keys.
-Since [MIGRATE](https://redis.io/commands/migrate/) command does locking internally, we can use [DUMP](https://redis.io/commands/dump/) and [RESTORE](https://redis.io/commands/restore/) commands instead.
+It needs more enhancement to be enough performance in the production environment that has tons of keys.
+Also, it should handle errors.
 
 ## See also
 * https://redis.io/docs/reference/cluster-spec/
