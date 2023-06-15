@@ -7,6 +7,13 @@ This library is a client for [Redis cluster](https://redis.io/docs/reference/clu
 It depends on [redis-client](https://github.com/redis-rb/redis-client).
 So it would be better to read `redis-client` documents first.
 
+## Background
+This gem is underlying in the official gem which is named as [redis-clustering](https://rubygems.org/gems/redis-clustering).
+The redis-clustering gem was decoupled from [the redis gem](https://rubygems.org/gems/redis) since `v5` or later.
+Both are maintained by [the repository](https://github.com/redis/redis-rb) in the official organization.
+The redis gem supported cluster mode since [the pull request](https://github.com/redis/redis-rb/pull/716) was merged until `v4`.
+You can see more details and reasons in [the issue](https://github.com/redis/redis-rb/issues/1070) if you have interest.
+
 ## Installation
 ```ruby
 gem 'redis-cluster-client'
@@ -256,5 +263,7 @@ Also, it should handle errors.
 * https://github.com/redis/redis-rb/issues/1070
 * https://github.com/redis/redis/issues/8948
 * https://github.com/antirez/redis-rb-cluster
+* https://twitter.com/antirez
+* http://antirez.com/latest/0
 * https://www.youtube.com/@antirez
 * https://www.twitch.tv/thetrueantirez/
