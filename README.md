@@ -10,7 +10,7 @@ So it would be better to read `redis-client` documents first.
 ## Background
 This gem is underlying in the official gem which is named as [redis-clustering](https://rubygems.org/gems/redis-clustering).
 The redis-clustering was decoupled from [the redis gem](https://rubygems.org/gems/redis) which is maintained by [the repository](https://github.com/redis/redis-rb) in the official organization since `v5` or later.
-The redis gem supported cluster mode since [the PR](https://github.com/redis/redis-rb/pull/716) until `v4.8.1`.
+The redis gem supported cluster mode since [the PR](https://github.com/redis/redis-rb/pull/716) until `v4`.
 You can see more details and reasons in [the issue](https://github.com/redis/redis-rb/issues/1070).
 
 ## Installation
