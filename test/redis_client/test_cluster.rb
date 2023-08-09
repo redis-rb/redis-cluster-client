@@ -186,6 +186,7 @@ class RedisClient
           pubsub = @client.pubsub
           pubsub.call('SUBSCRIBE', "channel#{i}")
           assert_equal(['subscribe', "channel#{i}", 1], pubsub.next_event(0.1))
+          pubsub.close
         end
 
         sub = Fiber.new do |client|
@@ -195,6 +196,7 @@ class RedisClient
           assert_equal(['subscribe', channel, 1], pubsub.next_event(TEST_TIMEOUT_SEC))
           Fiber.yield(channel)
           Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
+          pubsub.close
         end
 
         channel = sub.resume(@client)
@@ -216,12 +218,41 @@ class RedisClient
             assert_equal(['ssubscribe', channel, 1], pubsub.next_event(TEST_TIMEOUT_SEC))
             Fiber.yield(channel)
             Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
+            pubsub.close
           end
 
           channel = sub.resume(@client)
           @client.call('SPUBLISH', channel, "hello world #{i}")
           assert_equal(['smessage', channel, "hello world #{i}"], sub.resume)
         end
+      end
+
+      def test_sharded_pubsub_with_multiple_channels
+        if TEST_REDIS_MAJOR_VERSION < 7
+          skip('Sharded Pub/Sub is supported by Redis 7+.')
+          return
+        end
+
+        sub = Fiber.new do |pubsub|
+          assert_empty(pubsub.next_event(TEST_TIMEOUT_SEC))
+          pubsub.call('SSUBSCRIBE', 'chan1')
+          pubsub.call('SSUBSCRIBE', 'chan2')
+          assert_equal(
+            [['ssubscribe', 'chan1', 1], ['ssubscribe', 'chan2', 1]],
+            pubsub.next_event(TEST_TIMEOUT_SEC).sort_by { |e| e[1] }
+          )
+          Fiber.yield
+          Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
+          pubsub.close
+        end
+
+        sub.resume(@client.pubsub)
+        @client.call('SPUBLISH', 'chan1', 'hello')
+        @client.call('SPUBLISH', 'chan2', 'world')
+        assert_equal(
+          [%w[smessage chan1 hello], %w[smessage chan2 world]],
+          sub.resume.sort_by { |e| e[1] }
+        )
       end
 
       def test_close
