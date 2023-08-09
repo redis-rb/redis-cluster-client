@@ -191,10 +191,7 @@ class RedisClient
         sub = Fiber.new do |pubsub|
           channel = 'my-global-channel'
           pubsub.call('SUBSCRIBE', channel)
-          assert_equal(
-            ['subscribe', channel, 1],
-            pubsub.next_event(TEST_TIMEOUT_SEC)
-          )
+          assert_equal(['subscribe', channel, 1], pubsub.next_event(TEST_TIMEOUT_SEC))
           Fiber.yield(channel)
           Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
           pubsub.call('UNSUBSCRIBE')
@@ -236,10 +233,7 @@ class RedisClient
         sub = Fiber.new do |pubsub|
           channel = 'my-sharded-channel'
           pubsub.call('SSUBSCRIBE', channel)
-          assert_equal(
-            ['ssubscribe', channel, 1],
-            pubsub.next_event(TEST_TIMEOUT_SEC)
-          )
+          assert_equal(['ssubscribe', channel, 1], pubsub.next_event(TEST_TIMEOUT_SEC))
           Fiber.yield(channel)
           Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
           pubsub.call('SUNSUBSCRIBE')
