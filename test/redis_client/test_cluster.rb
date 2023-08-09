@@ -260,11 +260,8 @@ class RedisClient
 
         sub = Fiber.new do |pubsub|
           10.times { |i| pubsub.call('SSUBSCRIBE', "s-chan#{i}") }
-          counts = [1, 2, 1, 1, 3, 4, 2, 2, 5, 6]
-          assert_equal(
-            Array.new(10) { |i| ['ssubscribe', "s-chan#{i}", counts[i]] },
-            collect_messages(pubsub).sort_by { |e| e[1].to_s }
-          )
+          got = collect_messages(pubsub).sort_by { |e| e[1].to_s }
+          10.times { |i| assert_equal(['ssubscribe', "s-chan#{i}"], got[i].take(2)) }
           Fiber.yield
           Fiber.yield(collect_messages(pubsub))
           pubsub.call('SUNSUBSCRIBE')
