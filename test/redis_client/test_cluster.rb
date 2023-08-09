@@ -207,7 +207,7 @@ class RedisClient
       end
 
       def test_global_pubsub_with_multiple_channels
-        if ::RedisClient.default_driver == ::RedisClient::HiredisConnection
+        if hiredis_used?
           skip('FIXME: SEGV occured if using hiredis driver')
           return
         end
@@ -265,7 +265,7 @@ class RedisClient
           return
         end
 
-        if ::RedisClient.default_driver == ::RedisClient::HiredisConnection
+        if hiredis_used?
           skip('FIXME: SEGV occured if using hiredis driver')
           return
         end
@@ -416,6 +416,11 @@ class RedisClient
         client = new_test_client
         yield client
         client.close
+      end
+
+      def hiredis_used?
+        ::RedisClient.const_defined?(:HiredisConnection) &&
+          ::RedisClient.default_driver == ::RedisClient::HiredisConnection
       end
     end
 
