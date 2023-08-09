@@ -26,7 +26,7 @@ class RedisClient
 
       def next_event(timeout = nil)
         msgs = collect_messages(timeout).compact
-        return msgs.first if msgs.size == 1
+        return msgs.first if msgs.size < 2
 
         msgs
       end
