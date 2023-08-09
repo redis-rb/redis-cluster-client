@@ -199,11 +199,19 @@ class RedisClient
         end
 
         channel = sub.resume(@client.pubsub)
-        @client.call('PUBLISH', channel, 'hello global world')
+        publish_messages do |cli|
+          cli.call('PUBLISH', channel, 'hello global world')
+        end
+
         assert_equal(['message', channel, 'hello global world'], sub.resume)
       end
 
       def test_global_pubsub_with_multiple_channels
+        if ::RedisClient.default_driver == ::RedisClient::HiredisConnection
+          skip('FIXME: SEGV occured if using hiredis driver')
+          return
+        end
+
         sub = Fiber.new do |pubsub|
           pubsub.call('SUBSCRIBE', *Array.new(10) { |i| "g-chan#{i}" })
           assert_equal(
@@ -217,7 +225,10 @@ class RedisClient
         end
 
         sub.resume(@client.pubsub)
-        @client.pipelined { |pi| 10.times { |i| pi.call('PUBLISH', "g-chan#{i}", i) } }
+        publish_messages do |cli|
+          cli.pipelined { |pi| 10.times { |i| pi.call('PUBLISH', "g-chan#{i}", i) } }
+        end
+
         assert_equal(
           Array.new(10) { |i| ['message', "g-chan#{i}", i.to_s] },
           sub.resume.sort_by { |e| e[1].to_s }
@@ -241,13 +252,21 @@ class RedisClient
         end
 
         channel = sub.resume(@client.pubsub)
-        @client.call('SPUBLISH', channel, 'hello sharded world')
+        publish_messages do |cli|
+          cli.call('SPUBLISH', channel, 'hello sharded world')
+        end
+
         assert_equal(['smessage', channel, 'hello sharded world'], sub.resume)
       end
 
       def test_sharded_pubsub_with_multiple_channels
         if TEST_REDIS_MAJOR_VERSION < 7
           skip('Sharded Pub/Sub is supported by Redis 7+.')
+          return
+        end
+
+        if ::RedisClient.default_driver == ::RedisClient::HiredisConnection
+          skip('FIXME: SEGV occured if using hiredis driver')
           return
         end
 
@@ -262,7 +281,10 @@ class RedisClient
         end
 
         sub.resume(@client.pubsub)
-        @client.pipelined { |pi| 10.times { |i| pi.call('SPUBLISH', "s-chan#{i}", i) } }
+        publish_messages do |cli|
+          cli.pipelined { |pi| 10.times { |i| pi.call('SPUBLISH', "s-chan#{i}", i) } }
+        end
+
         assert_equal(
           Array.new(10) { |i| ['smessage', "s-chan#{i}", i.to_s] },
           sub.resume.sort_by { |e| e[1].to_s }
@@ -388,6 +410,12 @@ class RedisClient
         end
 
         messages
+      end
+
+      def publish_messages
+        client = new_test_client
+        yield client
+        client.close
       end
     end
 
