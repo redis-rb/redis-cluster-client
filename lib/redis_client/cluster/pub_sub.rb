@@ -9,6 +9,7 @@ class RedisClient
         @router = router
         @command_builder = command_builder
         @pubsub_states = {}
+        @messages = []
       end
 
       def call(*args, **kwargs)
@@ -22,15 +23,15 @@ class RedisClient
       def close
         @pubsub_states.each_value(&:close)
         @pubsub_states.clear
+        @messages.clear
       end
 
       def next_event(timeout = nil)
         return if @pubsub_states.empty?
+        return @messages.shift unless @messages.empty?
 
-        msgs = collect_messages(timeout).compact
-        return msgs.first if msgs.size < 2
-
-        msgs
+        collect_messages(timeout)
+        @messages.shift
       end
 
       private
@@ -45,8 +46,8 @@ class RedisClient
         pubsub.call_v(command)
       end
 
-      def collect_messages(timeout) # rubocop:disable Metrics/AbcSize
-        @pubsub_states.each_slice(MAX_THREADS).each_with_object([]) do |chuncked_pubsub_states, acc|
+      def collect_messages(timeout)
+        @pubsub_states.each_slice(MAX_THREADS) do |chuncked_pubsub_states|
           threads = chuncked_pubsub_states.map do |_, v|
             Thread.new(v) do |pubsub|
               Thread.current[:reply] = pubsub.next_event(timeout)
@@ -57,7 +58,7 @@ class RedisClient
 
           threads.each do |t|
             t.join
-            acc << t[:reply] unless t[:reply].nil?
+            @messages << t[:reply] unless t[:reply].nil?
           end
         end
       end

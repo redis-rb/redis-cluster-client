@@ -214,10 +214,8 @@ class RedisClient
 
         sub = Fiber.new do |pubsub|
           pubsub.call('SUBSCRIBE', *Array.new(10) { |i| "g-chan#{i}" })
-          assert_equal(
-            Array.new(10) { |i| ['subscribe', "g-chan#{i}", i + 1] },
-            collect_messages(pubsub).sort_by { |e| e[1].to_s }
-          )
+          got = collect_messages(pubsub).sort_by { |e| e[1].to_s }
+          10.times { |i| assert_equal(['subscribe', "g-chan#{i}", i + 1], got[i]) }
           Fiber.yield
           Fiber.yield(collect_messages(pubsub))
           pubsub.call('UNSUBSCRIBE')
@@ -229,10 +227,8 @@ class RedisClient
           cli.pipelined { |pi| 10.times { |i| pi.call('PUBLISH', "g-chan#{i}", i) } }
         end
 
-        assert_equal(
-          Array.new(10) { |i| ['message', "g-chan#{i}", i.to_s] },
-          sub.resume.sort_by { |e| e[1].to_s }
-        )
+        got = sub.resume.sort_by { |e| e[1].to_s }
+        10.times { |i| assert_equal(['message', "g-chan#{i}", i.to_s], got[i]) }
       end
 
       def test_sharded_pubsub
@@ -285,10 +281,8 @@ class RedisClient
           cli.pipelined { |pi| 10.times { |i| pi.call('SPUBLISH', "s-chan#{i}", i) } }
         end
 
-        assert_equal(
-          Array.new(10) { |i| ['smessage', "s-chan#{i}", i.to_s] },
-          sub.resume.sort_by { |e| e[1].to_s }
-        )
+        got = sub.resume.sort_by { |e| e[1].to_s }
+        10.times { |i| assert_equal(['smessage', "s-chan#{i}", i.to_s], got[i]) }
       end
 
       def test_close
