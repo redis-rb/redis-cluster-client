@@ -181,27 +181,58 @@ class RedisClient
         results.each_with_index { |got, i| assert_equal(i.to_s, got) }
       end
 
-      def test_global_pubsub
-        10.times do |i|
-          pubsub = @client.pubsub
-          pubsub.call('SUBSCRIBE', "channel#{i}")
-          assert_equal(['subscribe', "channel#{i}", 1], pubsub.next_event(0.1))
-          pubsub.close
-        end
+      def test_pubsub_without_subscription
+        pubsub = @client.pubsub
+        assert_nil(pubsub.next_event(TEST_TIMEOUT_SEC))
+        pubsub.close
+      end
 
-        sub = Fiber.new do |client|
-          channel = 'my-channel'
-          pubsub = client.pubsub
+      def test_global_pubsub
+        sub = Fiber.new do |pubsub|
+          channel = 'my-global-channel'
           pubsub.call('SUBSCRIBE', channel)
           assert_equal(['subscribe', channel, 1], pubsub.next_event(TEST_TIMEOUT_SEC))
           Fiber.yield(channel)
           Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
+          pubsub.call('UNSUBSCRIBE')
           pubsub.close
         end
 
-        channel = sub.resume(@client)
-        @client.call('PUBLISH', channel, 'hello world')
-        assert_equal(['message', channel, 'hello world'], sub.resume)
+        channel = sub.resume(@client.pubsub)
+        publish_messages do |cli|
+          cli.call('PUBLISH', channel, 'hello global world')
+        end
+
+        assert_equal(['message', channel, 'hello global world'], sub.resume)
+      end
+
+      def test_global_pubsub_with_multiple_channels
+        if hiredis_used?
+          skip('FIXME: SEGV occured if using hiredis driver')
+          return
+        end
+
+        sub = Fiber.new do |pubsub|
+          pubsub.call('SUBSCRIBE', *Array.new(10) { |i| "g-chan#{i}" })
+          assert_equal(
+            Array.new(10) { |i| ['subscribe', "g-chan#{i}", i + 1] },
+            collect_messages(pubsub).sort_by { |e| e[1].to_s }
+          )
+          Fiber.yield
+          Fiber.yield(collect_messages(pubsub))
+          pubsub.call('UNSUBSCRIBE')
+          pubsub.close
+        end
+
+        sub.resume(@client.pubsub)
+        publish_messages do |cli|
+          cli.pipelined { |pi| 10.times { |i| pi.call('PUBLISH', "g-chan#{i}", i) } }
+        end
+
+        assert_equal(
+          Array.new(10) { |i| ['message', "g-chan#{i}", i.to_s] },
+          sub.resume.sort_by { |e| e[1].to_s }
+        )
       end
 
       def test_sharded_pubsub
@@ -210,21 +241,22 @@ class RedisClient
           return
         end
 
-        10.times do |i|
-          sub = Fiber.new do |client|
-            channel = "my-channel-#{i}"
-            pubsub = client.pubsub
-            pubsub.call('SSUBSCRIBE', channel)
-            assert_equal(['ssubscribe', channel, 1], pubsub.next_event(TEST_TIMEOUT_SEC))
-            Fiber.yield(channel)
-            Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
-            pubsub.close
-          end
-
-          channel = sub.resume(@client)
-          @client.call('SPUBLISH', channel, "hello world #{i}")
-          assert_equal(['smessage', channel, "hello world #{i}"], sub.resume)
+        sub = Fiber.new do |pubsub|
+          channel = 'my-sharded-channel'
+          pubsub.call('SSUBSCRIBE', channel)
+          assert_equal(['ssubscribe', channel, 1], pubsub.next_event(TEST_TIMEOUT_SEC))
+          Fiber.yield(channel)
+          Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
+          pubsub.call('SUNSUBSCRIBE')
+          pubsub.close
         end
+
+        channel = sub.resume(@client.pubsub)
+        publish_messages do |cli|
+          cli.call('SPUBLISH', channel, 'hello sharded world')
+        end
+
+        assert_equal(['smessage', channel, 'hello sharded world'], sub.resume)
       end
 
       def test_sharded_pubsub_with_multiple_channels
@@ -233,25 +265,29 @@ class RedisClient
           return
         end
 
+        if hiredis_used?
+          skip('FIXME: SEGV occured if using hiredis driver')
+          return
+        end
+
         sub = Fiber.new do |pubsub|
-          assert_empty(pubsub.next_event(TEST_TIMEOUT_SEC))
-          pubsub.call('SSUBSCRIBE', 'chan1')
-          pubsub.call('SSUBSCRIBE', 'chan2')
-          assert_equal(
-            [['ssubscribe', 'chan1', 1], ['ssubscribe', 'chan2', 1]],
-            pubsub.next_event(TEST_TIMEOUT_SEC).sort_by { |e| e[1] }
-          )
+          10.times { |i| pubsub.call('SSUBSCRIBE', "s-chan#{i}") }
+          got = collect_messages(pubsub).sort_by { |e| e[1].to_s }
+          10.times { |i| assert_equal(['ssubscribe', "s-chan#{i}"], got[i].take(2)) }
           Fiber.yield
-          Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
+          Fiber.yield(collect_messages(pubsub))
+          pubsub.call('SUNSUBSCRIBE')
           pubsub.close
         end
 
         sub.resume(@client.pubsub)
-        @client.call('SPUBLISH', 'chan1', 'hello')
-        @client.call('SPUBLISH', 'chan2', 'world')
+        publish_messages do |cli|
+          cli.pipelined { |pi| 10.times { |i| pi.call('SPUBLISH', "s-chan#{i}", i) } }
+        end
+
         assert_equal(
-          [%w[smessage chan1 hello], %w[smessage chan2 world]],
-          sub.resume.sort_by { |e| e[1] }
+          Array.new(10) { |i| ['smessage', "s-chan#{i}", i.to_s] },
+          sub.resume.sort_by { |e| e[1].to_s }
         )
       end
 
@@ -354,6 +390,37 @@ class RedisClient
         client_side_timeout = TEST_TIMEOUT_SEC + 1.0
         server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
         @client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+      end
+
+      def collect_messages(pubsub, max_attempts: 30, timeout: 1.0)
+        messages = []
+        attempts = 0
+        loop do
+          attempts += 1
+          break if attempts > max_attempts
+
+          reply = pubsub.next_event(timeout)
+          break if reply.nil?
+
+          if reply.first.is_a?(Array)
+            messages += reply
+          else
+            messages << reply
+          end
+        end
+
+        messages
+      end
+
+      def publish_messages
+        client = new_test_client
+        yield client
+        client.close
+      end
+
+      def hiredis_used?
+        ::RedisClient.const_defined?(:HiredisConnection) &&
+          ::RedisClient.default_driver == ::RedisClient::HiredisConnection
       end
     end
 
