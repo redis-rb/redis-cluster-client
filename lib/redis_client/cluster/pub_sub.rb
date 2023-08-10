@@ -14,12 +14,13 @@ class RedisClient
         end
 
         def close
+          @worker.exit if @worker&.alive?
           @client.close
         end
 
         def take_message(timeout)
           @worker = subscribe(@client, timeout) if @worker.nil?
-          return if @worker.status != false
+          return if @worker.join(0.01).nil?
 
           message = @worker[:reply]
           @worker = nil
