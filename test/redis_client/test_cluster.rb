@@ -396,11 +396,7 @@ class RedisClient
           reply = pubsub.next_event(timeout)
           break if reply.nil?
 
-          if reply.first.is_a?(Array)
-            messages += reply
-          else
-            messages << reply
-          end
+          messages << reply
         end
 
         messages
