@@ -204,18 +204,18 @@ class RedisClient
 
       def test_global_pubsub_without_timeout
         sub = Fiber.new do |pubsub|
-          pubsub.call('SUBSCRIBE', 'my-global-not-subscribed-channel', 'my-global-subscribed-channel')
-          want = [%w[subscribe my-global-not-subscribed-channel], %w[subscribe my-global-subscribed-channel]]
+          pubsub.call('SUBSCRIBE', 'my-global-not-published-channel', 'my-global-published-channel')
+          want = [%w[subscribe my-global-not-published-channel], %w[subscribe my-global-published-channel]]
           got = collect_messages(pubsub, size: 2, timeout: nil).map { |e| e.take(2) }.sort_by { |e| e[1].to_s }
           assert_equal(want, got)
-          Fiber.yield('my-global-subscribed-channel')
+          Fiber.yield('my-global-published-channel')
           Fiber.yield(collect_messages(pubsub, size: 1, timeout: nil).first)
           pubsub.close
         end
 
         channel = sub.resume(@client.pubsub)
-        publish_messages { |cli| cli.call('PUBLISH', channel, 'hello global subscribed world') }
-        assert_equal(['message', channel, 'hello global subscribed world'], sub.resume)
+        publish_messages { |cli| cli.call('PUBLISH', channel, 'hello global published world') }
+        assert_equal(['message', channel, 'hello global published world'], sub.resume)
       end
 
       def test_global_pubsub_with_multiple_channels
@@ -266,19 +266,19 @@ class RedisClient
         end
 
         sub = Fiber.new do |pubsub|
-          pubsub.call('SSUBSCRIBE', 'my-sharded-not-subscribed-channel')
-          pubsub.call('SSUBSCRIBE', 'my-sharded-subscribed-channel')
-          want = [%w[ssubscribe my-sharded-not-subscribed-channel], %w[ssubscribe my-sharded-subscribed-channel]]
+          pubsub.call('SSUBSCRIBE', 'my-sharded-not-published-channel')
+          pubsub.call('SSUBSCRIBE', 'my-sharded-published-channel')
+          want = [%w[ssubscribe my-sharded-not-published-channel], %w[ssubscribe my-sharded-published-channel]]
           got = collect_messages(pubsub, size: 2, timeout: nil).map { |e| e.take(2) }.sort_by { |e| e[1].to_s }
           assert_equal(want, got)
-          Fiber.yield('my-sharded-subscribed-channel')
+          Fiber.yield('my-sharded-published-channel')
           Fiber.yield(collect_messages(pubsub, size: 1, timeout: nil).first)
           pubsub.close
         end
 
         channel = sub.resume(@client.pubsub)
-        publish_messages { |cli| cli.call('SPUBLISH', channel, 'hello sharded subscribed world') }
-        assert_equal(['smessage', channel, 'hello sharded subscribed world'], sub.resume)
+        publish_messages { |cli| cli.call('SPUBLISH', channel, 'hello sharded published world') }
+        assert_equal(['smessage', channel, 'hello sharded published world'], sub.resume)
       end
 
       def test_sharded_pubsub_with_multiple_channels
