@@ -3,13 +3,45 @@
 class RedisClient
   class Cluster
     class PubSub
-      MAX_THREADS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
+      class State
+        def initialize(client)
+          @client = client
+          @worker = nil
+        end
+
+        def call(command)
+          @client.call_v(command)
+        end
+
+        def close
+          @worker.exit if @worker&.alive?
+          @client.close
+        end
+
+        def take_message(timeout)
+          @worker = subscribe(@client, timeout) if @worker.nil?
+          return if @worker.join(0.01).nil?
+
+          message = @worker[:reply]
+          @worker = nil
+          message
+        end
+
+        private
+
+        def subscribe(client, timeout)
+          Thread.new(client, timeout) do |pubsub, to|
+            Thread.current[:reply] = pubsub.next_event(to)
+          rescue StandardError => e
+            Thread.current[:reply] = e
+          end
+        end
+      end
 
       def initialize(router, command_builder)
         @router = router
         @command_builder = command_builder
-        @pubsub_states = {}
-        @messages = []
+        @states = {}
       end
 
       def call(*args, **kwargs)
@@ -21,46 +53,39 @@ class RedisClient
       end
 
       def close
-        @pubsub_states.each_value(&:close)
-        @pubsub_states.clear
-        @messages.clear
+        @states.each_value(&:close)
+        @states.clear
       end
 
       def next_event(timeout = nil)
-        return if @pubsub_states.empty?
-        return @messages.shift unless @messages.empty?
+        return if @states.empty?
 
-        collect_messages(timeout)
-        @messages.shift
+        max_duration = calc_max_duration(timeout)
+        starting = obtain_current_time
+        loop do
+          break if max_duration > 0 && obtain_current_time - starting > max_duration
+
+          @states.each_value do |pubsub|
+            message = pubsub.take_message(timeout)
+            return message if message
+          end
+        end
       end
 
       private
 
       def _call(command)
         node_key = @router.find_node_key(command)
-        pubsub = if @pubsub_states.key?(node_key)
-                   @pubsub_states[node_key]
-                 else
-                   @pubsub_states[node_key] = @router.find_node(node_key).pubsub
-                 end
-        pubsub.call_v(command)
+        @states[node_key] = State.new(@router.find_node(node_key).pubsub) unless @states.key?(node_key)
+        @states[node_key].call(command)
       end
 
-      def collect_messages(timeout)
-        @pubsub_states.each_slice(MAX_THREADS) do |chuncked_pubsub_states|
-          threads = chuncked_pubsub_states.map do |_, v|
-            Thread.new(v) do |pubsub|
-              Thread.current[:reply] = pubsub.next_event(timeout)
-            rescue StandardError => e
-              Thread.current[:reply] = e
-            end
-          end
+      def obtain_current_time
+        Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond)
+      end
 
-          threads.each do |t|
-            t.join
-            @messages << t[:reply] unless t[:reply].nil?
-          end
-        end
+      def calc_max_duration(timeout)
+        timeout.nil? || timeout < 0 ? 0 : timeout * 1_000_000
       end
     end
   end
