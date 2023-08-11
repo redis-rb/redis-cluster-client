@@ -219,11 +219,6 @@ class RedisClient
       end
 
       def test_global_pubsub_with_multiple_channels
-        if hiredis_used?
-          skip('FIXME: SEGV occured if using hiredis driver')
-          return
-        end
-
         sub = Fiber.new do |pubsub|
           pubsub.call('SUBSCRIBE', *Array.new(10) { |i| "g-chan#{i}" })
           got = collect_messages(pubsub, size: 10).sort_by { |e| e[1].to_s }
@@ -284,11 +279,6 @@ class RedisClient
       def test_sharded_pubsub_with_multiple_channels
         if TEST_REDIS_MAJOR_VERSION < 7
           skip('Sharded Pub/Sub is supported by Redis 7+.')
-          return
-        end
-
-        if hiredis_used?
-          skip('FIXME: SEGV occured if using hiredis driver')
           return
         end
 
