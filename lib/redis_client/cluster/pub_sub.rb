@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'redis_client'
+
 class RedisClient
   class Cluster
     class PubSub
@@ -76,8 +78,26 @@ class RedisClient
 
       def _call(command)
         node_key = @router.find_node_key(command)
-        @states[node_key] = State.new(@router.find_node(node_key).pubsub) unless @states.key?(node_key)
+        add_state(node_key)
+        try_call(node_key, command)
+      end
+
+      def try_call(node_key, command, retry_count: 1)
         @states[node_key].call(command)
+      rescue ::RedisClient::CommandError => e
+        raise if !e.message.start_with?('MOVED') || retry_count <= 0
+
+        # for sharded pub/sub
+        node_key = e.message.split[2]
+        add_state(node_key)
+        retry_count -= 1
+        retry
+      end
+
+      def add_state(node_key)
+        return @states[node_key] if @states.key?(node_key)
+
+        @states[node_key] = State.new(@router.find_node(node_key).pubsub)
       end
 
       def obtain_current_time
