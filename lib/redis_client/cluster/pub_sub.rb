@@ -22,7 +22,7 @@ class RedisClient
 
         def take_message(timeout)
           @worker = subscribe(@client, timeout) if @worker.nil?
-          return if @worker.join(0.01).nil?
+          return if @worker.alive?
 
           message = @worker[:reply]
           @worker = nil
