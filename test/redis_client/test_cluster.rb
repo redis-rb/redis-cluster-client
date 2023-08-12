@@ -187,6 +187,15 @@ class RedisClient
         pubsub.close
       end
 
+      def test_pubsub_with_wrong_command
+        pubsub = @client.pubsub
+        assert_nil(pubsub.call('SUBWAY'))
+        assert_nil(pubsub.call_v(%w[SUBSCRIBE]))
+        assert_instance_of(::RedisClient::CommandError, pubsub.next_event, 'unknown command')
+        assert_instance_of(::RedisClient::CommandError, pubsub.next_event, 'wrong number of arguments')
+        pubsub.close
+      end
+
       def test_global_pubsub
         sub = Fiber.new do |pubsub|
           channel = 'my-global-channel'
