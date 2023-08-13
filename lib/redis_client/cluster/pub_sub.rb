@@ -74,6 +74,8 @@ class RedisClient
             message = pubsub.take_message(timeout)
             return message if message
           end
+
+          sleep 0.001
         end
       end
 
