@@ -116,6 +116,8 @@ class RedisClient
                 errors[t[:index]] = t[:error]
               end
             end
+
+            break unless node_info_list.nil?
           end
 
           raise ::RedisClient::Cluster::InitialSetupError, errors if node_info_list.nil?
