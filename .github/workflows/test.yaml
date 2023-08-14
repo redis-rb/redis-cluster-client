@@ -38,18 +38,19 @@ jobs:
           - {redis: '5.0', ruby: '2.7'}
           - {ruby: 'jruby'}
           - {ruby: 'truffleruby'}
-          - {task: test_cluster_state,  redis: '7.0', replica: '2', compose: compose.replica.yaml}
-          - {task: test_cluster_state,  redis: '6.2', replica: '2', compose: compose.replica.yaml}
-          - {task: test_cluster_broken, redis: '7.0', restart: 'no'}
-          - {task: test_cluster_broken, redis: '6.2', restart: 'no'}
-          - {task: test_cluster_scale,  redis: '7.0', compose: compose.scale.yaml}
-          - {task: test_cluster_scale,  redis: '6.2', compose: compose.scale.yaml}
+          - {task: test_cluster_state,  redis: '7.0', replica: '2', compose: compose.replica.yaml, startup: '9'}
+          - {task: test_cluster_state,  redis: '6.2', replica: '2', compose: compose.replica.yaml, startup: '9'}
+          - {task: test_cluster_broken, redis: '7.0', restart: 'no', startup: '6'}
+          - {task: test_cluster_broken, redis: '6.2', restart: 'no', startup: '6'}
+          - {task: test_cluster_scale,  redis: '7.0', compose: compose.scale.yaml, startup: '8'}
+          - {task: test_cluster_scale,  redis: '6.2', compose: compose.scale.yaml, startup: '8'}
     env:
       REDIS_VERSION: ${{ matrix.redis || '7.0' }}
       DOCKER_COMPOSE_FILE: ${{ matrix.compose || 'compose.yaml' }}
       REDIS_CONNECTION_DRIVER: ${{ matrix.driver || 'ruby' }}
       REDIS_REPLICA_SIZE: ${{ matrix.replica || '1' }}
       RESTART_POLICY: ${{ matrix.restart || 'always' }}
+      REDIS_CLIENT_MAX_STARTUP_SAMPLE: ${{ matrix.startup || '3' }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -247,6 +248,7 @@ jobs:
       DOCKER_COMPOSE_FILE: 'compose.massive.yaml'
       REDIS_SHARD_SIZE: '10'
       REDIS_REPLICA_SIZE: '2'
+      REDIS_CLIENT_MAX_STARTUP_SAMPLE: '5'
     steps:
       - name: Check out code
         uses: actions/checkout@v3
