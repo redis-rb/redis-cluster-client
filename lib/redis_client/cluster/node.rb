@@ -15,7 +15,7 @@ class RedisClient
       SLOT_SIZE = 16_384
       MIN_SLOT = 0
       MAX_SLOT = SLOT_SIZE - 1
-      MAX_STARTUP_SAMPLE = 37
+      MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
       MAX_THREADS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
       IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
       DEAD_FLAGS = %w[fail? fail handshake noaddr noflags].freeze
