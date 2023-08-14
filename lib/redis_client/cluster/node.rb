@@ -201,6 +201,10 @@ class RedisClient
         @topology.clients.each_value(&block)
       end
 
+      def shuffled_nodes
+        @topology.clients.values.shuffle
+      end
+
       def sample
         @topology.clients.values.sample
       end
