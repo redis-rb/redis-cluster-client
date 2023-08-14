@@ -24,7 +24,7 @@ class RedisClient
         def load(nodes)
           cmd = errors = nil
 
-          nodes&.shuffle_each do |node|
+          nodes&.each do |node|
             reply = node.call('COMMAND')
             commands = parse_command_reply(reply)
             cmd = ::RedisClient::Cluster::Command.new(commands)

@@ -7,15 +7,7 @@ class RedisClient
   class Cluster
     class TestCommand < TestingWrapper
       def setup
-        per_node_key = TEST_REDIS_PORTS.map do |port|
-          [
-            "#{TEST_REDIS_HOST}:#{port}",
-            { host: TEST_REDIS_HOST, port: port }.merge(TEST_GENERIC_OPTIONS)
-          ]
-        end.to_h
-        node_info_list = ::RedisClient::Cluster::Node.load_info(per_node_key)
-        @raw_clients = ::RedisClient::Cluster::Node.new(per_node_key, node_info_list: node_info_list)
-        @empty_clients = ::RedisClient::Cluster::Node.new([], node_info_list: node_info_list)
+        @raw_clients = TEST_NODE_URIS.map { |addr| ::RedisClient.config(url: addr, **TEST_GENERIC_OPTIONS).new_client }
       end
 
       def teardown
@@ -25,7 +17,7 @@ class RedisClient
       def test_load
         [
           { nodes: @raw_clients, error: nil },
-          { nodes: @empty_clients, error: ::RedisClient::Cluster::InitialSetupError },
+          { nodes: [], error: ::RedisClient::Cluster::InitialSetupError },
           { nodes: [''], error: NoMethodError },
           { nodes: nil, error: ::RedisClient::Cluster::InitialSetupError }
         ].each_with_index do |c, idx|
