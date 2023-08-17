@@ -27,25 +27,25 @@ jobs:
       max-parallel: 10
       matrix:
         include:
-          - {redis: '7.0', ruby: '3.2'}
-          - {redis: '7.0', ruby: '3.2', compose: compose.ssl.yaml}
-          - {redis: '7.0', ruby: '3.2', driver: 'hiredis'}
-          - {redis: '7.0', ruby: '3.2', driver: 'hiredis', compose: compose.ssl.yaml}
-          - {redis: '7.0', ruby: '3.2', replica: '2', compose: compose.replica.yaml}
-          - {redis: '7.0', ruby: '3.2', compose: compose.auth.yaml}
-          - {redis: '6.2', ruby: '3.1'}
+          - {redis: '7.2', ruby: '3.2'}
+          - {redis: '7.2', ruby: '3.2', compose: compose.ssl.yaml}
+          - {redis: '7.2', ruby: '3.2', driver: 'hiredis'}
+          - {redis: '7.2', ruby: '3.2', driver: 'hiredis', compose: compose.ssl.yaml}
+          - {redis: '7.2', ruby: '3.2', replica: '2', compose: compose.replica.yaml}
+          - {redis: '7.2', ruby: '3.2', compose: compose.auth.yaml}
+          - {redis: '7.0', ruby: '3.1'}
           - {redis: '6.2', ruby: '3.0'}
           - {redis: '5.0', ruby: '2.7'}
           - {ruby: 'jruby'}
           - {ruby: 'truffleruby'}
-          - {task: test_cluster_state,  redis: '7.0', replica: '2', compose: compose.replica.yaml, startup: '9'}
+          - {task: test_cluster_state,  redis: '7.2', replica: '2', compose: compose.replica.yaml, startup: '9'}
           - {task: test_cluster_state,  redis: '6.2', replica: '2', compose: compose.replica.yaml, startup: '9'}
-          - {task: test_cluster_broken, redis: '7.0', restart: 'no', startup: '6'}
+          - {task: test_cluster_broken, redis: '7.2', restart: 'no', startup: '6'}
           - {task: test_cluster_broken, redis: '6.2', restart: 'no', startup: '6'}
-          - {task: test_cluster_scale,  redis: '7.0', compose: compose.scale.yaml, startup: '8'}
+          - {task: test_cluster_scale,  redis: '7.2', compose: compose.scale.yaml, startup: '8'}
           - {task: test_cluster_scale,  redis: '6.2', compose: compose.scale.yaml, startup: '8'}
     env:
-      REDIS_VERSION: ${{ matrix.redis || '7.0' }}
+      REDIS_VERSION: ${{ matrix.redis || '7.2' }}
       DOCKER_COMPOSE_FILE: ${{ matrix.compose || 'compose.yaml' }}
       REDIS_CONNECTION_DRIVER: ${{ matrix.driver || 'ruby' }}
       REDIS_REPLICA_SIZE: ${{ matrix.replica || '1' }}
@@ -76,7 +76,7 @@ jobs:
     timeout-minutes: 5
     runs-on: ubuntu-latest
     env:
-      REDIS_VERSION: '7.0'
+      REDIS_VERSION: '7.2'
       DOCKER_COMPOSE_FILE: 'compose.nat.yaml'
     steps:
       - name: Check out code
@@ -148,7 +148,7 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
-      REDIS_VERSION: '7.0'
+      REDIS_VERSION: '7.2'
       DOCKER_COMPOSE_FILE: 'compose.latency.yaml'
       REDIS_REPLICA_SIZE: '2'
       REDIS_CLIENT_MAX_THREADS: '5'
@@ -215,7 +215,7 @@ jobs:
           - excessive_pipelining
           - pipelining_in_moderation
     env:
-      REDIS_VERSION: '7.0'
+      REDIS_VERSION: '7.2'
       DOCKER_COMPOSE_FILE: 'compose.yaml'
     steps:
       - name: Check out code
@@ -244,7 +244,7 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
-      REDIS_VERSION: '7.0'
+      REDIS_VERSION: '7.2'
       DOCKER_COMPOSE_FILE: 'compose.massive.yaml'
       REDIS_SHARD_SIZE: '10'
       REDIS_REPLICA_SIZE: '2'
