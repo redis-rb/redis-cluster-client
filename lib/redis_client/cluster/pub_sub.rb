@@ -64,12 +64,12 @@ class RedisClient
       def next_event(timeout = nil)
         return if @state_list.empty?
 
+        @state_list.shuffle!
         max_duration = calc_max_duration(timeout)
         starting = obtain_current_time
         loop do
           break if max_duration > 0 && obtain_current_time - starting > max_duration
 
-          @state_list.shuffle!
           @state_list.each do |pubsub|
             message = pubsub.take_message(timeout)
             return message if message
