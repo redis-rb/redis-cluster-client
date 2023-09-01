@@ -39,30 +39,27 @@ class RedisClient
 
         private
 
-        def measure_latencies(clients) # rubocop:disable Metrics/AbcSize
+        def measure_latencies(clients)
           clients.each_slice(::RedisClient::Cluster::Node::MAX_THREADS).each_with_object({}) do |chuncked_clients, acc|
-            threads = chuncked_clients.map do |k, v|
-              Thread.new(k, v) do |node_key, client|
-                Thread.current[:node_key] = node_key
+            chuncked_clients
+              .map { |node_key, client| [node_key, build_thread_for_measuring_latency(client)] }
+              .each { |node_key, thread| acc[node_key] = thread.value }
+          end
+        end
 
-                min = DUMMY_LATENCY_MSEC
-                MEASURE_ATTEMPT_COUNT.times do
-                  starting = Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond)
-                  client.call_once('PING')
-                  duration = Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond) - starting
-                  min = duration if duration < min
-                end
-
-                Thread.current[:latency] = min
-              rescue StandardError
-                Thread.current[:latency] = DUMMY_LATENCY_MSEC
-              end
+        def build_thread_for_measuring_latency(client)
+          Thread.new(client) do |cli|
+            min = DUMMY_LATENCY_MSEC
+            MEASURE_ATTEMPT_COUNT.times do
+              starting = Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond)
+              cli.call_once('PING')
+              duration = Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond) - starting
+              min = duration if duration < min
             end
 
-            threads.each do |t|
-              t.join
-              acc[t[:node_key]] = t[:latency]
-            end
+            min
+          rescue StandardError
+            DUMMY_LATENCY_MSEC
           end
         end
 
