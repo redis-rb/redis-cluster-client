@@ -95,25 +95,17 @@ class RedisClient
           startup_nodes = ::RedisClient::Cluster::Node.new(startup_options, **kwargs)
           startup_nodes.each_slice(MAX_THREADS).with_index do |chuncked_startup_nodes, chuncked_idx|
             threads = chuncked_startup_nodes.each_with_index.map do |raw_client, idx|
-              Thread.new(raw_client, (MAX_THREADS * chuncked_idx) + idx) do |cli, i|
-                Thread.current[:index] = i
-                reply = cli.call('CLUSTER', 'NODES')
-                Thread.current[:info] = parse_cluster_node_reply(reply)
-              rescue StandardError => e
-                Thread.current[:error] = e
-              ensure
-                cli&.close
-              end
+              [(MAX_THREADS * chuncked_idx) + idx, build_thread_for_cluster_node(raw_client)]
             end
 
-            threads.each do |t|
-              t.join
-              if t.key?(:info)
-                node_info_list ||= Array.new(startup_size)
-                node_info_list[t[:index]] = t[:info]
-              elsif t.key?(:error)
+            threads.each do |i, t|
+              v = t.value
+              if v.is_a?(StandardError)
                 errors ||= Array.new(startup_size)
-                errors[t[:index]] = t[:error]
+                errors[i] = v
+              else
+                node_info_list ||= Array.new(startup_size)
+                node_info_list[i] = v
               end
             end
           end
@@ -131,6 +123,17 @@ class RedisClient
         end
 
         private
+
+        def build_thread_for_cluster_node(raw_client)
+          Thread.new(raw_client) do |client|
+            reply = client.call('CLUSTER', 'NODES')
+            parse_cluster_node_reply(reply)
+          rescue StandardError => e
+            e
+          ensure
+            client&.close
+          end
+        end
 
         # @see https://redis.io/commands/cluster-nodes/
         # @see https://github.com/redis/redis/blob/78960ad57b8a5e6af743d789ed8fd767e37d42b8/src/cluster.c#L4660-L4683
@@ -331,32 +334,32 @@ class RedisClient
         raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
-      def try_map(clients) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      def try_map(clients, &block)
         results = errors = nil
         clients.each_slice(MAX_THREADS) do |chuncked_clients|
-          threads = chuncked_clients.map do |k, v|
-            Thread.new(k, v) do |node_key, client|
-              Thread.current[:node_key] = node_key
-              reply = yield(node_key, client)
-              Thread.current[:result] = reply
-            rescue StandardError => e
-              Thread.current[:error] = e
+          chuncked_clients
+            .map { |node_key, client| [node_key, build_thread_for_command(node_key, client, &block)] }
+            .each do |node_key, thread|
+              v = thread.value
+              if v.is_a?(StandardError)
+                errors ||= {}
+                errors[node_key] = v
+              else
+                results ||= {}
+                results[node_key] = v
+              end
             end
-          end
-
-          threads.each do |t|
-            t.join
-            if t.key?(:result)
-              results ||= {}
-              results[t[:node_key]] = t[:result]
-            elsif t.key?(:error)
-              errors ||= {}
-              errors[t[:node_key]] = t[:error]
-            end
-          end
         end
 
         [results, errors]
+      end
+
+      def build_thread_for_command(node_key, client)
+        Thread.new(node_key, client) do |nk, cli|
+          yield(nk, cli)
+        rescue StandardError => e
+          e
+        end
       end
     end
   end
