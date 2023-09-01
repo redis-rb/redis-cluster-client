@@ -75,7 +75,7 @@ class RedisClient
             return message if message
           end
 
-          Thread.pass
+          sleep 0.001
         end
       end
 
