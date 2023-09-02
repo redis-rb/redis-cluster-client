@@ -16,7 +16,7 @@ module BenchmarkMixin
     @client&.close
   end
 
-  def bench_echo
+  def bench_single_echo
     assert_performance_linear(MIN_THRESHOLD) do |n|
       n.times do
         @client.call('ECHO', 'Hello world')
@@ -24,7 +24,7 @@ module BenchmarkMixin
     end
   end
 
-  def bench_set
+  def bench_single_set
     assert_performance_linear(MIN_THRESHOLD) do |n|
       n.times do |i|
         @client.call('SET', "key#{i}", i)
@@ -32,7 +32,7 @@ module BenchmarkMixin
     end
   end
 
-  def bench_get
+  def bench_single_get
     assert_performance_linear(MIN_THRESHOLD) do |n|
       n.times do |i|
         @client.call('GET', "key#{i}")

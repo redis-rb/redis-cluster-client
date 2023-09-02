@@ -69,7 +69,7 @@ class BenchCommand
     include BenchmarkMixinForProxy
 
     # https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/other_protocols/redis#supported-commands
-    def bench_echo
+    def bench_single_echo
       skip('Envoy does not support ECHO command.')
     end
 
