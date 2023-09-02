@@ -149,7 +149,7 @@ class RedisClient
         all_replies = errors = nil
         @pipelines&.each_slice(MAX_THREADS) do |chuncked_pipelines|
           chuncked_pipelines
-            .map { |node_key, pipeline| [node_key, build_thread_for_pipeline(@router, node_key, pipeline)] }
+            .map { |node_key, pipeline| [node_key, build_thread_for_pipeline(@router.find_node(node_key), pipeline)] }
             .each do |node_key, thread|
               case v = thread.value
               when ::RedisClient::Cluster::Pipeline::RedirectionNeeded
@@ -182,9 +182,9 @@ class RedisClient
         @pipelines[node_key]
       end
 
-      def build_thread_for_pipeline(router, node_key, pipeline)
-        Thread.new(router, node_key, pipeline) do |rt, nk, pl|
-          replies = do_pipelining(rt.find_node(nk), pl)
+      def build_thread_for_pipeline(client, pipeline)
+        Thread.new(client, pipeline) do |cli, pl|
+          replies = do_pipelining(cli, pl)
           raise ReplySizeError, "commands: #{pl._size}, replies: #{replies.size}" if pl._size != replies.size
 
           replies
