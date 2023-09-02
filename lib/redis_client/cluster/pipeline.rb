@@ -148,25 +148,23 @@ class RedisClient
       def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         all_replies = errors = nil
         @pipelines&.each_slice(MAX_THREADS) do |chuncked_pipelines|
-          threads = chuncked_pipelines.map do |node_key, pipeline|
-            [node_key, build_thread_for_pipeline(@router, node_key, pipeline)]
-          end
-
-          threads.each do |node_key, thread|
-            case v = thread.value
-            when ::RedisClient::Cluster::Pipeline::RedirectionNeeded
-              all_replies ||= Array.new(@size)
-              pipeline = @pipelines[node_key]
-              v.indices.each { |i| v.replies[i] = handle_redirection(v.replies[i], pipeline, i) }
-              pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
-            when StandardError
-              errors ||= {}
-              errors[node_key] = v
-            else
-              all_replies ||= Array.new(@size)
-              @pipelines[node_key].outer_indices.each_with_index { |outer, inner| all_replies[outer] = v[inner] }
+          chuncked_pipelines
+            .map { |node_key, pipeline| [node_key, build_thread_for_pipeline(@router, node_key, pipeline)] }
+            .each do |node_key, thread|
+              case v = thread.value
+              when ::RedisClient::Cluster::Pipeline::RedirectionNeeded
+                all_replies ||= Array.new(@size)
+                pipeline = @pipelines[node_key]
+                v.indices.each { |i| v.replies[i] = handle_redirection(v.replies[i], pipeline, i) }
+                pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
+              when StandardError
+                errors ||= {}
+                errors[node_key] = v
+              else
+                all_replies ||= Array.new(@size)
+                @pipelines[node_key].outer_indices.each_with_index { |outer, inner| all_replies[outer] = v[inner] }
+              end
             end
-          end
         end
 
         raise ::RedisClient::Cluster::ErrorCollection, errors unless errors.nil?
