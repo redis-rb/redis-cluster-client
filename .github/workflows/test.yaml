@@ -194,7 +194,7 @@ jobs:
       - name: Print disk info
         run: df -h
       - name: Run minitest
-        run: bundle exec rake bench | sort
+        run: bundle exec rake bench | grep BenchCommand | grep -v 'Envoy#bench_pipeline_echo\|Envoy#bench_single_echo' | sort
       - name: Reset qdisc
         run: |
           for i in {5..9..2}
