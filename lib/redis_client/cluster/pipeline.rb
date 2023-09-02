@@ -190,8 +190,6 @@ class RedisClient
           raise ReplySizeError, "commands: #{pl._size}, replies: #{replies.size}" if pl._size != replies.size
 
           replies
-        rescue ::RedisClient::Cluster::Pipeline::RedirectionNeeded => e
-          e
         rescue StandardError => e
           e
         end

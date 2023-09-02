@@ -94,20 +94,19 @@ class RedisClient
           startup_options = options.to_a.sample(MAX_STARTUP_SAMPLE).to_h
           startup_nodes = ::RedisClient::Cluster::Node.new(startup_options, **kwargs)
           startup_nodes.each_slice(MAX_THREADS).with_index do |chuncked_startup_nodes, chuncked_idx|
-            threads = chuncked_startup_nodes.each_with_index.map do |raw_client, idx|
-              [(MAX_THREADS * chuncked_idx) + idx, build_thread_for_cluster_node(raw_client)]
-            end
-
-            threads.each do |i, t|
-              v = t.value
-              if v.is_a?(StandardError)
-                errors ||= Array.new(startup_size)
-                errors[i] = v
-              else
-                node_info_list ||= Array.new(startup_size)
-                node_info_list[i] = v
+            chuncked_startup_nodes
+              .each_with_index
+              .map { |raw_client, idx| [(MAX_THREADS * chuncked_idx) + idx, build_thread_for_cluster_node(raw_client)] }
+              .each do |i, t|
+                case v = t.value
+                when StandardError
+                  errors ||= Array.new(startup_size)
+                  errors[i] = v
+                else
+                  node_info_list ||= Array.new(startup_size)
+                  node_info_list[i] = v
+                end
               end
-            end
           end
 
           raise ::RedisClient::Cluster::InitialSetupError, errors if node_info_list.nil?
@@ -340,8 +339,8 @@ class RedisClient
           chuncked_clients
             .map { |node_key, client| [node_key, build_thread_for_command(node_key, client, &block)] }
             .each do |node_key, thread|
-              v = thread.value
-              if v.is_a?(StandardError)
+              case v = thread.value
+              when StandardError
                 errors ||= {}
                 errors[node_key] = v
               else
