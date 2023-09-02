@@ -194,7 +194,7 @@ jobs:
       - name: Print disk info
         run: df -h
       - name: Run minitest
-        run: bundle exec rake bench
+        run: bundle exec rake bench | sort
       - name: Reset qdisc
         run: |
           for i in {5..9..2}
