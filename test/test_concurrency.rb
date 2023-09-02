@@ -59,13 +59,13 @@ class TestConcurrency < TestingWrapper
       Thread.new do
         ATTEMPTS.times { MAX_THREADS.times { |i| @client.call('INCR', "key#{i}") } }
         ATTEMPTS.times { MAX_THREADS.times { |i| @client.call('DECR', "key#{i}") } }
+        nil
       rescue StandardError => e
-        Thread.current[:error] = e
+        e
       end
     end
 
-    threads.each(&:join)
-    threads.each { |t| assert_nil(t[:error]) }
+    threads.each { |t| assert_nil(t.value) }
     MAX_THREADS.times { |i| assert_equal(WANT, @client.call('GET', "key#{i}")) }
   end
 
@@ -74,13 +74,13 @@ class TestConcurrency < TestingWrapper
       Thread.new do
         @client.pipelined { |pi| ATTEMPTS.times { MAX_THREADS.times { |i| pi.call('INCR', "key#{i}") } } }
         @client.pipelined { |pi| ATTEMPTS.times { MAX_THREADS.times { |i| pi.call('DECR', "key#{i}") } } }
+        nil
       rescue StandardError => e
-        Thread.current[:error] = e
+        e
       end
     end
 
-    threads.each(&:join)
-    threads.each { |t| assert_nil(t[:error]) }
+    threads.each { |t| assert_nil(t.value) }
     MAX_THREADS.times { |i| assert_equal(WANT, @client.call('GET', "key#{i}")) }
   end
 

@@ -24,12 +24,12 @@ class RedisClient
         private
 
         def build_clients(primary_node_keys, options, pool, **kwargs)
-          options.filter_map do |node_key, option|
+          options.to_h do |node_key, option|
             option = option.merge(kwargs.reject { |k, _| ::RedisClient::Cluster::Node::IGNORE_GENERIC_CONFIG_KEYS.include?(k) })
             config = ::RedisClient::Cluster::Node::Config.new(scale_read: !primary_node_keys.include?(node_key), **option)
             client = pool.nil? ? config.new_client : config.new_pool(**pool)
             [node_key, client]
-          end.to_h
+          end
         end
       end
     end

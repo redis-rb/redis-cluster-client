@@ -24,7 +24,7 @@ class RedisClient
           @worker = subscribe(@client, timeout) if @worker.nil?
           return if @worker.alive?
 
-          message = @worker[:reply]
+          message = @worker.value
           @worker = nil
           message
         end
@@ -33,9 +33,9 @@ class RedisClient
 
         def subscribe(client, timeout)
           Thread.new(client, timeout) do |pubsub, to|
-            Thread.current[:reply] = pubsub.next_event(to)
+            pubsub.next_event(to)
           rescue StandardError => e
-            Thread.current[:reply] = e
+            e
           end
         end
       end
