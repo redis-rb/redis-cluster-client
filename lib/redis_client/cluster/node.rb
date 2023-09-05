@@ -4,6 +4,7 @@ require 'redis_client'
 require 'redis_client/config'
 require 'redis_client/cluster/errors'
 require 'redis_client/cluster/node/primary_only'
+require 'redis_client/cluster/node/random_node'
 require 'redis_client/cluster/node/random_replica'
 require 'redis_client/cluster/node/latency_replica'
 
@@ -284,6 +285,8 @@ class RedisClient
       def make_topology_class(with_replica, replica_affinity)
         if with_replica && replica_affinity == :random
           ::RedisClient::Cluster::Node::RandomReplica
+        elsif with_replica && replica_affinity == :random_node
+          ::RedisClient::Cluster::Node::RandomNode
         elsif with_replica && replica_affinity == :latency
           ::RedisClient::Cluster::Node::LatencyReplica
         else
