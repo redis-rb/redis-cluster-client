@@ -183,7 +183,7 @@ class RedisClient
 
       def test_pubsub_without_subscription
         pubsub = @client.pubsub
-        assert_nil(pubsub.next_event(TEST_TIMEOUT_SEC))
+        assert_nil(pubsub.next_event(0.01))
         pubsub.close
       end
 
