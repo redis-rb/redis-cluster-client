@@ -6,7 +6,7 @@ require 'redis_client/cluster/node/testing_topology_mixin'
 class RedisClient
   class Cluster
     class Node
-      class TestRandomNode < TestingWrapper
+      class TestRandomReplicaWithPrimary < TestingWrapper
         include TestingTopologyMixin
 
         def test_clients_with_redis_client
@@ -16,7 +16,7 @@ class RedisClient
         end
 
         def test_clients_with_pooled_redis_client
-          test_topology = ::RedisClient::Cluster::Node::RandomNode.new(
+          test_topology = ::RedisClient::Cluster::Node::RandomReplicaOrPrimary.new(
             @replications,
             @options,
             { timeout: 3, size: 2 },
@@ -76,7 +76,7 @@ class RedisClient
         private
 
         def topology_class
-          ::RedisClient::Cluster::Node::RandomNode
+          ::RedisClient::Cluster::Node::RandomReplicaOrPrimary
         end
       end
     end

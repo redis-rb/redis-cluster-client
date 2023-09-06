@@ -5,7 +5,7 @@ require 'redis_client/cluster/node/replica_mixin'
 class RedisClient
   class Cluster
     class Node
-      class RandomNode
+      class RandomReplicaOrPrimary
         include ::RedisClient::Cluster::Node::ReplicaMixin
 
         def replica_clients

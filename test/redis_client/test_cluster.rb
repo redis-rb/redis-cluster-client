@@ -462,6 +462,21 @@ class RedisClient
       end
     end
 
+    class ScaleReadRandomWithPrimary < TestingWrapper
+      include Mixin
+
+      def new_test_client
+        config = ::RedisClient::ClusterConfig.new(
+          nodes: TEST_NODE_URIS,
+          replica: true,
+          replica_affinity: :random_with_primary,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        )
+        ::RedisClient::Cluster.new(config)
+      end
+    end
+
     class ScaleReadLatency < TestingWrapper
       include Mixin
 
