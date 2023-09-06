@@ -13,9 +13,11 @@ class RedisClient
         end
 
         def call(command)
-          ret = @client.call_v(command)
-          @worker = spawn_worker(@client, @queue) if @worker.nil?
-          ret
+          @client.call_v(command)
+        end
+
+        def subscribe
+          @worker = spawn_worker(@client, @queue) unless @worker&.alive?
         end
 
         def close
@@ -58,8 +60,10 @@ class RedisClient
       end
 
       def next_event(timeout = nil)
+        @state_dict.each_value(&:subscribe)
         max_duration = calc_max_duration(timeout)
         starting = obtain_current_time
+
         loop do
           break if max_duration > 0 && obtain_current_time - starting > max_duration
 
