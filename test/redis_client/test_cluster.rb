@@ -183,7 +183,7 @@ class RedisClient
 
       def test_pubsub_without_subscription
         pubsub = @client.pubsub
-        assert_nil(pubsub.next_event(TEST_TIMEOUT_SEC))
+        assert_nil(pubsub.next_event(0.01))
         pubsub.close
       end
 
@@ -191,8 +191,8 @@ class RedisClient
         pubsub = @client.pubsub
         assert_nil(pubsub.call('SUBWAY'))
         assert_nil(pubsub.call_v(%w[SUBSCRIBE]))
-        assert_instance_of(::RedisClient::CommandError, pubsub.next_event, 'unknown command')
-        assert_instance_of(::RedisClient::CommandError, pubsub.next_event, 'wrong number of arguments')
+        assert_raises(::RedisClient::CommandError, 'unknown command') { pubsub.next_event }
+        assert_raises(::RedisClient::CommandError, 'wrong number of arguments') { pubsub.next_event }
         pubsub.close
       end
 

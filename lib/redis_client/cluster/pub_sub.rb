@@ -6,13 +6,18 @@ class RedisClient
   class Cluster
     class PubSub
       class State
-        def initialize(client)
+        def initialize(client, queue)
           @client = client
           @worker = nil
+          @queue = queue
         end
 
         def call(command)
           @client.call_v(command)
+        end
+
+        def ensure_worker
+          @worker = spawn_worker(@client, @queue) unless @worker&.alive?
         end
 
         def close
@@ -20,30 +25,25 @@ class RedisClient
           @client.close
         end
 
-        def take_message(timeout)
-          @worker = subscribe(@client, timeout) if @worker.nil?
-          return if @worker.alive?
-
-          message = @worker.value
-          @worker = nil
-          message
-        end
-
         private
 
-        def subscribe(client, timeout)
-          Thread.new(client, timeout) do |pubsub, to|
-            pubsub.next_event(to)
-          rescue StandardError => e
-            e
+        def spawn_worker(client, queue)
+          Thread.new(client, queue) do |pubsub, q|
+            loop do
+              q << pubsub.next_event
+            rescue StandardError => e
+              q << e
+            end
           end
         end
       end
 
+      BUF_SIZE = Integer(ENV.fetch('REDIS_CLIENT_PUBSUB_BUF_SIZE', 1024))
+
       def initialize(router, command_builder)
         @router = router
         @command_builder = command_builder
-        @state_list = []
+        @queue = SizedQueue.new(BUF_SIZE)
         @state_dict = {}
       end
 
@@ -56,26 +56,25 @@ class RedisClient
       end
 
       def close
-        @state_list.each(&:close)
-        @state_list.clear
+        @state_dict.each_value(&:close)
         @state_dict.clear
+        @queue.clear
       end
 
       def next_event(timeout = nil)
-        return if @state_list.empty?
-
-        @state_list.shuffle!
+        @state_dict.each_value(&:ensure_worker)
         max_duration = calc_max_duration(timeout)
         starting = obtain_current_time
+
         loop do
           break if max_duration > 0 && obtain_current_time - starting > max_duration
 
-          @state_list.each do |pubsub|
-            message = pubsub.take_message(timeout)
-            return message if message
+          case event = @queue.pop(true)
+          when StandardError then raise event
+          when Array then break event
           end
-
-          sleep 0.001
+        rescue ThreadError
+          sleep 0.005
         end
       end
 
@@ -100,8 +99,7 @@ class RedisClient
       def add_state(node_key)
         return @state_dict[node_key] if @state_dict.key?(node_key)
 
-        state = State.new(@router.find_node(node_key).pubsub)
-        @state_list << state
+        state = State.new(@router.find_node(node_key).pubsub, @queue)
         @state_dict[node_key] = state
       end
 
