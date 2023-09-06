@@ -38,10 +38,12 @@ class RedisClient
         end
       end
 
+      BUF_SIZE = Integer(ENV.fetch('REDIS_CLIENT_PUBSUB_BUF_SIZE', 1024))
+
       def initialize(router, command_builder)
         @router = router
         @command_builder = command_builder
-        @queue = Queue.new
+        @queue = SizedQueue.new(BUF_SIZE)
         @state_dict = {}
       end
 
