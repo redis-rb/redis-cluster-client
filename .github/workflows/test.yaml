@@ -70,7 +70,7 @@ jobs:
       - name: Run minitest
         run: bundle exec rake ${{ matrix.task || 'test' }}
       - name: Stop containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE down
+        run: docker compose -f $DOCKER_COMPOSE_FILE down || true
   nat-ted-env:
     name: NAT-ted Environments
     timeout-minutes: 5
@@ -128,7 +128,7 @@ jobs:
       - name: Run minitest
         run: bundle exec rake test
       - name: Stop containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE down
+        run: docker compose -f $DOCKER_COMPOSE_FILE down || true
   lint:
     name: Lint
     timeout-minutes: 5
@@ -199,10 +199,10 @@ jobs:
         run: |
           for i in {5..9..2}
           do
-            docker compose -f $DOCKER_COMPOSE_FILE exec node$i tc qdisc del dev eth0 root netem
+            docker compose -f $DOCKER_COMPOSE_FILE exec node$i tc qdisc del dev eth0 root netem || true
           done
       - name: Stop containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE down
+        run: docker compose -f $DOCKER_COMPOSE_FILE down || true
   profiling:
     name: Profiling
     timeout-minutes: 5
@@ -238,7 +238,7 @@ jobs:
         env:
           MEMORY_PROFILE_MODE: ${{ matrix.mode }}
       - name: Stop containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE down
+        run: docker compose -f $DOCKER_COMPOSE_FILE down || true
   massive:
     name: Massive Cluster
     timeout-minutes: 10
@@ -298,4 +298,4 @@ jobs:
         env:
           MEMORY_PROFILE_MODE: pipelining_in_moderation
       - name: Stop containers
-        run: docker compose -f $DOCKER_COMPOSE_FILE down
+        run: docker compose -f $DOCKER_COMPOSE_FILE down || true
