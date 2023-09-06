@@ -107,7 +107,7 @@ jobs:
               echo "Max attempts exceeded: $i times"
               exit 1
             fi
-            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps --format json | jq .[].Status | (grep healthy || true) | wc -l)
+            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps --format json | (jq .[].Status || true) | (grep healthy || true) | wc -l)
             if [[ $healthy_cnt -eq $node_cnt ]]
             then
               break
@@ -117,7 +117,7 @@ jobs:
             : $((++i))
           done
         env:
-          MAX_ATTEMPTS: "10"
+          MAX_ATTEMPTS: "20"
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Build cluster
