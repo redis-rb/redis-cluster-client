@@ -16,7 +16,7 @@ class RedisClient
           @client.call_v(command)
         end
 
-        def subscribe
+        def ensure_worker
           @worker = spawn_worker(@client, @queue) unless @worker&.alive?
         end
 
@@ -62,7 +62,7 @@ class RedisClient
       end
 
       def next_event(timeout = nil)
-        @state_dict.each_value(&:subscribe)
+        @state_dict.each_value(&:ensure_worker)
         max_duration = calc_max_duration(timeout)
         starting = obtain_current_time
 
