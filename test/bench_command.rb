@@ -34,6 +34,22 @@ class BenchCommand
     end
   end
 
+  class ScaleReadRandomWithPrimary < BenchmarkWrapper
+    include BenchmarkMixin
+
+    private
+
+    def new_test_client
+      ::RedisClient.cluster(
+        nodes: TEST_NODE_URIS,
+        replica: true,
+        replica_affinity: :random_with_primary,
+        fixed_hostname: TEST_FIXED_HOSTNAME,
+        **TEST_GENERIC_OPTIONS
+      ).new_client
+    end
+  end
+
   class ScaleReadLatency < BenchmarkWrapper
     include BenchmarkMixin
 

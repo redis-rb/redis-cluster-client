@@ -24,7 +24,7 @@ gem 'redis-cluster-client'
 | --- | --- | --- | --- |
 | `:nodes` | String or Hash or Array<String, Hash> | `['redis://127.0.0.1:6379']` | node addresses for startup connection |
 | `:replica` | Boolean | `false` | `true` if client should use scale read feature |
-| `:replica_affinity` | Symbol or String | `:random` | scale reading strategy, `:random` or `:latency` are valid |
+| `:replica_affinity` | Symbol or String | `:random` | scale reading strategy, `:random`, `random_with_primary` or `:latency` are valid |
 | `:fixed_hostname` | String | `nil` | required if client should connect to single endpoint with SSL |
 
 Also, [the other generic options](https://github.com/redis-rb/redis-client#configuration) can be passed.
@@ -42,6 +42,10 @@ RedisClient.cluster.new_client
 
 # To connect to all nodes to use scale reading feature
 RedisClient.cluster(replica: true).new_client
+#=> #<RedisClient::Cluster 172.20.0.2:6379, 172.20.0.3:6379, 172.20.0.4:6379, 172.20.0.5:6379, 172.20.0.6:6379, 172.20.0.7:6379>
+
+# To connect to all nodes to use scale reading feature + make reads equally likely from replicas and primary
+RedisClient.cluster(replica: true, replica_affinity: :random_with_primary).new_client
 #=> #<RedisClient::Cluster 172.20.0.2:6379, 172.20.0.3:6379, 172.20.0.4:6379, 172.20.0.5:6379, 172.20.0.6:6379, 172.20.0.7:6379>
 
 # To connect to all nodes to use scale reading feature prioritizing low-latency replicas
