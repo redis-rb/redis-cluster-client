@@ -98,7 +98,7 @@ jobs:
           HOST_ADDR: ${{ env.HOST_IP_ADDR }}
       - name: Wait for nodes to be ready
         run: |
-          node_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps | tail -n +2 | wc -l)
+          node_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps --format json | jq -s 'length')
           i=0
           while :
           do
@@ -107,7 +107,7 @@ jobs:
               echo "Max attempts exceeded: $i times"
               exit 1
             fi
-            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps --format json | (jq .[].Status || true) | (grep healthy || true) | wc -l)
+            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps --format json | jq -s 'map(select(.Health == "healthy")) | length')
             if [[ $healthy_cnt -eq $node_cnt ]]
             then
               break
@@ -117,7 +117,7 @@ jobs:
             : $((++i))
           done
         env:
-          MAX_ATTEMPTS: "20"
+          MAX_ATTEMPTS: "10"
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Build cluster
