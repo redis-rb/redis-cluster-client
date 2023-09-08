@@ -21,8 +21,8 @@ class RedisClient
 
       def push(id, queue, *args, **kwargs, &block)
         ensure_threads if (@count % MAX_THREADS).zero?
+        @count += 1
         @q << Task.new(id: id, queue: queue, args: args, kwargs: kwargs, proc: block)
-        @count += 0
         nil
       end
 
@@ -31,6 +31,7 @@ class RedisClient
         @threads.each { |t| t&.exit }
         @threads.clear
         @q.close
+        @count = 0
       end
 
       private
