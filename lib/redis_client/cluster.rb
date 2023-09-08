@@ -3,6 +3,7 @@
 require 'redis_client/cluster/pipeline'
 require 'redis_client/cluster/pub_sub'
 require 'redis_client/cluster/router'
+require 'redis_client/cluster/thread_pool'
 
 class RedisClient
   class Cluster
@@ -14,6 +15,7 @@ class RedisClient
       @config = config
       @router = ::RedisClient::Cluster::Router.new(config, pool: pool, **kwargs)
       @command_builder = config.command_builder
+      @thread_pool = ::RedisClient::Cluster::ThreadPool.new
     end
 
     def inspect
@@ -79,7 +81,7 @@ class RedisClient
 
     def pipelined
       seed = @config.use_replica? && @config.replica_affinity == :random ? nil : Random.new_seed
-      pipeline = ::RedisClient::Cluster::Pipeline.new(@router, @command_builder, seed: seed)
+      pipeline = ::RedisClient::Cluster::Pipeline.new(@router, @command_builder, @thread_pool, seed: seed)
       yield pipeline
       return [] if pipeline.empty?
 
