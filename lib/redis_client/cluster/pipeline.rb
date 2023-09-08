@@ -148,7 +148,7 @@ class RedisClient
         return if @pipelines.nil? || @pipelines.empty?
 
         all_replies = errors = nil
-        queue = Queue.new
+        queue = SizedQueue.new(@pipelines.size)
 
         @pipelines.each do |node_key, pipeline|
           @thread_pool.push(node_key, queue, @router.find_node(node_key), pipeline) do |cli, pl|
