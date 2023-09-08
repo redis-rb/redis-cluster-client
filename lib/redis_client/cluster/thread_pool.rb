@@ -7,7 +7,11 @@ class RedisClient
     class ThreadPool
       MAX_THREADS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
 
-      Task = Struct.new('RedisClusterClientThreadPoolTask', :id, :queue, :args, :kwargs, :proc, :result)
+      Task = Struct.new(
+        'RedisClusterClientThreadPoolTask',
+        :id, :queue, :args, :kwargs, :proc, :result,
+        keyword_init: true
+      )
 
       def initialize
         @q = Queue.new
