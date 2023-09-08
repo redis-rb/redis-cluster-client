@@ -93,6 +93,7 @@ class RedisClient
     end
 
     def close
+      @thread_pool.close
       @router.node.each(&:close)
       nil
     end

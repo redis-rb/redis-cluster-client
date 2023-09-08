@@ -28,7 +28,7 @@ class RedisClient
 
       def close
         @q.clear
-        @threads.each(&:exit)
+        @threads.each { |t| t&.exit }
         @threads.clear
         @q.close
       end
