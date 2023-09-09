@@ -28,7 +28,7 @@ class RedisClient
           fixed_hostname: TEST_FIXED_HOSTNAME,
           **TEST_GENERIC_OPTIONS
         )
-        @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker::OnDemand.new
+        @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
         @test_node_info_list = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key, @concurrent_worker)
         if TEST_FIXED_HOSTNAME
           @test_node_info_list.each do |info|

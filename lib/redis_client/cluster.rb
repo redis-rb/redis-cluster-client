@@ -1,10 +1,9 @@
 # frozen_string_literal: true
 
+require 'redis_client/cluster/concurrent_worker'
 require 'redis_client/cluster/pipeline'
 require 'redis_client/cluster/pub_sub'
 require 'redis_client/cluster/router'
-require 'redis_client/cluster/concurrent_worker/on_demand'
-require 'redis_client/cluster/concurrent_worker/pooled'
 
 class RedisClient
   class Cluster
@@ -14,7 +13,7 @@ class RedisClient
 
     def initialize(config, pool: nil, **kwargs)
       @config = config
-      @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker::OnDemand.new
+      @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
       @router = ::RedisClient::Cluster::Router.new(config, @concurrent_worker, pool: pool, **kwargs)
       @command_builder = config.command_builder
     end

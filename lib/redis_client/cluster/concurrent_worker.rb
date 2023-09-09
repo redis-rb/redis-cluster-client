@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require 'redis_client/cluster/concurrent_worker/on_demand'
+require 'redis_client/cluster/concurrent_worker/pooled'
+
 class RedisClient
   class Cluster
     module ConcurrentWorker
@@ -40,6 +43,16 @@ class RedisClient
         def close
           @result_queue.clear
           @result_queue.close
+        end
+      end
+
+      module_function
+
+      def create(model: :on_demand)
+        case model
+        when :on_demand then ::RedisClient::Cluster::ConcurrentWorker::OnDemand.new
+        when :pooled then ::RedisClient::Cluster::ConcurrentWorker::Pooled.new
+        else raise ArgumentError, "Unknown model: #{model}"
         end
       end
     end

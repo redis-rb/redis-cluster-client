@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require 'redis_client/cluster/concurrent_worker'
-
 class RedisClient
   class Cluster
     module ConcurrentWorker
