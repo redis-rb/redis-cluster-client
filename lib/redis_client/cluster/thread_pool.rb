@@ -9,20 +9,26 @@ class RedisClient
 
       Task = Struct.new(
         'RedisClusterClientThreadPoolTask',
-        :id, :queue, :args, :kwargs, :proc, :result,
+        :id, :queue, :args, :kwargs, :block, :result,
         keyword_init: true
-      )
+      ) do
+        def exec
+          self[:result] = block&.call(*args, **kwargs)
+        rescue StandardError => e
+          self[:result] = e
+        ensure
+          queue&.push(self)
+        end
+      end
 
       def initialize
         @q = Queue.new
         @threads = Array.new(MAX_THREADS)
-        @count = 0
       end
 
       def push(id, queue, *args, **kwargs, &block)
-        ensure_threads if (@count % MAX_THREADS).zero?
-        @count += 1
-        @q << Task.new(id: id, queue: queue, args: args, kwargs: kwargs, proc: block)
+        ensure_threads if @threads.first.nil?
+        @q << Task.new(id: id, queue: queue, args: args, kwargs: kwargs, block: block)
         nil
       end
 
@@ -31,7 +37,6 @@ class RedisClient
         @threads.each { |t| t&.exit }
         @threads.clear
         @q.close
-        @count = 0
       end
 
       private
@@ -44,14 +49,7 @@ class RedisClient
 
       def spawn_thread
         Thread.new(@q) do |q|
-          loop do
-            task = q.pop
-            task.result = task.proc.call(*task.args, **task.kwargs)
-          rescue StandardError => e
-            task.result = e
-          ensure
-            task&.queue&.push(task)
-          end
+          loop { q.pop.exec }
         end
       end
     end
