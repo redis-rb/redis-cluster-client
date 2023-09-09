@@ -8,11 +8,15 @@ class RedisClient
       class OnDemand
         def initialize
           @q = Queue.new
-          @buffer = SizedQueue.new(::RedisClient::Cluster::ConcurrentWorker::MAX_WORKERS - 1)
+          size = ::RedisClient::Cluster::ConcurrentWorker::MAX_WORKERS
+          size = size.positive? ? size : 5
+          @buffer = SizedQueue.new(size)
           @manager = nil
         end
 
         def new_group(size:)
+          raise ArgumentError, "size must be positive: #{size} given" unless size.positive?
+
           @manager = spawn_manager unless @manager&.alive?
           ::RedisClient::Cluster::ConcurrentWorker::Group.new(queue: @q, size: size)
         end

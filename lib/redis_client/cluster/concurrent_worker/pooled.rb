@@ -8,10 +8,14 @@ class RedisClient
       class Pooled
         def initialize
           @q = Queue.new
-          @workers = Array.new(::RedisClient::Cluster::ConcurrentWorker::MAX_WORKERS)
+          size = ::RedisClient::Cluster::ConcurrentWorker::MAX_WORKERS
+          size = size.positive? ? size : 5
+          @workers = Array.new(size)
         end
 
         def new_group(size:)
+          raise ArgumentError, "size must be positive: #{size} given" unless size.positive?
+
           ensure_workers if @workers.first.nil?
           ::RedisClient::Cluster::ConcurrentWorker::Group.new(queue: @q, size: size)
         end
@@ -26,7 +30,7 @@ class RedisClient
         private
 
         def ensure_workers
-          ::RedisClient::Cluster::ConcurrentWorker::MAX_WORKERS.times do |i|
+          @workers.size.times do |i|
             @workers[i] = spawn_worker unless @workers[i]&.alive?
           end
         end
