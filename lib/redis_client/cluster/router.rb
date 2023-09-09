@@ -16,13 +16,12 @@ class RedisClient
       METHODS_FOR_BLOCKING_CMD = %i[blocking_call_v blocking_call].freeze
       TSF = ->(f, x) { f.nil? ? x : f.call(x) }.curry
 
-      attr_reader :node
-
-      def initialize(config, pool: nil, **kwargs)
+      def initialize(config, concurrent_worker, pool: nil, **kwargs)
         @config = config.dup
+        @concurrent_worker = concurrent_worker
         @pool = pool
         @client_kwargs = kwargs
-        @node = fetch_cluster_info(@config, pool: @pool, **@client_kwargs)
+        @node = fetch_cluster_info(@config, @concurrent_worker, pool: @pool, **@client_kwargs)
         @command = ::RedisClient::Cluster::Command.load(@node.shuffled_nodes)
         @mutex = Mutex.new
         @command_builder = @config.command_builder
@@ -206,6 +205,14 @@ class RedisClient
         find_node(node_key)
       end
 
+      def node_keys
+        @node.node_keys
+      end
+
+      def close
+        @node.each(&:close)
+      end
+
       private
 
       def send_wait_command(method, command, args, retry_count: 3, &block) # rubocop:disable Metrics/AbcSize
@@ -284,12 +291,13 @@ class RedisClient
         end
       end
 
-      def fetch_cluster_info(config, pool: nil, **kwargs)
-        node_info_list = ::RedisClient::Cluster::Node.load_info(config.per_node_key, **kwargs)
+      def fetch_cluster_info(config, concurrent_worker, pool: nil, **kwargs)
+        node_info_list = ::RedisClient::Cluster::Node.load_info(config.per_node_key, concurrent_worker, **kwargs)
         node_addrs = node_info_list.map { |i| ::RedisClient::Cluster::NodeKey.hashify(i.node_key) }
         config.update_node(node_addrs)
         ::RedisClient::Cluster::Node.new(
           config.per_node_key,
+          concurrent_worker,
           node_info_list: node_info_list,
           pool: pool,
           with_replica: config.use_replica?,
@@ -308,7 +316,7 @@ class RedisClient
             # ignore
           end
 
-          @node = fetch_cluster_info(@config, pool: @pool, **@client_kwargs)
+          @node = fetch_cluster_info(@config, @concurrent_worker, pool: @pool, **@client_kwargs)
         end
       end
     end

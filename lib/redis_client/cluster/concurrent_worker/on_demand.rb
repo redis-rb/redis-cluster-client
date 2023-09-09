@@ -13,7 +13,7 @@ class RedisClient
         end
 
         def new_group(size:)
-          @manager = spawn_manager if @manager.nil?
+          @manager = spawn_manager unless @manager&.alive?
           ::RedisClient::Cluster::ConcurrentWorker::Group.new(queue: @q, size: size)
         end
 

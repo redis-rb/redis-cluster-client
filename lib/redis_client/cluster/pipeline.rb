@@ -147,7 +147,6 @@ class RedisClient
       def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         return if @pipelines.nil? || @pipelines.empty?
 
-        all_replies = errors = nil
         work_group = @concurrent_worker.new_group(size: @pipelines.size)
 
         @pipelines.each do |node_key, pipeline|
@@ -158,6 +157,8 @@ class RedisClient
             replies
           end
         end
+
+        all_replies = errors = nil
 
         work_group.each do |node_key, v|
           case v

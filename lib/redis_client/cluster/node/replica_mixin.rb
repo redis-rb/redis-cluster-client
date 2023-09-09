@@ -8,7 +8,7 @@ class RedisClient
 
         EMPTY_ARRAY = [].freeze
 
-        def initialize(replications, options, pool, **kwargs)
+        def initialize(replications, options, pool, _concurrent_worker, **kwargs)
           @replications = replications
           @primary_node_keys = @replications.keys.sort
           @replica_node_keys = @replications.values.flatten.sort

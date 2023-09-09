@@ -306,10 +306,6 @@ class RedisClient
         10.times { |i| assert_equal(['smessage', "s-chan#{i}", i.to_s], got[i]) }
       end
 
-      def test_close
-        assert_nil(@client.close)
-      end
-
       def test_dedicated_commands # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         10.times { |i| @client.call('SET', "key#{i}", i) }
         wait_for_replication

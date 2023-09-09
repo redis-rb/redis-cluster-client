@@ -14,13 +14,13 @@ class RedisClient
 
     def initialize(config, pool: nil, **kwargs)
       @config = config
-      @router = ::RedisClient::Cluster::Router.new(config, pool: pool, **kwargs)
-      @command_builder = config.command_builder
       @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker::OnDemand.new
+      @router = ::RedisClient::Cluster::Router.new(config, @concurrent_worker, pool: pool, **kwargs)
+      @command_builder = config.command_builder
     end
 
     def inspect
-      "#<#{self.class.name} #{@router.node.node_keys.join(', ')}>"
+      "#<#{self.class.name} #{@router.node_keys.join(', ')}>"
     end
 
     def call(*args, **kwargs, &block)
@@ -95,7 +95,7 @@ class RedisClient
 
     def close
       @concurrent_worker.close
-      @router.node.each(&:close)
+      @router.close
       nil
     end
 
