@@ -59,6 +59,7 @@ class RedisClient
         @state_dict.each_value(&:close)
         @state_dict.clear
         @queue.clear
+        @queue.close
         nil
       end
 
