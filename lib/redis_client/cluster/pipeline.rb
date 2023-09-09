@@ -95,10 +95,10 @@ class RedisClient
         attr_accessor :replies, :indices
       end
 
-      def initialize(router, command_builder, thread_pool, seed: Random.new_seed)
+      def initialize(router, command_builder, concurrent_worker, seed: Random.new_seed)
         @router = router
         @command_builder = command_builder
-        @thread_pool = thread_pool
+        @concurrent_worker = concurrent_worker
         @seed = seed
         @pipelines = nil
         @size = 0
@@ -148,10 +148,10 @@ class RedisClient
         return if @pipelines.nil? || @pipelines.empty?
 
         all_replies = errors = nil
-        queue = SizedQueue.new(@pipelines.size)
+        work_group = @concurrent_worker.new_group(size: @pipelines.size)
 
         @pipelines.each do |node_key, pipeline|
-          @thread_pool.push(node_key, queue, @router.find_node(node_key), pipeline) do |cli, pl|
+          work_group.push(node_key, @router.find_node(node_key), pipeline) do |cli, pl|
             replies = do_pipelining(cli, pl)
             raise ReplySizeError, "commands: #{pl._size}, replies: #{replies.size}" if pl._size != replies.size
 
@@ -159,10 +159,8 @@ class RedisClient
           end
         end
 
-        @pipelines.size.times do
-          task = queue.pop
-          node_key = task.id
-          case v = task.result
+        work_group.each do |node_key, v|
+          case v
           when ::RedisClient::Cluster::Pipeline::RedirectionNeeded
             all_replies ||= Array.new(@size)
             pipeline = @pipelines[node_key]
@@ -177,8 +175,7 @@ class RedisClient
           end
         end
 
-        queue.clear
-        queue.close
+        work_group.close
 
         raise ::RedisClient::Cluster::ErrorCollection, errors unless errors.nil?
 
