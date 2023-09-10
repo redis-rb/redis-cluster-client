@@ -7,7 +7,7 @@ class RedisClient
   class Cluster
     module ConcurrentWorker
       MAX_WORKERS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
-      NotEnoughTasks = Class.new(::RedisClient::Error)
+      InvalidNumberOfTasks = Class.new(::RedisClient::Error)
 
       class Group
         Task = Struct.new(
@@ -33,6 +33,8 @@ class RedisClient
         end
 
         def push(id, *args, **kwargs, &block)
+          raise InvalidNumberOfTasks, "expected: #{@result_queue.max}, actual: #{@count + 1}" if @count + 1 > @result_queue.max
+
           task = Task.new(id: id, queue: @result_queue, args: args, kwargs: kwargs, block: block)
           @worker.push(task)
           @count += 1
@@ -40,7 +42,7 @@ class RedisClient
         end
 
         def each
-          raise NotEnoughTasks, "expected: #{@result_queue.max}, actual: #{@count}" if @count != @result_queue.max
+          raise InvalidNumberOfTasks, "expected: #{@result_queue.max}, actual: #{@count}" if @count != @result_queue.max
 
           @result_queue.max.times do
             task = @result_queue.pop
