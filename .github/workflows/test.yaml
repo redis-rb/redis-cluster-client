@@ -151,7 +151,7 @@ jobs:
       REDIS_VERSION: '7.2'
       DOCKER_COMPOSE_FILE: 'compose.latency.yaml'
       REDIS_REPLICA_SIZE: '2'
-      REDIS_CLIENT_MAX_THREADS: '5'
+      REDIS_CLIENT_MAX_THREADS: '10'
       DELAY_TIME: '1ms'
     steps:
       - name: Check out code
