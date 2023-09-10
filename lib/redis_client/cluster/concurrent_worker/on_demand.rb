@@ -25,6 +25,7 @@ class RedisClient
           @manager&.exit
           @buffer.close
           @q.close
+          nil
         end
 
         private

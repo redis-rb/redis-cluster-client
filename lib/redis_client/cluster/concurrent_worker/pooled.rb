@@ -23,6 +23,7 @@ class RedisClient
           @workers.each { |t| t&.exit }
           @workers.clear
           @q.close
+          nil
         end
 
         private
