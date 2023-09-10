@@ -32,9 +32,7 @@ class RedisClient
 
         def spawn_manager
           Thread.new(@q, @buffer) do |q, b|
-            loop do
-              b << spawn_worker(q.pop, b)
-            end
+            loop { b << spawn_worker(q.pop, b) }
           end
         end
 
