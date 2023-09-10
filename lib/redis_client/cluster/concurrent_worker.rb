@@ -24,16 +24,17 @@ class RedisClient
           end
         end
 
-        def initialize(queue:, size:)
+        def initialize(worker:, size:)
           raise ArgumentError, "the size must be positive: #{size} given" unless size.positive?
 
-          @task_queue = queue
+          @worker = worker
           @result_queue = SizedQueue.new(size)
           @count = 0
         end
 
         def push(id, *args, **kwargs, &block)
-          @task_queue << Task.new(id: id, queue: @result_queue, args: args, kwargs: kwargs, block: block)
+          task = Task.new(id: id, queue: @result_queue, args: args, kwargs: kwargs, block: block)
+          @worker.push(task)
           @count += 1
           nil
         end

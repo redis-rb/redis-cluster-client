@@ -3,6 +3,10 @@
 class RedisClient
   class Cluster
     module ConcurrentWorker
+      # This class is just an experimental implementation. There are some bugs for race condition.
+      # Ruby VM allocates 1 MB memory as a stack for a thread.
+      # It is a fixed size but we can modify the size with some environment variables.
+      # So it consumes memory 1 MB multiplied a number of workers.
       class Pooled
         def initialize
           @q = Queue.new
@@ -15,7 +19,11 @@ class RedisClient
           raise ArgumentError, "size must be positive: #{size} given" unless size.positive?
 
           ensure_workers if @workers.first.nil?
-          ::RedisClient::Cluster::ConcurrentWorker::Group.new(queue: @q, size: size)
+          ::RedisClient::Cluster::ConcurrentWorker::Group.new(worker: self, size: size)
+        end
+
+        def push(task)
+          @q << task
         end
 
         def close
