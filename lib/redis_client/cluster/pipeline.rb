@@ -95,11 +95,10 @@ class RedisClient
         attr_accessor :replies, :indices
       end
 
-      MAX_THREADS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
-
-      def initialize(router, command_builder, seed: Random.new_seed)
+      def initialize(router, command_builder, concurrent_worker, seed: Random.new_seed)
         @router = router
         @command_builder = command_builder
+        @concurrent_worker = concurrent_worker
         @seed = seed
         @pipelines = nil
         @size = 0
@@ -146,26 +145,38 @@ class RedisClient
       end
 
       def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        all_replies = errors = nil
-        @pipelines&.each_slice(MAX_THREADS) do |chuncked_pipelines|
-          chuncked_pipelines
-            .map { |node_key, pipeline| [node_key, build_thread_for_pipeline(@router.find_node(node_key), pipeline)] }
-            .each do |node_key, thread|
-              case v = thread.value
-              when ::RedisClient::Cluster::Pipeline::RedirectionNeeded
-                all_replies ||= Array.new(@size)
-                pipeline = @pipelines[node_key]
-                v.indices.each { |i| v.replies[i] = handle_redirection(v.replies[i], pipeline, i) }
-                pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
-              when StandardError
-                errors ||= {}
-                errors[node_key] = v
-              else
-                all_replies ||= Array.new(@size)
-                @pipelines[node_key].outer_indices.each_with_index { |outer, inner| all_replies[outer] = v[inner] }
-              end
-            end
+        return if @pipelines.nil? || @pipelines.empty?
+
+        work_group = @concurrent_worker.new_group(size: @pipelines.size)
+
+        @pipelines.each do |node_key, pipeline|
+          work_group.push(node_key, @router.find_node(node_key), pipeline) do |cli, pl|
+            replies = do_pipelining(cli, pl)
+            raise ReplySizeError, "commands: #{pl._size}, replies: #{replies.size}" if pl._size != replies.size
+
+            replies
+          end
         end
+
+        all_replies = errors = nil
+
+        work_group.each do |node_key, v|
+          case v
+          when ::RedisClient::Cluster::Pipeline::RedirectionNeeded
+            all_replies ||= Array.new(@size)
+            pipeline = @pipelines[node_key]
+            v.indices.each { |i| v.replies[i] = handle_redirection(v.replies[i], pipeline, i) }
+            pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
+          when StandardError
+            errors ||= {}
+            errors[node_key] = v
+          else
+            all_replies ||= Array.new(@size)
+            @pipelines[node_key].outer_indices.each_with_index { |outer, inner| all_replies[outer] = v[inner] }
+          end
+        end
+
+        work_group.close
 
         raise ::RedisClient::Cluster::ErrorCollection, errors unless errors.nil?
 
@@ -180,17 +191,6 @@ class RedisClient
         @pipelines[node_key].add_outer_index(@size)
         @size += 1
         @pipelines[node_key]
-      end
-
-      def build_thread_for_pipeline(client, pipeline)
-        Thread.new(client, pipeline) do |cli, pl|
-          replies = do_pipelining(cli, pl)
-          raise ReplySizeError, "commands: #{pl._size}, replies: #{replies.size}" if pl._size != replies.size
-
-          replies
-        rescue StandardError => e
-          e
-        end
       end
 
       def do_pipelining(client, pipeline)

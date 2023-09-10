@@ -20,6 +20,7 @@ class RedisClient
             @replications,
             @options,
             { timeout: 3, size: 2 },
+            @concurrent_worker,
             **TEST_GENERIC_OPTIONS
           )
 

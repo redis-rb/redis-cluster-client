@@ -17,7 +17,6 @@ class RedisClient
       MIN_SLOT = 0
       MAX_SLOT = SLOT_SIZE - 1
       MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
-      MAX_THREADS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
       IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
       DEAD_FLAGS = %w[fail? fail handshake noaddr noflags].freeze
       ROLE_FLAGS = %w[master slave].freeze
@@ -89,26 +88,39 @@ class RedisClient
       end
 
       class << self
-        def load_info(options, **kwargs) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        def load_info(options, concurrent_worker, **kwargs) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+          raise ::RedisClient::Cluster::InitialSetupError, [] if options.nil? || options.empty?
+
           startup_size = options.size > MAX_STARTUP_SAMPLE ? MAX_STARTUP_SAMPLE : options.size
-          node_info_list = errors = nil
           startup_options = options.to_a.sample(MAX_STARTUP_SAMPLE).to_h
-          startup_nodes = ::RedisClient::Cluster::Node.new(startup_options, **kwargs)
-          startup_nodes.each_slice(MAX_THREADS).with_index do |chuncked_startup_nodes, chuncked_idx|
-            chuncked_startup_nodes
-              .each_with_index
-              .map { |raw_client, idx| [(MAX_THREADS * chuncked_idx) + idx, build_thread_for_cluster_node(raw_client)] }
-              .each do |i, t|
-                case v = t.value
-                when StandardError
-                  errors ||= Array.new(startup_size)
-                  errors[i] = v
-                else
-                  node_info_list ||= Array.new(startup_size)
-                  node_info_list[i] = v
-                end
-              end
+          startup_nodes = ::RedisClient::Cluster::Node.new(startup_options, concurrent_worker, **kwargs)
+          work_group = concurrent_worker.new_group(size: startup_size)
+
+          startup_nodes.each_with_index do |raw_client, i|
+            work_group.push(i, raw_client) do |client|
+              reply = client.call('CLUSTER', 'NODES')
+              parse_cluster_node_reply(reply)
+            rescue StandardError => e
+              e
+            ensure
+              client&.close
+            end
           end
+
+          node_info_list = errors = nil
+
+          work_group.each do |i, v|
+            case v
+            when StandardError
+              errors ||= Array.new(startup_size)
+              errors[i] = v
+            else
+              node_info_list ||= Array.new(startup_size)
+              node_info_list[i] = v
+            end
+          end
+
+          work_group.close
 
           raise ::RedisClient::Cluster::InitialSetupError, errors if node_info_list.nil?
 
@@ -123,17 +135,6 @@ class RedisClient
         end
 
         private
-
-        def build_thread_for_cluster_node(raw_client)
-          Thread.new(raw_client) do |client|
-            reply = client.call('CLUSTER', 'NODES')
-            parse_cluster_node_reply(reply)
-          rescue StandardError => e
-            e
-          ensure
-            client&.close
-          end
-        end
 
         # @see https://redis.io/commands/cluster-nodes/
         # @see https://github.com/redis/redis/blob/78960ad57b8a5e6af743d789ed8fd767e37d42b8/src/cluster.c#L4660-L4683
@@ -183,6 +184,7 @@ class RedisClient
 
       def initialize(
         options,
+        concurrent_worker,
         node_info_list: [],
         with_replica: false,
         replica_affinity: :random,
@@ -190,9 +192,11 @@ class RedisClient
         **kwargs
       )
 
+        @concurrent_worker = concurrent_worker
         @slots = build_slot_node_mappings(node_info_list)
         @replications = build_replication_mappings(node_info_list)
-        @topology = make_topology_class(with_replica, replica_affinity).new(@replications, options, pool, **kwargs)
+        klass = make_topology_class(with_replica, replica_affinity)
+        @topology = klass.new(@replications, options, pool, @concurrent_worker, **kwargs)
         @mutex = Mutex.new
       end
 
@@ -336,32 +340,35 @@ class RedisClient
         raise ::RedisClient::Cluster::ErrorCollection, errors
       end
 
-      def try_map(clients, &block)
-        results = errors = nil
-        clients.each_slice(MAX_THREADS) do |chuncked_clients|
-          chuncked_clients
-            .map { |node_key, client| [node_key, build_thread_for_command(node_key, client, &block)] }
-            .each do |node_key, thread|
-              case v = thread.value
-              when StandardError
-                errors ||= {}
-                errors[node_key] = v
-              else
-                results ||= {}
-                results[node_key] = v
-              end
-            end
+      def try_map(clients, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+        return [{}, {}] if clients.empty?
+
+        work_group = @concurrent_worker.new_group(size: clients.size)
+
+        clients.each do |node_key, client|
+          work_group.push(node_key, node_key, client, block) do |nk, cli, blk|
+            blk.call(nk, cli)
+          rescue StandardError => e
+            e
+          end
         end
+
+        results = errors = nil
+
+        work_group.each do |node_key, v|
+          case v
+          when StandardError
+            errors ||= {}
+            errors[node_key] = v
+          else
+            results ||= {}
+            results[node_key] = v
+          end
+        end
+
+        work_group.close
 
         [results, errors]
-      end
-
-      def build_thread_for_command(node_key, client)
-        Thread.new(node_key, client) do |nk, cli|
-          yield(nk, cli)
-        rescue StandardError => e
-          e
-        end
       end
     end
   end

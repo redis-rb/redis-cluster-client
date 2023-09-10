@@ -6,7 +6,7 @@ class RedisClient
       class PrimaryOnly
         attr_reader :clients
 
-        def initialize(replications, options, pool, **kwargs)
+        def initialize(replications, options, pool, _concurrent_worker, **kwargs)
           @primary_node_keys = replications.keys.sort
           @clients = build_clients(@primary_node_keys, options, pool, **kwargs)
         end

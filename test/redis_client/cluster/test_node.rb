@@ -28,7 +28,8 @@ class RedisClient
           fixed_hostname: TEST_FIXED_HOSTNAME,
           **TEST_GENERIC_OPTIONS
         )
-        @test_node_info_list = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key)
+        @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
+        @test_node_info_list = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key, @concurrent_worker)
         if TEST_FIXED_HOSTNAME
           @test_node_info_list.each do |info|
             _, port = ::RedisClient::Cluster::NodeKey.split(info.node_key)
@@ -39,10 +40,12 @@ class RedisClient
         @test_config.update_node(node_addrs)
         @test_node = ::RedisClient::Cluster::Node.new(
           @test_config.per_node_key,
+          @concurrent_worker,
           node_info_list: @test_node_info_list
         )
         @test_node_with_scale_read = ::RedisClient::Cluster::Node.new(
           @test_config.per_node_key,
+          @concurrent_worker,
           node_info_list: @test_node_info_list,
           with_replica: true
         )
@@ -69,7 +72,7 @@ class RedisClient
           }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
-          got = -> { ::RedisClient::Cluster::Node.load_info(c[:params][:options], **c[:params][:kwargs]) }
+          got = -> { ::RedisClient::Cluster::Node.load_info(c[:params][:options], @concurrent_worker, **c[:params][:kwargs]) }
           if c[:want].key?(:error)
             assert_raises(c[:want][:error], msg, &got)
           else

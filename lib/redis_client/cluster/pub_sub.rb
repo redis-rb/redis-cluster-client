@@ -28,6 +28,9 @@ class RedisClient
         private
 
         def spawn_worker(client, queue)
+          # Ruby VM allocates 1 MB memory as a stack for a thread.
+          # It is a fixed size but we can modify the size with some environment variables.
+          # So it consumes memory 1 MB multiplied a number of workers.
           Thread.new(client, queue) do |pubsub, q|
             loop do
               q << pubsub.next_event
@@ -59,6 +62,8 @@ class RedisClient
         @state_dict.each_value(&:close)
         @state_dict.clear
         @queue.clear
+        @queue.close
+        nil
       end
 
       def next_event(timeout = nil)

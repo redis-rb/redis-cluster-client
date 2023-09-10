@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'redis_client/cluster/concurrent_worker'
 require 'redis_client/cluster/pipeline'
 require 'redis_client/cluster/pub_sub'
 require 'redis_client/cluster/router'
@@ -12,12 +13,13 @@ class RedisClient
 
     def initialize(config, pool: nil, **kwargs)
       @config = config
-      @router = ::RedisClient::Cluster::Router.new(config, pool: pool, **kwargs)
+      @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
+      @router = ::RedisClient::Cluster::Router.new(config, @concurrent_worker, pool: pool, **kwargs)
       @command_builder = config.command_builder
     end
 
     def inspect
-      "#<#{self.class.name} #{@router.node.node_keys.join(', ')}>"
+      "#<#{self.class.name} #{@router.node_keys.join(', ')}>"
     end
 
     def call(*args, **kwargs, &block)
@@ -79,7 +81,7 @@ class RedisClient
 
     def pipelined
       seed = @config.use_replica? && @config.replica_affinity == :random ? nil : Random.new_seed
-      pipeline = ::RedisClient::Cluster::Pipeline.new(@router, @command_builder, seed: seed)
+      pipeline = ::RedisClient::Cluster::Pipeline.new(@router, @command_builder, @concurrent_worker, seed: seed)
       yield pipeline
       return [] if pipeline.empty?
 
@@ -91,7 +93,8 @@ class RedisClient
     end
 
     def close
-      @router.node.each(&:close)
+      @concurrent_worker.close
+      @router.close
       nil
     end
 
