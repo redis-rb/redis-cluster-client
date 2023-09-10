@@ -92,7 +92,7 @@ class RedisClient
           raise ::RedisClient::Cluster::InitialSetupError, [] if options.nil? || options.empty?
 
           startup_size = options.size > MAX_STARTUP_SAMPLE ? MAX_STARTUP_SAMPLE : options.size
-          startup_options = options.to_a.sample(MAX_STARTUP_SAMPLE).to_h
+          startup_options = options.to_a.sample(startup_size).to_h
           startup_nodes = ::RedisClient::Cluster::Node.new(startup_options, concurrent_worker, **kwargs)
           work_group = concurrent_worker.new_group(size: startup_size)
 
