@@ -27,7 +27,8 @@ class RedisClient
       replica: false,
       replica_affinity: :random,
       fixed_hostname: '',
-      client_implementation: Cluster,
+      concurrent_worker_model: nil,
+      client_implementation: ::RedisClient::Cluster, # for redis gem
       **client_config
     )
 
@@ -38,6 +39,7 @@ class RedisClient
       client_config = client_config.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) }
       @command_builder = client_config.fetch(:command_builder, ::RedisClient::CommandBuilder)
       @client_config = merge_generic_config(client_config, @node_configs)
+      @concurrent_worker_model = concurrent_worker_model
       @client_implementation = client_implementation
       @mutex = Mutex.new
     end
@@ -48,6 +50,7 @@ class RedisClient
         replica: @replica,
         replica_affinity: @replica_affinity,
         fixed_hostname: @fixed_hostname,
+        concurrent_worker_model: @concurrent_worker_model,
         client_implementation: @client_implementation,
         **@client_config
       )
@@ -62,11 +65,16 @@ class RedisClient
     end
 
     def new_pool(size: 5, timeout: 5, **kwargs)
-      @client_implementation.new(self, pool: { size: size, timeout: timeout }, **kwargs)
+      @client_implementation.new(
+        self,
+        pool: { size: size, timeout: timeout },
+        concurrent_worker_model: @concurrent_worker_model,
+        **kwargs
+      )
     end
 
     def new_client(**kwargs)
-      @client_implementation.new(self, **kwargs)
+      @client_implementation.new(self, concurrent_worker_model: @concurrent_worker_model, **kwargs)
     end
 
     def per_node_key

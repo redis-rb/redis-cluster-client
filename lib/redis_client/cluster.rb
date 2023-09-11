@@ -11,9 +11,9 @@ class RedisClient
 
     attr_reader :config
 
-    def initialize(config, pool: nil, **kwargs)
+    def initialize(config, pool: nil, concurrent_worker_model: nil, **kwargs)
       @config = config
-      @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
+      @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create(model: concurrent_worker_model)
       @router = ::RedisClient::Cluster::Router.new(config, @concurrent_worker, pool: pool, **kwargs)
       @command_builder = config.command_builder
     end
