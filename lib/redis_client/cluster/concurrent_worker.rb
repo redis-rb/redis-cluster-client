@@ -17,9 +17,16 @@ class RedisClient
         ) do
           def exec
             self[:result] = block&.call(*args, **kwargs)
-            queue&.push(self)
           rescue StandardError => e
             self[:result] = e
+          ensure
+            done
+          end
+
+          def done
+            queue&.push(self)
+          rescue ClosedQueueError
+            # something was wrong
           end
         end
 
