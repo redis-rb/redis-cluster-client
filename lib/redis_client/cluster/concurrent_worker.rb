@@ -64,7 +64,7 @@ class RedisClient
 
       def create(model: :on_demand)
         case model
-        when :on_demand then ::RedisClient::Cluster::ConcurrentWorker::OnDemand.new
+        when :on_demand, nil then ::RedisClient::Cluster::ConcurrentWorker::OnDemand.new
         when :pooled then ::RedisClient::Cluster::ConcurrentWorker::Pooled.new
         else raise ArgumentError, "Unknown model: #{model}"
         end
