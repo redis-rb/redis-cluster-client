@@ -60,7 +60,7 @@ class RedisClient
         [
           {
             params: { options: TEST_NODE_OPTIONS, kwargs: TEST_GENERIC_OPTIONS },
-            want: { size: TEST_NODE_OPTIONS.size }
+            want: { size: TEST_NUMBER_OF_NODES }
           },
           {
             params: { options: { '127.0.0.1:11211' => { host: '127.0.0.1', port: 11_211 } }, kwargs: TEST_GENERIC_OPTIONS },

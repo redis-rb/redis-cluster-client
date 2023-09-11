@@ -53,7 +53,7 @@ jobs:
       REDIS_CLIENT_MAX_STARTUP_SAMPLE: ${{ matrix.startup || '3' }}
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -80,7 +80,7 @@ jobs:
       DOCKER_COMPOSE_FILE: 'compose.nat.yaml'
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -135,7 +135,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -155,7 +155,7 @@ jobs:
       DELAY_TIME: '1ms'
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -195,6 +195,8 @@ jobs:
         run: df -h
       - name: Run minitest
         run: bundle exec rake bench | grep BenchCommand | grep -v 'Envoy#bench_pipeline_echo\|Envoy#bench_single_echo' | sort
+      - name: Run iteration per second
+        run: bundle exec rake ips
       - name: Reset qdisc
         run: |
           for i in {5..9..2}
@@ -219,7 +221,7 @@ jobs:
       DOCKER_COMPOSE_FILE: 'compose.yaml'
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -251,7 +253,7 @@ jobs:
       REDIS_CLIENT_MAX_STARTUP_SAMPLE: '5'
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:

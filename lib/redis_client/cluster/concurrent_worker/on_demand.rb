@@ -5,14 +5,10 @@ class RedisClient
     module ConcurrentWorker
       class OnDemand
         def initialize
-          size = ::RedisClient::Cluster::ConcurrentWorker::MAX_WORKERS
-          size = size.positive? ? size : 5
-          @q = SizedQueue.new(size)
+          @q = SizedQueue.new(::RedisClient::Cluster::ConcurrentWorker.size)
         end
 
         def new_group(size:)
-          raise ArgumentError, "size must be positive: #{size} given" unless size.positive?
-
           ::RedisClient::Cluster::ConcurrentWorker::Group.new(worker: self, size: size)
         end
 

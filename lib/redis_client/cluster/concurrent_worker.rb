@@ -20,7 +20,13 @@ class RedisClient
           rescue StandardError => e
             self[:result] = e
           ensure
+            done
+          end
+
+          def done
             queue&.push(self)
+          rescue ClosedQueueError
+            # something was wrong
           end
         end
 
@@ -68,6 +74,10 @@ class RedisClient
         when :pooled then ::RedisClient::Cluster::ConcurrentWorker::Pooled.new
         else raise ArgumentError, "Unknown model: #{model}"
         end
+      end
+
+      def size
+        MAX_WORKERS.positive? ? MAX_WORKERS : 5
       end
     end
   end
