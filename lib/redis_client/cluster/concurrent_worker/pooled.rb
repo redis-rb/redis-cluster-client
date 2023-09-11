@@ -15,8 +15,6 @@ class RedisClient
         end
 
         def new_group(size:)
-          raise ArgumentError, "size must be positive: #{size} given" unless size.positive?
-
           reset if @pid != ::RedisClient::PIDCache.pid
           ensure_workers if @workers.first.nil?
           ::RedisClient::Cluster::ConcurrentWorker::Group.new(worker: self, size: size)
@@ -37,6 +35,17 @@ class RedisClient
 
         private
 
+        def setup
+          @q = Queue.new
+          @workers = Array.new(::RedisClient::Cluster::ConcurrentWorker.size)
+          @pid = ::RedisClient::PIDCache.pid
+        end
+
+        def reset
+          close
+          setup
+        end
+
         def ensure_workers
           @workers.size.times do |i|
             @workers[i] = spawn_worker unless @workers[i]&.alive?
@@ -44,22 +53,7 @@ class RedisClient
         end
 
         def spawn_worker
-          Thread.new(@q) do |q|
-            loop { q.pop.exec }
-          end
-        end
-
-        def setup
-          @q = Queue.new
-          size = ::RedisClient::Cluster::ConcurrentWorker::MAX_WORKERS
-          size = size.positive? ? size : 5
-          @workers = Array.new(size)
-          @pid = ::RedisClient::PIDCache.pid
-        end
-
-        def reset
-          close
-          setup
+          Thread.new(@q) { |q| loop { q.pop.exec } }
         end
       end
     end

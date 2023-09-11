@@ -4,31 +4,28 @@ require 'benchmark/ips'
 require 'redis_cluster_client'
 require 'testing_constants'
 
-module IpsPipeline
+module IpsSingle
   module_function
 
-  ATTEMPTS = 100
+  ATTEMPTS = 10
 
   def run
-    on_demand = make_client(:on_demand)
-    pooled = make_client(:pooled)
+    cli = make_client
     envoy = make_client_for_envoy
     cluster_proxy = make_client_for_cluster_proxy
-    prepare(on_demand, pooled, envoy, cluster_proxy)
-    print_letter('pipelined')
+    prepare(cli, envoy, cluster_proxy)
+    print_letter('single')
     bench(
-      ondemand: on_demand,
-      pooled: pooled,
+      cli: cli,
       envoy: envoy,
       cproxy: cluster_proxy
     )
   end
 
-  def make_client(model)
+  def make_client
     ::RedisClient.cluster(
       nodes: TEST_NODE_URIS,
       fixed_hostname: TEST_FIXED_HOSTNAME,
-      concurrent_worker_model: model,
       **TEST_GENERIC_OPTIONS
     ).new_client
   end
@@ -54,10 +51,8 @@ module IpsPipeline
 
   def prepare(*clients)
     clients.each do |client|
-      client.pipelined do |pi|
-        ATTEMPTS.times do |i|
-          pi.call('SET', "key#{i}", "val#{i}")
-        end
+      ATTEMPTS.times do |i|
+        client.call('SET', "key#{i}", "val#{i}")
       end
     end
   end
@@ -68,11 +63,9 @@ module IpsPipeline
       x.warmup = 1
 
       kwargs.each do |key, client|
-        x.report("pipelined: #{key}") do
-          client.pipelined do |pi|
-            ATTEMPTS.times do |i|
-              pi.call('GET', "key#{i}")
-            end
+        x.report("single: #{key}") do
+          ATTEMPTS.times do |i|
+            client.call('GET', "key#{i}")
           end
         end
       end
@@ -82,4 +75,4 @@ module IpsPipeline
   end
 end
 
-IpsPipeline.run
+IpsSingle.run
