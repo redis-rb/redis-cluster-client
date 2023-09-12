@@ -25,6 +25,8 @@ module IpsSingle
   def make_client
     ::RedisClient.cluster(
       nodes: TEST_NODE_URIS,
+      replica: true,
+      replica_affinity: :random,
       fixed_hostname: TEST_FIXED_HOSTNAME,
       **TEST_GENERIC_OPTIONS
     ).new_client
