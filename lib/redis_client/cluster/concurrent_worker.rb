@@ -39,7 +39,7 @@ class RedisClient
         end
 
         def push(id, *args, **kwargs, &block)
-          raise InvalidNumberOfTasks, "expected: #{@result_queue.max}, actual: #{@count + 1}" if @count + 1 > @result_queue.max
+          raise InvalidNumberOfTasks, "max size reached: #{@count}" if @count == @result_queue.max
 
           task = Task.new(id: id, queue: @result_queue, args: args, kwargs: kwargs, block: block)
           @worker.push(task)
