@@ -10,14 +10,19 @@ class RedisClient
       # It is a fixed size but we can modify the size with some environment variables.
       # So it consumes memory 1 MB multiplied a number of workers.
       class Pooled
-        def initialize
+        def initialize(size:)
+          @size = size
           setup
         end
 
         def new_group(size:)
           reset if @pid != ::RedisClient::PIDCache.pid
           ensure_workers if @workers.first.nil?
-          ::RedisClient::Cluster::ConcurrentWorker::Group.new(worker: self, size: size)
+          ::RedisClient::Cluster::ConcurrentWorker::Group.new(
+            worker: self,
+            queue: SizedQueue.new(size),
+            size: size
+          )
         end
 
         def push(task)
@@ -37,7 +42,7 @@ class RedisClient
 
         def setup
           @q = Queue.new
-          @workers = Array.new(::RedisClient::Cluster::ConcurrentWorker.size)
+          @workers = Array.new(@size)
           @pid = ::RedisClient::PIDCache.pid
         end
 

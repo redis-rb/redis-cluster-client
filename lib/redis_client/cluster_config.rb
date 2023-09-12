@@ -17,6 +17,7 @@ class RedisClient
     VALID_NODES_KEYS = %i[ssl username password host port db].freeze
     MERGE_CONFIG_KEYS = %i[ssl username password].freeze
     IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
+    MAX_WORKERS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
 
     InvalidClientConfigError = Class.new(::RedisClient::Error)
 
@@ -27,7 +28,7 @@ class RedisClient
       replica: false,
       replica_affinity: :random,
       fixed_hostname: '',
-      concurrent_worker_model: nil,
+      concurrency: nil,
       client_implementation: ::RedisClient::Cluster, # for redis gem
       **client_config
     )
@@ -39,7 +40,7 @@ class RedisClient
       client_config = client_config.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) }
       @command_builder = client_config.fetch(:command_builder, ::RedisClient::CommandBuilder)
       @client_config = merge_generic_config(client_config, @node_configs)
-      @concurrent_worker_model = concurrent_worker_model
+      @concurrency = merge_concurrency_option(concurrency)
       @client_implementation = client_implementation
       @mutex = Mutex.new
     end
@@ -50,7 +51,7 @@ class RedisClient
         replica: @replica,
         replica_affinity: @replica_affinity,
         fixed_hostname: @fixed_hostname,
-        concurrent_worker_model: @concurrent_worker_model,
+        concurrency: @concurrency,
         client_implementation: @client_implementation,
         **@client_config
       )
@@ -61,20 +62,20 @@ class RedisClient
     end
 
     def read_timeout
-      @client_config[:read_timeout] || @client_config[:timeout] || RedisClient::Config::DEFAULT_TIMEOUT
+      @client_config[:read_timeout] || @client_config[:timeout] || ::RedisClient::Config::DEFAULT_TIMEOUT
     end
 
     def new_pool(size: 5, timeout: 5, **kwargs)
       @client_implementation.new(
         self,
         pool: { size: size, timeout: timeout },
-        concurrent_worker_model: @concurrent_worker_model,
+        concurrency: @concurrency,
         **kwargs
       )
     end
 
     def new_client(**kwargs)
-      @client_implementation.new(self, concurrent_worker_model: @concurrent_worker_model, **kwargs)
+      @client_implementation.new(self, concurrency: @concurrency, **kwargs)
     end
 
     def per_node_key
@@ -103,6 +104,15 @@ class RedisClient
     end
 
     private
+
+    def merge_concurrency_option(option)
+      case option
+      when Hash
+        option = option.transform_keys(&:to_sym)
+        { size: MAX_WORKERS }.merge(option)
+      else { size: MAX_WORKERS }
+      end
+    end
 
     def build_node_configs(addrs)
       configs = Array[addrs].flatten.filter_map { |addr| parse_node_addr(addr) }

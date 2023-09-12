@@ -4,12 +4,16 @@ class RedisClient
   class Cluster
     module ConcurrentWorker
       class OnDemand
-        def initialize
-          @q = SizedQueue.new(::RedisClient::Cluster::ConcurrentWorker.size)
+        def initialize(size:)
+          @q = SizedQueue.new(size)
         end
 
         def new_group(size:)
-          ::RedisClient::Cluster::ConcurrentWorker::Group.new(worker: self, size: size)
+          ::RedisClient::Cluster::ConcurrentWorker::Group.new(
+            worker: self,
+            queue: SizedQueue.new(size),
+            size: size
+          )
         end
 
         def push(task)
