@@ -7,7 +7,7 @@ class RedisClient
         def new_group(size:)
           ::RedisClient::Cluster::ConcurrentWorker::Group.new(
             worker: self,
-            queue: Array.new(size),
+            queue: [],
             size: size
           )
         end
