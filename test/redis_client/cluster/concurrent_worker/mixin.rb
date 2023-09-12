@@ -46,6 +46,9 @@ class RedisClient
           4.times { |i| group.push(i, i) { |n| n } }
           sum = 0
           assert_raises(InvalidNumberOfTasks) { group.each { |_, v| sum += v } }
+          group.push(4, 4) { |n| n }
+          group.each { |_, v| sum += v }
+          assert_equal(10, sum)
           group.close
         end
 
