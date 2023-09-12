@@ -27,6 +27,8 @@ module IpsPipeline
   def make_client(model)
     ::RedisClient.cluster(
       nodes: TEST_NODE_URIS,
+      replica: true,
+      replica_affinity: :random,
       fixed_hostname: TEST_FIXED_HOSTNAME,
       concurrent_worker_model: model,
       **TEST_GENERIC_OPTIONS

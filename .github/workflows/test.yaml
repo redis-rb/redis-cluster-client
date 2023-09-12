@@ -195,14 +195,14 @@ jobs:
         run: df -h
       - name: Run minitest
         run: bundle exec rake bench | grep BenchCommand | grep -v 'Envoy#bench_pipeline_echo\|Envoy#bench_single_echo' | sort
-      - name: Run iteration per second
-        run: bundle exec rake ips
       - name: Reset qdisc
         run: |
           for i in {5..9..2}
           do
             docker compose -f $DOCKER_COMPOSE_FILE exec node$i tc qdisc del dev eth0 root netem || true
           done
+      - name: Run iteration per second
+        run: bundle exec rake ips
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down || true
   profiling:
