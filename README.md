@@ -26,6 +26,7 @@ gem 'redis-cluster-client'
 | `:replica` | Boolean | `false` | `true` if client should use scale read feature |
 | `:replica_affinity` | Symbol or String | `:random` | scale reading strategy, `:random`, `random_with_primary` or `:latency` are valid |
 | `:fixed_hostname` | String | `nil` | required if client should connect to single endpoint with SSL |
+| `:concurrency` | Hash | `{ model: :on_demand, size: 5}` | concurrency settings, `:on_demand`, `:pooled` and `:none` are valid models, size is a max number of workers, `:none` model is no concurrency |
 
 Also, [the other generic options](https://github.com/redis-rb/redis-client#configuration) can be passed.
 But `:url`, `:host`, `:port` and `:path` are ignored because they conflict with the `:nodes` option.
