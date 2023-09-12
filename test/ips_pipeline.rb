@@ -12,13 +12,15 @@ module IpsPipeline
   def run
     on_demand = make_client(:on_demand)
     pooled = make_client(:pooled)
+    none = make_client(:none)
     envoy = make_client_for_envoy
     cluster_proxy = make_client_for_cluster_proxy
-    prepare(on_demand, pooled, envoy, cluster_proxy)
+    prepare(on_demand, pooled, none, envoy, cluster_proxy)
     print_letter('pipelined')
     bench(
       ondemand: on_demand,
       pooled: pooled,
+      none: none,
       envoy: envoy,
       cproxy: cluster_proxy
     )
@@ -30,7 +32,7 @@ module IpsPipeline
       replica: true,
       replica_affinity: :random,
       fixed_hostname: TEST_FIXED_HOSTNAME,
-      concurrent_worker_model: model,
+      concurrency: { model: model },
       **TEST_GENERIC_OPTIONS
     ).new_client
   end

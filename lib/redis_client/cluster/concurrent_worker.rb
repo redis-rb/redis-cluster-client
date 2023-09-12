@@ -2,11 +2,11 @@
 
 require 'redis_client/cluster/concurrent_worker/on_demand'
 require 'redis_client/cluster/concurrent_worker/pooled'
+require 'redis_client/cluster/concurrent_worker/none'
 
 class RedisClient
   class Cluster
     module ConcurrentWorker
-      MAX_WORKERS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
       InvalidNumberOfTasks = Class.new(::RedisClient::Error)
 
       class Group
@@ -30,28 +30,27 @@ class RedisClient
           end
         end
 
-        def initialize(worker:, size:)
-          raise ArgumentError, "the size must be positive: #{size} given" unless size.positive?
-
+        def initialize(worker:, queue:, size:)
           @worker = worker
-          @result_queue = SizedQueue.new(size)
+          @queue = queue
+          @size = size
           @count = 0
         end
 
         def push(id, *args, **kwargs, &block)
-          raise InvalidNumberOfTasks, "max size reached: #{@count}" if @count == @result_queue.max
+          raise InvalidNumberOfTasks, "max size reached: #{@count}" if @count == @size
 
-          task = Task.new(id: id, queue: @result_queue, args: args, kwargs: kwargs, block: block)
+          task = Task.new(id: id, queue: @queue, args: args, kwargs: kwargs, block: block)
           @worker.push(task)
           @count += 1
           nil
         end
 
         def each
-          raise InvalidNumberOfTasks, "expected: #{@result_queue.max}, actual: #{@count}" if @count != @result_queue.max
+          raise InvalidNumberOfTasks, "expected: #{@size}, actual: #{@count}" if @count != @size
 
-          @result_queue.max.times do
-            task = @result_queue.pop
+          @size.times do
+            task = @queue.pop
             yield(task.id, task.result)
           end
 
@@ -59,8 +58,8 @@ class RedisClient
         end
 
         def close
-          @result_queue.clear
-          @result_queue.close
+          @queue.clear
+          @queue.close if @queue.respond_to?(:close)
           @count = 0
           nil
         end
@@ -68,16 +67,15 @@ class RedisClient
 
       module_function
 
-      def create(model: :on_demand)
+      def create(model: :on_demand, size: 5)
+        size = size.positive? ? size : 5
+
         case model
-        when :on_demand, nil then ::RedisClient::Cluster::ConcurrentWorker::OnDemand.new
-        when :pooled then ::RedisClient::Cluster::ConcurrentWorker::Pooled.new
+        when :on_demand, nil then ::RedisClient::Cluster::ConcurrentWorker::OnDemand.new(size: size)
+        when :pooled then ::RedisClient::Cluster::ConcurrentWorker::Pooled.new(size: size)
+        when :none then ::RedisClient::Cluster::ConcurrentWorker::None.new
         else raise ArgumentError, "Unknown model: #{model}"
         end
-      end
-
-      def size
-        MAX_WORKERS.positive? ? MAX_WORKERS : 5
       end
     end
   end
