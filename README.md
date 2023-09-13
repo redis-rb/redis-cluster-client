@@ -90,6 +90,16 @@ RedisClient.cluster(nodes: 'rediss://endpoint.example.com:6379').new_client
 RedisClient.cluster(nodes: 'rediss://endpoint.example.com:6379', fixed_hostname: 'endpoint.example.com').new_client
 ```
 
+```ruby
+# To specify concurrency settings
+RedisClient.cluster(concurrency: { model: :on_demand, size: 6 }).new_client
+RedisClient.cluster(concurrency: { model: :pooled, size: 3 }).new_client
+RedisClient.cluster(concurrency: { model: :none }).new_client
+
+# The above settings are used by sending commands to multiple nodes like pipelining.
+# Please choose the one suited your workloads.
+```
+
 ## Interfaces
 The following methods are able to be used like `redis-client`.
 * `#call`
