@@ -4,10 +4,10 @@ require 'benchmark/ips'
 require 'redis_cluster_client'
 
 module IpsConcurrentWorker
-  module_function
-
   TASK_SIZE = 40
   WORKER_SIZE = 5
+
+  module_function
 
   def run
     on_demand = make_worker(:on_demand)
