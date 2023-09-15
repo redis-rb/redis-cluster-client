@@ -26,6 +26,10 @@ class RedisClient
           nil
         end
 
+        def inspect
+          "#<#{self.class.name} active: #{@q.size}, max: #{@q.max}>"
+        end
+
         private
 
         def spawn_worker(task, queue)

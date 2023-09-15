@@ -7,7 +7,7 @@ require 'redis_client/cluster/concurrent_worker/none'
 class RedisClient
   class Cluster
     module ConcurrentWorker
-      InvalidNumberOfTasks = Class.new(::RedisClient::Error)
+      InvalidNumberOfTasks = Class.new(StandardError)
 
       class Group
         Task = Struct.new(
@@ -62,6 +62,10 @@ class RedisClient
           @queue.close if @queue.respond_to?(:close)
           @count = 0
           nil
+        end
+
+        def inspect
+          "#<#{self.class.name} size: #{@count}, max: #{@size}, worker: #{@worker.class.name}>"
         end
       end
 
