@@ -17,6 +17,10 @@ class RedisClient
         end
 
         def close; end
+
+        def inspect
+          "#<#{self.class.name} main thread only>"
+        end
       end
     end
   end

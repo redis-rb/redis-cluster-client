@@ -38,6 +38,10 @@ class RedisClient
           nil
         end
 
+        def inspect
+          "#<#{self.class.name} tasks: #{@q.size}, workers: #{@size}>"
+        end
+
         private
 
         def setup
@@ -52,13 +56,15 @@ class RedisClient
         end
 
         def ensure_workers
-          @workers.size.times do |i|
+          @size.times do |i|
             @workers[i] = spawn_worker unless @workers[i]&.alive?
           end
         end
 
         def spawn_worker
-          Thread.new(@q) { |q| loop { q.pop.exec } }
+          Thread.new(@q) do |q|
+            loop { q.pop.exec }
+          end
         end
       end
     end
