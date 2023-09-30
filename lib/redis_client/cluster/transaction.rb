@@ -33,11 +33,11 @@ class RedisClient
         ensure_node_key(command)
       end
 
-      def find_node
+      def execute(watch: nil, &block)
         yield self
         raise ArgumentError, 'empty transaction' if @node_key.nil?
 
-        @router.find_node(@node_key)
+        @router.find_node(@node_key).multi(watch: watch, &block)
       end
 
       private
