@@ -90,10 +90,7 @@ class RedisClient
     end
 
     def multi(watch: nil, &block)
-      ::RedisClient::Cluster::Transaction
-        .new(@router, @command_builder)
-        .find_node(&block)
-        .multi(watch: watch, &block)
+      ::RedisClient::Cluster::Transaction.new(@router, @command_builder).execute(watch: watch, &block)
     end
 
     def pubsub

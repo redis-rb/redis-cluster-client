@@ -188,15 +188,14 @@ class RedisClient
       end
 
       def test_transaction_with_single_key
-        want = ['OK', 1, 2, '2']
         got = @client.multi do |t|
           t.call('SET', 'counter', '0')
           t.call('INCR', 'counter')
           t.call('INCR', 'counter')
-          t.call('GET', 'counter')
         end
 
-        assert_equal(want, got)
+        assert_equal(['OK', 1, 2], got)
+        assert_equal('2', @client.call('GET', 'counter'))
       end
 
       def test_transaction_with_multiple_key
@@ -215,17 +214,26 @@ class RedisClient
 
       def test_transaction_with_empty_block
         assert_raises(ArgumentError) { @client.multi {} }
+        assert_raises(LocalJumpError) { @client.multi }
+      end
+
+      def test_transaction_with_keyless_commands
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
+          @client.multi do |t|
+            t.call('ECHO', 'foo')
+            t.call('ECHO', 'bar')
+          end
+        end
       end
 
       def test_transaction_with_hashtag
-        want = ['OK', 'OK', %w[1 2 3 4]]
         got = @client.multi do |t|
           t.call('MSET', '{key}1', '1', '{key}2', '2')
           t.call('MSET', '{key}3', '3', '{key}4', '4')
-          t.call('MGET', '{key}1', '{key}2', '{key}3', '{key}4')
         end
 
-        assert_equal(want, got)
+        assert_equal(%w[OK OK], got)
+        assert_equal(%w[1 2 3 4], @client.call('MGET', '{key}1', '{key}2', '{key}3', '{key}4'))
       end
 
       def test_transaction_without_hashtag
@@ -233,7 +241,14 @@ class RedisClient
           @client.multi do |t|
             t.call('MSET', 'key1', '1', 'key2', '2')
             t.call('MSET', 'key3', '3', 'key4', '4')
-            t.call('MGET', 'key1', 'key2', 'key3', 'key4')
+          end
+        end
+
+        assert_raises(::RedisClient::CommandError, 'CROSSSLOT keys') do
+          @client.multi do |t|
+            t.call('MSET', 'key1', '1', 'key2', '2')
+            t.call('MSET', 'key1', '1', 'key3', '3')
+            t.call('MSET', 'key1', '1', 'key4', '4')
           end
         end
 
