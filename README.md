@@ -113,6 +113,7 @@ The following methods are able to be used like `redis-client`.
 * `#hscan`
 * `#zscan`
 * `#pipelined`
+* `#multi`
 * `#pubsub`
 * `#close`
 

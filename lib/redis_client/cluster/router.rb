@@ -179,6 +179,12 @@ class RedisClient
         end
       end
 
+      def find_primary_node_key(command)
+        key = @command.extract_first_key(command)
+        slot = key.empty? ? nil : ::RedisClient::Cluster::KeySlotConverter.convert(key)
+        @node.find_node_key_of_primary(slot)
+      end
+
       def find_node(node_key, retry_count: 3)
         @node.find_by(node_key)
       rescue ::RedisClient::Cluster::Node::ReloadNeeded

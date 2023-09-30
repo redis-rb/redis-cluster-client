@@ -4,6 +4,7 @@ require 'redis_client/cluster/concurrent_worker'
 require 'redis_client/cluster/pipeline'
 require 'redis_client/cluster/pub_sub'
 require 'redis_client/cluster/router'
+require 'redis_client/cluster/transaction'
 
 class RedisClient
   class Cluster
@@ -86,6 +87,13 @@ class RedisClient
       return [] if pipeline.empty?
 
       pipeline.execute
+    end
+
+    def multi(watch: nil, &block)
+      ::RedisClient::Cluster::Transaction
+        .new(@router, @command_builder)
+        .find_node(&block)
+        .multi(watch: watch, &block)
     end
 
     def pubsub
