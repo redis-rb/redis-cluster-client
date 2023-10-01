@@ -3,24 +3,20 @@
 require 'benchmark/ips'
 require 'redis_cluster_client'
 
-module IpsSlotArray
+module IpsSlotNodeMapping
   ELEMENTS = %w[foo bar baz].freeze
-  SIZE = 256
+  SIZE = ::RedisClient::Cluster::Node::SLOT_SIZE
 
   module_function
 
   def run
-    ca = ::RedisClient::Cluster::Node::CharArray.new(::RedisClient::Cluster::Node::SLOT_SIZE, ELEMENTS)
-    arr = Array.new(::RedisClient::Cluster::Node::SLOT_SIZE)
+    ca = ::RedisClient::Cluster::Node::CharArray.new(SIZE, ELEMENTS)
+    arr = Array.new(SIZE)
 
-    print_letter('CharArray vs Array')
+    print_letter('Mappings between slots and nodes')
     fullfill(ca)
     fullfill(arr)
     bench({ ca.class.name.split('::').last => ca, arr.class.name => arr })
-  end
-
-  def make_worker(model)
-    ::RedisClient::Cluster::ConcurrentWorker.create(model: model, size: WORKER_SIZE)
   end
 
   def print_letter(title)
@@ -41,7 +37,7 @@ module IpsSlotArray
 
       subjects.each do |subtitle, arr|
         x.report(subtitle) do
-          arr[0] = arr[1]
+          arr[0]
         end
       end
 
@@ -50,4 +46,4 @@ module IpsSlotArray
   end
 end
 
-IpsSlotArray.run
+IpsSlotNodeMapping.run

@@ -17,7 +17,7 @@ class RedisClient
       MIN_SLOT = 0
       MAX_SLOT = SLOT_SIZE - 1
       MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
-      USE_CHAR_ARRAY_SLOT = Integer(ENV.fetch('REDIS_CLIENT_USE_CHAR_ARRAY_SLOT', 0)) == 1 # less memory consumption, but too slow
+      USE_CHAR_ARRAY_SLOT = Integer(ENV.fetch('REDIS_CLIENT_USE_CHAR_ARRAY_SLOT', 1)) == 1 # less memory consumption, but slow
       IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
       DEAD_FLAGS = %w[fail? fail handshake noaddr noflags].freeze
       ROLE_FLAGS = %w[master slave].freeze
