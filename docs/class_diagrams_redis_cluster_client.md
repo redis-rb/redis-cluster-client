@@ -108,6 +108,14 @@ classDiagram
     +execute()
   }
 
+  class RedisClient_Cluster_Transaction {
+    +call()
+    +call_v()
+    +call_once()
+    +call_once_v()
+    +execute()
+  }
+
   class RedisClient_Cluster_PubSub {
     +call()
     +call_v()
@@ -127,10 +135,12 @@ classDiagram
   RedisClient_ClusterConfig ..> RedisClient_Cluster : new
 
   RedisClient_Cluster ..> RedisClient_Cluster_Pipeline : new
+  RedisClient_Cluster ..> RedisClient_Cluster_Transaction : new
   RedisClient_Cluster ..> RedisClient_Cluster_PubSub : new
   RedisClient_Cluster ..> RedisClient_Cluster_Router : new
 
   RedisClient_Cluster_Pipeline ..> RedisClient_Cluster_Router : use
+  RedisClient_Cluster_Transaction ..> RedisClient_Cluster_Router : use
   RedisClient_Cluster_PubSub ..> RedisClient_Cluster_Router : use
 
   RedisClient_Cluster_Router ..> RedisClient_Cluster_Node : new
