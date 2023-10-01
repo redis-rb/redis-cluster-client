@@ -181,12 +181,6 @@ class RedisClient
         results.each_with_index { |got, i| assert_equal(i.to_s, got) }
       end
 
-      def test_pubsub_without_subscription
-        pubsub = @client.pubsub
-        assert_nil(pubsub.next_event(0.01))
-        pubsub.close
-      end
-
       def test_transaction_with_single_key
         got = @client.multi do |t|
           t.call('SET', 'counter', '0')
@@ -255,6 +249,12 @@ class RedisClient
         (1..4).each do |i|
           assert_nil(@client.call('GET', "key#{i}"))
         end
+      end
+
+      def test_pubsub_without_subscription
+        pubsub = @client.pubsub
+        assert_nil(pubsub.next_event(0.01))
+        pubsub.close
       end
 
       def test_pubsub_with_wrong_command
