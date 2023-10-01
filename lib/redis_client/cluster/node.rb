@@ -17,6 +17,7 @@ class RedisClient
       MIN_SLOT = 0
       MAX_SLOT = SLOT_SIZE - 1
       MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
+      USE_CHAR_ARRAY_SLOT = Integer(ENV.fetch('REDIS_CLIENT_USE_CHAR_ARRAY_SLOT', 0)) == 1 # less memory consumption, but too slow
       IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
       DEAD_FLAGS = %w[fail? fail handshake noaddr noflags].freeze
       ROLE_FLAGS = %w[master slave].freeze
@@ -310,7 +311,7 @@ class RedisClient
       end
 
       def make_array_for_slot_node_mappings(node_info_list)
-        return Array.new(SLOT_SIZE) if node_info_list.count(&:primary?) > 256
+        return Array.new(SLOT_SIZE) if !USE_CHAR_ARRAY_SLOT || node_info_list.count(&:primary?) > 256
 
         primary_node_keys = node_info_list.select(&:primary?).map(&:node_key)
         ::RedisClient::Cluster::Node::CharArray.new(SLOT_SIZE, primary_node_keys)

@@ -488,7 +488,7 @@ class RedisClient
 
         want = node_info_list.first.node_key
         got = @test_node.send(:make_array_for_slot_node_mappings, node_info_list)
-        assert_instance_of(::RedisClient::Cluster::Node::CharArray, got)
+        assert_instance_of(::RedisClient::Cluster::Node::USE_CHAR_ARRAY_SLOT ? ::RedisClient::Cluster::Node::CharArray : Array, got)
         ::RedisClient::Cluster::Node::SLOT_SIZE.times do |i|
           got[i] = want
           assert_equal(want, got[i], "Case: #{i}")
@@ -521,19 +521,19 @@ class RedisClient
         end
 
         got = @test_node.send(:make_array_for_slot_node_mappings, node_info_list)
-        assert_instance_of(::RedisClient::Cluster::Node::CharArray, got)
+        assert_instance_of(::RedisClient::Cluster::Node::USE_CHAR_ARRAY_SLOT ? ::RedisClient::Cluster::Node::CharArray : Array, got)
 
         ::RedisClient::Cluster::Node::SLOT_SIZE.times { |i| got[i] = node_info_list.first.node_key }
 
         got[0] = 'newbie:6379'
         assert_equal('newbie:6379', got[0])
-        assert_raises(RangeError) { got[0] = 'zombie:6379' }
+        assert_raises(RangeError) { got[0] = 'zombie:6379' } if ::RedisClient::Cluster::Node::USE_CHAR_ARRAY_SLOT
 
-        assert_raises(IndexError) { got[-1] = 'newbie:6379' }
-        assert_raises(IndexError) { got[-1] }
+        assert_raises(IndexError) { got[-1] = 'newbie:6379' } if ::RedisClient::Cluster::Node::USE_CHAR_ARRAY_SLOT
+        assert_raises(IndexError) { got[-1] } if ::RedisClient::Cluster::Node::USE_CHAR_ARRAY_SLOT
 
         got[16_384] = 'newbie:6379'
-        assert_nil(got[16_384])
+        assert_nil(got[16_384]) if ::RedisClient::Cluster::Node::USE_CHAR_ARRAY_SLOT
       end
 
       def test_build_replication_mappings_regular
