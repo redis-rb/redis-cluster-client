@@ -37,7 +37,8 @@ class RedisClient
         yield self
         raise ArgumentError, 'empty transaction' if @node_key.nil?
 
-        @router.find_node(@node_key).multi(watch: watch, &block)
+        node = @router.find_node(@node_key)
+        @router.try_delegate(node, :multi, watch: watch, &block)
       end
 
       private
