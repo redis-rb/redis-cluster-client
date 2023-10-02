@@ -386,12 +386,12 @@ class RedisClient
         assert_instance_of(Array, @client.call('pubsub', 'channels'))
         assert_instance_of(Integer, @client.call('pubsub', 'numpat'))
         assert_instance_of(Hash, @client.call('pubsub', 'numsub'))
-        assert_instance_of(Array, @client.call('pubsub', 'shardchannels'))
-        assert_instance_of(Hash, @client.call('pubsub', 'shardnumsub'))
+        assert_instance_of(Array, @client.call('pubsub', 'shardchannels')) if TEST_REDIS_MAJOR_VERSION >= 7
+        assert_instance_of(Hash, @client.call('pubsub', 'shardnumsub')) if TEST_REDIS_MAJOR_VERSION >= 7
         ps = @client.pubsub
         assert_nil(ps.call('unsubscribe'))
         assert_nil(ps.call('punsubscribe'))
-        assert_nil(ps.call('sunsubscribe'))
+        assert_nil(ps.call('sunsubscribe')) if TEST_REDIS_MAJOR_VERSION >= 7
         ps.close
       end
 
