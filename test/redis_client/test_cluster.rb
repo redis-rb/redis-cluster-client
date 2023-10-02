@@ -273,6 +273,7 @@ class RedisClient
           assert_equal(['subscribe', channel, 1], pubsub.next_event(TEST_TIMEOUT_SEC))
           Fiber.yield(channel)
           Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
+          pubsub.call('UNSUBSCRIBE')
           pubsub.close
         end
 
@@ -289,6 +290,7 @@ class RedisClient
           assert_equal(want, got)
           Fiber.yield('my-global-published-channel')
           Fiber.yield(collect_messages(pubsub, size: 1, timeout: nil).first)
+          pubsub.call('UNSUBSCRIBE')
           pubsub.close
         end
 
@@ -304,6 +306,7 @@ class RedisClient
           10.times { |i| assert_equal(['subscribe', "g-chan#{i}", i + 1], got[i]) }
           Fiber.yield
           Fiber.yield(collect_messages(pubsub, size: 10))
+          pubsub.call('UNSUBSCRIBE')
           pubsub.close
         end
 
@@ -325,6 +328,7 @@ class RedisClient
           assert_equal(['ssubscribe', channel, 1], pubsub.next_event(TEST_TIMEOUT_SEC))
           Fiber.yield(channel)
           Fiber.yield(pubsub.next_event(TEST_TIMEOUT_SEC))
+          pubsub.call('SUNSUBSCRIBE')
           pubsub.close
         end
 
@@ -347,6 +351,7 @@ class RedisClient
           assert_equal(want, got)
           Fiber.yield('my-sharded-published-channel')
           Fiber.yield(collect_messages(pubsub, size: 1, timeout: nil).first)
+          pubsub.call('SUNSUBSCRIBE')
           pubsub.close
         end
 
@@ -367,6 +372,7 @@ class RedisClient
           10.times { |i| assert_equal(['ssubscribe', "s-chan#{i}"], got[i].take(2)) }
           Fiber.yield
           Fiber.yield(collect_messages(pubsub, size: 10))
+          pubsub.call('SUNSUBSCRIBE')
           pubsub.close
         end
 
@@ -374,6 +380,19 @@ class RedisClient
         publish_messages { |cli| cli.pipelined { |pi| 10.times { |i| pi.call('SPUBLISH', "s-chan#{i}", i) } } }
         got = sub.resume.sort_by { |e| e[1].to_s }
         10.times { |i| assert_equal(['smessage', "s-chan#{i}", i.to_s], got[i]) }
+      end
+
+      def test_other_pubsub_commands
+        assert_instance_of(Array, @client.call('pubsub', 'channels'))
+        assert_instance_of(Integer, @client.call('pubsub', 'numpat'))
+        assert_instance_of(Hash, @client.call('pubsub', 'numsub'))
+        assert_instance_of(Array, @client.call('pubsub', 'shardchannels'))
+        assert_instance_of(Hash, @client.call('pubsub', 'shardnumsub'))
+        ps = @client.pubsub
+        assert_nil(ps.call('unsubscribe'))
+        assert_nil(ps.call('punsubscribe'))
+        assert_nil(ps.call('sunsubscribe'))
+        ps.close
       end
 
       def test_dedicated_commands # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity

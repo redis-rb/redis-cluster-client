@@ -288,11 +288,18 @@ class RedisClient
 
       def send_pubsub_command(method, command, args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
-        when 'channels' then @node.call_all(method, command, args).flatten.uniq.sort_by(&:to_s).then(&TSF.call(block))
+        when 'channels'
+          @node.call_all(method, command, args).flatten.uniq.sort_by(&:to_s).then(&TSF.call(block))
+        when 'shardchannels'
+          @node.call_replicas(method, command, args).flatten.uniq.sort_by(&:to_s).then(&TSF.call(block))
+        when 'numpat'
+          @node.call_all(method, command, args).select { |e| e.is_a?(Integer) }.sum.then(&TSF.call(block))
         when 'numsub'
           @node.call_all(method, command, args).reject(&:empty?).map { |e| Hash[*e] }
                .reduce({}) { |a, e| a.merge(e) { |_, v1, v2| v1 + v2 } }.then(&TSF.call(block))
-        when 'numpat' then @node.call_all(method, command, args).select { |e| e.is_a?(Integer) }.sum.then(&TSF.call(block))
+        when 'shardnumsub'
+          @node.call_replicas(method, command, args).reject(&:empty?).map { |e| Hash[*e] }
+               .reduce({}) { |a, e| a.merge(e) { |_, v1, v2| v1 + v2 } }.then(&TSF.call(block))
         else assign_node(command).public_send(method, *args, command, &block)
         end
       end
