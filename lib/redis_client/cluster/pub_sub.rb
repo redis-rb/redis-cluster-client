@@ -52,10 +52,12 @@ class RedisClient
 
       def call(*args, **kwargs)
         _call(@command_builder.generate(args, kwargs))
+        nil
       end
 
       def call_v(command)
         _call(@command_builder.generate(command))
+        nil
       end
 
       def close
@@ -86,8 +88,29 @@ class RedisClient
       private
 
       def _call(command)
+        case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
+        when 'subscribe', 'psubscribe', 'ssubscribe' then call_to_single_state(command)
+        when 'unsubscribe', 'punsubscribe' then call_to_all_states(command)
+        when 'sunsubscribe' then call_for_sharded_states(command)
+        else call_to_single_state(command)
+        end
+      end
+
+      def call_to_single_state(command)
         node_key = @router.find_node_key(command)
         try_call(node_key, command)
+      end
+
+      def call_to_all_states(command)
+        @state_dict.each_value { |s| s.call_v(command) }
+      end
+
+      def call_for_sharded_states(command)
+        if command.size == 1
+          call_to_all_states(command)
+        else
+          call_to_single_state(command)
+        end
       end
 
       def try_call(node_key, command, retry_count: 1)
