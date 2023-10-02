@@ -102,7 +102,7 @@ class RedisClient
       end
 
       def call_to_all_states(command)
-        @state_dict.each_value { |s| s.call_v(command) }
+        @state_dict.each_value { |s| s.call(command) }
       end
 
       def call_for_sharded_states(command)
