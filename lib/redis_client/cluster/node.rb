@@ -16,7 +16,7 @@ class RedisClient
       # It affects to strike a balance between load and stability in initialization or changed states.
       MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
 
-      #  It's used with slow queries of fetching meta data like CLUSTER NODES, COMMAND and so on.
+      # It's used with slow queries of fetching meta data like CLUSTER NODES, COMMAND and so on.
       SLOW_COMMAND_TIMEOUT = Float(ENV.fetch('REDIS_CLIENT_SLOW_COMMAND_TIMEOUT', -1))
 
       # less memory consumption, but slow
