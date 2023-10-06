@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'redis_client'
+require 'redis_client/cluster/normalized_cmd_name'
 
 class RedisClient
   class Cluster

@@ -22,7 +22,7 @@ class RedisClient
         @pool = pool
         @client_kwargs = kwargs
         @node = fetch_cluster_info(@config, @concurrent_worker, pool: @pool, **@client_kwargs)
-        @command = ::RedisClient::Cluster::Command.load(@node.shuffled_nodes)
+        @command = ::RedisClient::Cluster::Command.load(@node.replica_clients.shuffle)
         @mutex = Mutex.new
         @command_builder = @config.command_builder
       end
