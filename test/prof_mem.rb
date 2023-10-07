@@ -42,7 +42,7 @@ module ProfMem
   }.freeze
 
   def run
-    mode = ENV.fetch('MEMORY_PROFILE_MODE', :single).to_sym
+    mode = ENV.fetch('PROFILE_MODE', :single).to_sym
     subject = MODES.fetch(mode)
 
     CLI_TYPES.each do |cli_type|

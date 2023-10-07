@@ -7,30 +7,16 @@ require 'redis_cluster_client'
 require 'testing_constants'
 
 module ProfStack
-  PIPELINE_SIZE = 100
+  SIZE = 40
   ATTEMPTS = 1000
 
   module_function
 
   def run
     client = make_client
-
-    client.pipelined do |pi|
-      PIPELINE_SIZE.times do |i|
-        pi.call('SET', "key#{i}", "val#{i}")
-      end
-    end
-
-    profile = StackProf.run(mode: :cpu, raw: true) do
-      client.pipelined do |pi|
-        ATTEMPTS.times do
-          PIPELINE_SIZE.times do |i|
-            pi.call('GET', "key#{i}")
-          end
-        end
-      end
-    end
-
+    mode = ENV.fetch('PROFILE_MODE', :single).to_sym
+    prepare(client)
+    profile = StackProf.run(mode: :cpu, raw: true) { execute(client, mode) }
     StackProf::Report.new(profile).print_text(false, 40)
   end
 
@@ -42,6 +28,38 @@ module ProfStack
       fixed_hostname: TEST_FIXED_HOSTNAME,
       **TEST_GENERIC_OPTIONS
     ).new_client
+  end
+
+  def prepare(client)
+    ATTEMPTS.times do |i|
+      client.pipelined do |pi|
+        SIZE.times do |j|
+          n = SIZE * i + j
+          pi.call('SET', "key#{n}", "val#{n}")
+        end
+      end
+    end
+  end
+
+  def execute(client, mode)
+    case mode
+    when :single
+      (ATTEMPTS * SIZE).times { |i| client.call('GET', "key#{i}") }
+    when :excessive_pipelining
+      client.pipelined do |pi|
+        (ATTEMPTS * SIZE).times { |i| pi.call('GET', "key#{i}") }
+      end
+    when :pipelining_in_moderation
+      ATTEMPTS.times do |i|
+        client.pipelined do |pi|
+          SIZE.times do |j|
+            n = SIZE * i + j
+            pi.call('GET', "key#{n}")
+          end
+        end
+      end
+    else raise ArgumentError, mode
+    end
   end
 end
 

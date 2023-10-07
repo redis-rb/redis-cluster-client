@@ -37,7 +37,7 @@ services:
       bash -c "apt-get update > /dev/null
       && apt-get install --no-install-recommends --no-install-suggests -y iproute2 iputils-ping > /dev/null
       && rm -rf /var/lib/apt/lists/*
-      && (tc qdisc add dev eth0 root netem delay ${DELAY_TIME:-20ms} || echo skipped)
+      && (tc qdisc add dev eth0 root netem delay ${DELAY_TIME:-1ms} || echo skipped)
       && redis-server
       --maxmemory            64mb
       --maxmemory-policy     allkeys-lru
