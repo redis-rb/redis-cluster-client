@@ -201,6 +201,36 @@ jobs:
           do
             docker compose -f $DOCKER_COMPOSE_FILE exec node$i tc qdisc del dev eth0 root netem || true
           done
+      - name: Stop containers
+        run: docker compose -f $DOCKER_COMPOSE_FILE down || true
+  ips:
+    name: IPS
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    env:
+      REDIS_VERSION: '7.2'
+      DOCKER_COMPOSE_FILE: 'compose.latency.yaml'
+      REDIS_REPLICA_SIZE: '2'
+      REDIS_CLIENT_MAX_THREADS: '10'
+      DELAY_TIME: '0ms'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+      - name: Pull Docker images
+        run: docker pull redis:$REDIS_VERSION
+      - name: Run containers
+        run: docker compose -f $DOCKER_COMPOSE_FILE up -d
+      - name: Wait for Redis cluster to be ready
+        run: bundle exec rake wait
+      - name: Print containers
+        run: docker compose -f $DOCKER_COMPOSE_FILE ps
+      - name: Print cpu info
+        run: grep 'model name' /proc/cpuinfo
       - name: Run iteration per second
         run: bundle exec rake ips
       - name: Stop containers
@@ -235,10 +265,10 @@ jobs:
         run: bundle exec rake wait
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
-      - name: Run memory profiler
+      - name: Run profiler
         run: bundle exec rake prof
         env:
-          MEMORY_PROFILE_MODE: ${{ matrix.mode }}
+          PROFILE_MODE: ${{ matrix.mode }}
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down || true
   massive:
@@ -295,9 +325,9 @@ jobs:
           DEBUG: '1'
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
-      - name: Run memory profiler
+      - name: Run profiler
         run: bundle exec rake prof
         env:
-          MEMORY_PROFILE_MODE: pipelining_in_moderation
+          PROFILE_MODE: pipelining_in_moderation
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down || true

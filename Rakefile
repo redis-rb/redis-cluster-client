@@ -29,28 +29,14 @@ SLUGGISH_TEST_TYPES.each do |type|
   end
 end
 
-Rake::TestTask.new(:bench) do |t|
-  t.libs << :lib
-  t.libs << :test
-  t.options = '-v'
-  t.warning = false
-  t.test_files = ARGV.size > 1 ? ARGV[1..] : Dir['test/**/bench_*.rb']
-end
-
-Rake::TestTask.new(:ips) do |t|
-  t.libs << :lib
-  t.libs << :test
-  t.options = '-v'
-  t.warning = false
-  t.test_files = ARGV.size > 1 ? ARGV[1..] : Dir['test/**/ips_*.rb']
-end
-
-Rake::TestTask.new(:prof) do |t|
-  t.libs << :lib
-  t.libs << :test
-  t.options = '-v'
-  t.warning = false
-  t.test_files = ARGV.size > 1 ? ARGV[1..] : Dir['test/**/prof_*.rb']
+%i[bench ips prof].each do |k|
+  Rake::TestTask.new(k) do |t|
+    t.libs << :lib
+    t.libs << :test
+    t.options = '-v'
+    t.warning = false
+    t.test_files = ARGV.size > 1 ? ARGV[1..] : Dir["test/**/#{k}_*.rb"]
+  end
 end
 
 desc 'Wait for cluster to be ready'
