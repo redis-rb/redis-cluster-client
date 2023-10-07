@@ -235,7 +235,7 @@ jobs:
         run: bundle exec rake wait
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
-      - name: Run memory profiler
+      - name: Run profiler
         run: bundle exec rake prof
         env:
           MEMORY_PROFILE_MODE: ${{ matrix.mode }}
@@ -295,7 +295,7 @@ jobs:
           DEBUG: '1'
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
-      - name: Run memory profiler
+      - name: Run profiler
         run: bundle exec rake prof
         env:
           MEMORY_PROFILE_MODE: pipelining_in_moderation
