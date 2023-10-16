@@ -18,6 +18,8 @@ class RedisClient
 
       def initialize(config, concurrent_worker, pool: nil, **kwargs)
         @config = config.dup
+        @original_config = config.dup if config.connect_with_original_config
+        @connect_with_original_config = config.connect_with_original_config
         @concurrent_worker = concurrent_worker
         @pool = pool
         @client_kwargs = kwargs
@@ -329,6 +331,7 @@ class RedisClient
             # ignore
           end
 
+          @config = @original_config.dup if @connect_with_original_config
           @node = fetch_cluster_info(@config, @concurrent_worker, pool: @pool, **@client_kwargs)
         end
       end
