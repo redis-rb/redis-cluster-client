@@ -16,9 +16,6 @@ class RedisClient
       # It affects to strike a balance between load and stability in initialization or changed states.
       MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
 
-      # It's used with slow queries of fetching meta data like CLUSTER NODES, COMMAND and so on.
-      SLOW_COMMAND_TIMEOUT = Float(ENV.fetch('REDIS_CLIENT_SLOW_COMMAND_TIMEOUT', -1))
-
       # less memory consumption, but slow
       USE_CHAR_ARRAY_SLOT = Integer(ENV.fetch('REDIS_CLIENT_USE_CHAR_ARRAY_SLOT', 1)) == 1
 
@@ -96,7 +93,7 @@ class RedisClient
       end
 
       class << self
-        def load_info(options, concurrent_worker, **kwargs) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        def load_info(options, concurrent_worker, slow_command_timeout: -1, **kwargs) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
           raise ::RedisClient::Cluster::InitialSetupError, [] if options.nil? || options.empty?
 
           startup_size = options.size > MAX_STARTUP_SAMPLE ? MAX_STARTUP_SAMPLE : options.size
@@ -107,7 +104,7 @@ class RedisClient
           startup_nodes.each_with_index do |raw_client, i|
             work_group.push(i, raw_client) do |client|
               regular_timeout = client.read_timeout
-              client.read_timeout = SLOW_COMMAND_TIMEOUT > 0.0 ? SLOW_COMMAND_TIMEOUT : regular_timeout
+              client.read_timeout = slow_command_timeout > 0.0 ? slow_command_timeout : regular_timeout
               reply = client.call('CLUSTER', 'NODES')
               client.read_timeout = regular_timeout
               parse_cluster_node_reply(reply)

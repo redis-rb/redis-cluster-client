@@ -22,7 +22,7 @@ class RedisClient
         @pool = pool
         @client_kwargs = kwargs
         @node = fetch_cluster_info(@config, @concurrent_worker, pool: @pool, **@client_kwargs)
-        @command = ::RedisClient::Cluster::Command.load(@node.replica_clients.shuffle)
+        @command = ::RedisClient::Cluster::Command.load(@node.replica_clients.shuffle, slow_command_timeout: config.slow_command_timeout)
         @mutex = Mutex.new
         @command_builder = @config.command_builder
       end
@@ -305,7 +305,7 @@ class RedisClient
       end
 
       def fetch_cluster_info(config, concurrent_worker, pool: nil, **kwargs)
-        node_info_list = ::RedisClient::Cluster::Node.load_info(config.per_node_key, concurrent_worker, **kwargs)
+        node_info_list = ::RedisClient::Cluster::Node.load_info(config.per_node_key, concurrent_worker, slow_command_timeout: config.slow_command_timeout, **kwargs)
         node_addrs = node_info_list.map { |i| ::RedisClient::Cluster::NodeKey.hashify(i.node_key) }
         config.update_node(node_addrs)
         ::RedisClient::Cluster::Node.new(
