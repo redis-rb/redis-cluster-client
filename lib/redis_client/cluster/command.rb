@@ -7,8 +7,6 @@ require 'redis_client/cluster/normalized_cmd_name'
 class RedisClient
   class Cluster
     class Command
-      SLOW_COMMAND_TIMEOUT = Float(ENV.fetch('REDIS_CLIENT_SLOW_COMMAND_TIMEOUT', -1))
-
       EMPTY_STRING = ''
       LEFT_BRACKET = '{'
       RIGHT_BRACKET = '}'
@@ -23,12 +21,12 @@ class RedisClient
       )
 
       class << self
-        def load(nodes)
+        def load(nodes, slow_command_timeout: -1)
           cmd = errors = nil
 
           nodes&.each do |node|
             regular_timeout = node.read_timeout
-            node.read_timeout = SLOW_COMMAND_TIMEOUT > 0.0 ? SLOW_COMMAND_TIMEOUT : regular_timeout
+            node.read_timeout = slow_command_timeout > 0.0 ? slow_command_timeout : regular_timeout
             reply = node.call('COMMAND')
             node.read_timeout = regular_timeout
             commands = parse_command_reply(reply)

@@ -18,10 +18,12 @@ class RedisClient
     MERGE_CONFIG_KEYS = %i[ssl username password].freeze
     IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
     MAX_WORKERS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
+    # It's used with slow queries of fetching meta data like CLUSTER NODES, COMMAND and so on.
+    SLOW_COMMAND_TIMEOUT = Float(ENV.fetch('REDIS_CLIENT_SLOW_COMMAND_TIMEOUT', -1))
 
     InvalidClientConfigError = Class.new(::RedisClient::Error)
 
-    attr_reader :command_builder, :client_config, :replica_affinity
+    attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout
 
     def initialize(
       nodes: DEFAULT_NODES,
@@ -30,6 +32,7 @@ class RedisClient
       fixed_hostname: '',
       concurrency: nil,
       client_implementation: ::RedisClient::Cluster, # for redis gem
+      slow_command_timeout: SLOW_COMMAND_TIMEOUT,
       **client_config
     )
 
@@ -42,6 +45,7 @@ class RedisClient
       @client_config = merge_generic_config(client_config, @node_configs)
       @concurrency = merge_concurrency_option(concurrency)
       @client_implementation = client_implementation
+      @slow_command_timeout = slow_command_timeout
       @mutex = Mutex.new
     end
 
@@ -53,6 +57,7 @@ class RedisClient
         fixed_hostname: @fixed_hostname,
         concurrency: @concurrency,
         client_implementation: @client_implementation,
+        slow_command_timeout: @slow_command_timeout,
         **@client_config
       )
     end

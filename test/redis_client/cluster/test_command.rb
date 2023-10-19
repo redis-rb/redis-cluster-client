@@ -31,6 +31,20 @@ class RedisClient
         end
       end
 
+      def test_load_slow_timeout
+        nodes = @raw_clients
+        assert_equal(TEST_TIMEOUT_SEC, nodes.first.read_timeout)
+        nodes.first.singleton_class.prepend(Module.new do
+          def call(...)
+            @slow_timeout = read_timeout
+            super
+          end
+        end)
+        ::RedisClient::Cluster::Command.load(nodes, slow_command_timeout: 9)
+        assert_equal(9, nodes.first.instance_variable_get(:@slow_timeout))
+        assert_equal(TEST_TIMEOUT_SEC, nodes.first.read_timeout)
+      end
+
       def test_parse_command_reply
         [
           {
