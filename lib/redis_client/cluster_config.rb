@@ -23,14 +23,15 @@ class RedisClient
 
     InvalidClientConfigError = Class.new(::RedisClient::Error)
 
-    attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout
+    attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout, :connect_with_original_config
 
-    def initialize(
+    def initialize( # rubocop:disable Metrics/AbcSize
       nodes: DEFAULT_NODES,
       replica: false,
       replica_affinity: :random,
       fixed_hostname: '',
       concurrency: nil,
+      connect_with_original_config: false,
       client_implementation: ::RedisClient::Cluster, # for redis gem
       slow_command_timeout: SLOW_COMMAND_TIMEOUT,
       **client_config
@@ -44,6 +45,7 @@ class RedisClient
       @command_builder = client_config.fetch(:command_builder, ::RedisClient::CommandBuilder)
       @client_config = merge_generic_config(client_config, @node_configs)
       @concurrency = merge_concurrency_option(concurrency)
+      @connect_with_original_config = connect_with_original_config
       @client_implementation = client_implementation
       @slow_command_timeout = slow_command_timeout
       @mutex = Mutex.new
@@ -56,6 +58,7 @@ class RedisClient
         replica_affinity: @replica_affinity,
         fixed_hostname: @fixed_hostname,
         concurrency: @concurrency,
+        connect_with_original_config: @connect_with_original_config,
         client_implementation: @client_implementation,
         slow_command_timeout: @slow_command_timeout,
         **@client_config
