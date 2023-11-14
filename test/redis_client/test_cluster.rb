@@ -6,9 +6,11 @@ class RedisClient
   class TestCluster
     module Mixin
       def setup
+        @captured_commands = []
         @client = new_test_client
         @client.call('FLUSHDB')
         wait_for_replication
+        @captured_commands.clear
       end
 
       def teardown
@@ -207,7 +209,7 @@ class RedisClient
       end
 
       def test_transaction_with_empty_block
-        assert_raises(ArgumentError) { @client.multi {} }
+        assert_empty(@client.multi {})
         assert_raises(LocalJumpError) { @client.multi }
       end
 
@@ -249,6 +251,90 @@ class RedisClient
         (1..4).each do |i|
           assert_nil(@client.call('GET', "key#{i}"))
         end
+      end
+
+      def test_transaction_with_empty_watch
+        got = @client.multi(watch: []) do |t|
+          t.call('SET', '{hash}key1', 'value1')
+          t.call('SET', '{hash}key2', 'value2')
+        end
+
+        assert_equal(%w[OK OK], got)
+        assert_equal(%w[value1 value2], @client.call('MGET', '{hash}key1', '{hash}key2'))
+      end
+
+      def test_transaction_with_cross_slot_watch
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
+          @client.multi(watch: Array.new(20) { |i| "key#{i}" }) {}
+        end
+      end
+
+      def test_transaction_with_successful_watch
+        @client.call('SET', 'key', '1')
+        got = @client.multi(watch: ['key']) do |t|
+          old_value = @client.call('GET', 'key').to_i
+          t.call('SET', 'key', (old_value + 1).to_s)
+        end
+
+        assert_equal(%w[OK], got)
+        assert_equal('2', @client.call('GET', 'key'))
+      end
+
+      def test_transaction_does_not_unwatch_on_commit
+        skip if @client.config.use_replica?
+
+        @client.call('SET', 'key', '1')
+        @captured_commands.clear
+
+        @client.multi(watch: ['key']) do |t|
+          old_value = @client.call('GET', 'key').to_i
+          t.call('SET', 'key', (old_value + 1).to_s)
+        end
+
+        assert_equal([
+                       %w[WATCH key],
+                       %w[GET key],
+                       %w[MULTI],
+                       %w[SET key 2],
+                       %w[EXEC]
+                     ], @captured_commands.map(&:command))
+      end
+
+      def test_transaction_unwatches_on_abort
+        skip if @client.config.use_replica?
+
+        @client.call('SET', 'key', '1')
+        @captured_commands.clear
+
+        @client.multi(watch: ['key']) do |_t|
+          @client.call('GET', 'key')
+        end
+
+        assert_equal([
+                       %w[WATCH key],
+                       %w[GET key],
+                       %w[UNWATCH]
+                     ], @captured_commands.map(&:command))
+      end
+
+      def test_transaction_unwatches_on_exception
+        skip if @client.config.use_replica?
+
+        @client.call('SET', 'key', '1')
+        @captured_commands.clear
+
+        assert_raises(StandardError) do
+          @client.multi(watch: ['key']) do |_t|
+            @client.call('GET', 'key')
+            raise StandardError, 'boom'
+          end
+        end
+
+        assert_equal([
+                       %w[WATCH key],
+                       %w[GET key],
+                       %w[UNWATCH]
+                     ], @captured_commands.map(&:command))
       end
 
       def test_pubsub_without_subscription
@@ -519,6 +605,34 @@ class RedisClient
       end
     end
 
+    module CommandCaptureMiddleware
+      CapturedCommand = Struct.new(:server_url, :command, :pipelined, keyword_init: true) do
+        def inspect
+          "#<#{self.class.name} [on #{server_url}] #{command.join(' ')} >"
+        end
+      end
+
+      def call(command, redis_config)
+        redis_config.custom[:captured_commands] << CapturedCommand.new(
+          server_url: redis_config.server_url,
+          command: command,
+          pipelined: false
+        )
+        super
+      end
+
+      def call_pipelined(commands, redis_config)
+        commands.map do |command|
+          redis_config.custom[:captured_commands] << CapturedCommand.new(
+            server_url: redis_config.server_url,
+            command: command,
+            pipelined: true
+          )
+        end
+        super
+      end
+    end
+
     class PrimaryOnly < TestingWrapper
       include Mixin
 
@@ -526,6 +640,8 @@ class RedisClient
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
+          middlewares: [CommandCaptureMiddleware],
+          custom: { captured_commands: @captured_commands },
           **TEST_GENERIC_OPTIONS
         )
         ::RedisClient::Cluster.new(config)
@@ -541,6 +657,8 @@ class RedisClient
           replica: true,
           replica_affinity: :random,
           fixed_hostname: TEST_FIXED_HOSTNAME,
+          middlewares: [CommandCaptureMiddleware],
+          custom: { captured_commands: @captured_commands },
           **TEST_GENERIC_OPTIONS
         )
         ::RedisClient::Cluster.new(config)
@@ -556,6 +674,8 @@ class RedisClient
           replica: true,
           replica_affinity: :random_with_primary,
           fixed_hostname: TEST_FIXED_HOSTNAME,
+          middlewares: [CommandCaptureMiddleware],
+          custom: { captured_commands: @captured_commands },
           **TEST_GENERIC_OPTIONS
         )
         ::RedisClient::Cluster.new(config)
@@ -571,6 +691,8 @@ class RedisClient
           replica: true,
           replica_affinity: :latency,
           fixed_hostname: TEST_FIXED_HOSTNAME,
+          middlewares: [CommandCaptureMiddleware],
+          custom: { captured_commands: @captured_commands },
           **TEST_GENERIC_OPTIONS
         )
         ::RedisClient::Cluster.new(config)
@@ -584,6 +706,8 @@ class RedisClient
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
+          middlewares: [CommandCaptureMiddleware],
+          custom: { captured_commands: @captured_commands },
           **TEST_GENERIC_OPTIONS
         )
         ::RedisClient::Cluster.new(config, pool: { timeout: TEST_TIMEOUT_SEC, size: 2 })
