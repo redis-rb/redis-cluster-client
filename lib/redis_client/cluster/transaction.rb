@@ -32,10 +32,12 @@ class RedisClient
       alias call_once_v call_v
 
       def execute(watch: nil, &block)
-        if watch&.any?
-          execute_with_watch(watch: watch, &block)
-        else
-          execute_without_watch(&block)
+        @router.force_primary do
+          if watch&.any?
+            execute_with_watch(watch: watch, &block)
+          else
+            execute_without_watch(&block)
+          end
         end
       end
 
