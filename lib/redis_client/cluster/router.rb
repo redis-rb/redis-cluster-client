@@ -27,6 +27,7 @@ class RedisClient
         @command = ::RedisClient::Cluster::Command.load(@node.replica_clients.shuffle, slow_command_timeout: config.slow_command_timeout)
         @mutex = Mutex.new
         @command_builder = @config.command_builder
+        @force_primary_level = 0
       end
 
       def send_command(method, command, *args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
@@ -174,7 +175,7 @@ class RedisClient
         key = @command.extract_first_key(command)
         slot = key.empty? ? nil : ::RedisClient::Cluster::KeySlotConverter.convert(key)
 
-        if @command.should_send_to_primary?(command)
+        if @command.should_send_to_primary?(command) || @force_primary_level > 0
           @node.find_node_key_of_primary(slot) || @node.any_primary_node_key(seed: seed)
         else
           @node.find_node_key_of_replica(slot, seed: seed) || @node.any_replica_node_key(seed: seed)
@@ -219,6 +220,13 @@ class RedisClient
 
       def close
         @node.each(&:close)
+      end
+
+      def force_primary
+        @force_primary_level += 1
+        yield
+      ensure
+        @force_primary_level -= 1
       end
 
       private

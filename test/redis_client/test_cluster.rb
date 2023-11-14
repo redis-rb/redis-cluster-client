@@ -281,8 +281,6 @@ class RedisClient
       end
 
       def test_transaction_does_not_unwatch_on_commit
-        skip if @client.config.use_replica?
-
         @client.call('SET', 'key', '1')
         @captured_commands.clear
 
@@ -301,8 +299,6 @@ class RedisClient
       end
 
       def test_transaction_unwatches_on_abort
-        skip if @client.config.use_replica?
-
         @client.call('SET', 'key', '1')
         @captured_commands.clear
 
@@ -318,8 +314,6 @@ class RedisClient
       end
 
       def test_transaction_unwatches_on_exception
-        skip if @client.config.use_replica?
-
         @client.call('SET', 'key', '1')
         @captured_commands.clear
 
@@ -335,6 +329,21 @@ class RedisClient
                        %w[GET key],
                        %w[UNWATCH]
                      ], @captured_commands.map(&:command))
+      end
+
+      def test_transaction_executes_on_primary
+        keys = (1..20).map { |k| "{hash}key#{k}" }
+        keys.each { |key| @client.call('SET', key, '1') }
+        primary_url_for_slot = @captured_commands.last.server_url
+        @captured_commands.clear
+
+        @client.multi(watch: keys) do |_t|
+          keys.each { |key| @client.call('GET', key) }
+        end
+
+        @captured_commands.each do |cmd|
+          assert_equal(primary_url_for_slot, cmd.server_url)
+        end
       end
 
       def test_pubsub_without_subscription
