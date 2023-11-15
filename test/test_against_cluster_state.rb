@@ -13,6 +13,7 @@ class TestAgainstClusterState < TestingWrapper
         **TEST_GENERIC_OPTIONS.merge(timeout: 30.0)
       )
       @controller.rebuild
+      @capture_buffer = []
       @client = new_test_client
     end
 
@@ -59,6 +60,43 @@ class TestAgainstClusterState < TestingWrapper
       end
     end
 
+    def test_does_not_abort_transaction_on_resharding
+      key = 'key1'
+      @client.call_v(['SET', key, 'value1'])
+      slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
+      @client.call_v(['WATCH', key])
+      src, dest = @controller.select_resharding_target(slot)
+      @controller.start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+      @controller.finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+
+      # This should raise and the transaction should NOT aborted now
+      assert client_in_transaction?(@client)
+      assert_raises(::RedisClient::CommandError, 'MOVED') { @client.call_v(['GET', key]) }
+      assert client_in_transaction?(@client)
+      # In normal usage, redis-rb would catch that exception and call #unwatch, since CommandError
+      # does not inherit from ConnectionError.
+      assert_equal('OK', @client.call_v(['UNWATCH']))
+    end
+
+    def test_does_not_abort_transaction_on_clusterdown
+      key = 'key1'
+      @client.call_v(['SET', key, 'value1'])
+      @client.call_v(['WATCH', key])
+      @controller.down
+      @controller.rebuild
+
+      # We get no indication that anything has actually gone wrong with the transaction from redis,
+      # because we made no command whilst it was down.
+      assert client_in_transaction?(@client)
+      @client.call_v(['GET', key])
+
+      # but, if we try and commit something, it will fail - this is a guarantee provided by redis.
+      res = @client.multi do |txn|
+        txn.call_v(['SET', key, 'hello'])
+      end
+      assert_nil(res)
+    end
+
     private
 
     def wait_for_replication
@@ -84,6 +122,10 @@ class TestAgainstClusterState < TestingWrapper
       yield(keys)
       @controller.finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
     end
+
+    def client_in_transaction?(client)
+      !!client.instance_variable_get(:@transaction)
+    end
   end
 
   class PrimaryOnly < TestingWrapper
@@ -95,6 +137,8 @@ class TestAgainstClusterState < TestingWrapper
       ::RedisClient.cluster(
         nodes: TEST_NODE_URIS,
         fixed_hostname: TEST_FIXED_HOSTNAME,
+        middlewares: [CommandCaptureMiddleware],
+        custom: { captured_commands: @capture_buffer },
         **TEST_GENERIC_OPTIONS
       ).new_client
     end
@@ -124,6 +168,8 @@ class TestAgainstClusterState < TestingWrapper
         replica: true,
         replica_affinity: :random,
         fixed_hostname: TEST_FIXED_HOSTNAME,
+        middlewares: [CommandCaptureMiddleware],
+        custom: { captured_commands: @capture_buffer },
         **TEST_GENERIC_OPTIONS
       ).new_client
     end
@@ -153,6 +199,8 @@ class TestAgainstClusterState < TestingWrapper
         replica: true,
         replica_affinity: :random_with_primary,
         fixed_hostname: TEST_FIXED_HOSTNAME,
+        middlewares: [CommandCaptureMiddleware],
+        custom: { captured_commands: @capture_buffer },
         **TEST_GENERIC_OPTIONS
       ).new_client
     end
@@ -182,6 +230,8 @@ class TestAgainstClusterState < TestingWrapper
         replica: true,
         replica_affinity: :latency,
         fixed_hostname: TEST_FIXED_HOSTNAME,
+        middlewares: [CommandCaptureMiddleware],
+        custom: { captured_commands: @capture_buffer },
         **TEST_GENERIC_OPTIONS
       ).new_client
     end
@@ -196,6 +246,8 @@ class TestAgainstClusterState < TestingWrapper
       ::RedisClient.cluster(
         nodes: TEST_NODE_URIS,
         fixed_hostname: TEST_FIXED_HOSTNAME,
+        middlewares: [CommandCaptureMiddleware],
+        custom: { captured_commands: @capture_buffer },
         **TEST_GENERIC_OPTIONS
       ).new_pool(timeout: TEST_TIMEOUT_SEC, size: 2)
     end

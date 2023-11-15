@@ -12,6 +12,7 @@ class RedisClient
       RIGHT_BRACKET = '}'
       EMPTY_HASH = {}.freeze
       EMPTY_ARRAY = [].freeze
+      PRIMARY_COMMANDS = %w[watch unwatch multi exec discard].freeze
 
       Detail = Struct.new(
         'RedisCommand',
@@ -88,7 +89,7 @@ class RedisClient
 
       def should_send_to_primary?(command)
         name = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
-        @commands[name]&.write?
+        @commands[name]&.write? || PRIMARY_COMMANDS.include?(name)
       end
 
       def should_send_to_replica?(command)

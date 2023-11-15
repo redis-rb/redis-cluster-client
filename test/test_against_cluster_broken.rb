@@ -34,7 +34,38 @@ class TestAgainstClusterBroken < TestingWrapper
     do_test_a_node_is_down(sacrifice, number_of_keys: 10)
   end
 
+  def test_transaction_aborts_when_node_down
+    # Need a new client for this test which isn't used in the helpers
+    test_client = ::RedisClient.cluster(
+      nodes: TEST_NODE_URIS,
+      replica: true,
+      fixed_hostname: TEST_FIXED_HOSTNAME,
+      **TEST_GENERIC_OPTIONS
+    ).new_client
+    key = 'key1'
+    slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
+    sacrifice = @controller.select_sacrifice_by_slot(slot)
+
+    test_client.call_v(['WATCH', key])
+
+    kill_a_node(sacrifice, kill_attempts: 10)
+    wait_for_cluster_to_be_ready(wait_attempts: 10)
+
+    # We don't know that it was closed yet
+    assert client_in_transaction?(test_client)
+    # It was closed
+    assert_raises(RedisClient::ConnectionError) { test_client.call_v(['GET', key]) }
+    # We're not in a transaction anymore
+    refute client_in_transaction?(test_client)
+    # So doing some other access will be fine now.
+    assert_nil(test_client.call_v(%w[GET other_key]))
+  end
+
   private
+
+  def client_in_transaction?(client)
+    !!client.instance_variable_get(:@transaction)
+  end
 
   def wait_for_replication
     client_side_timeout = TEST_TIMEOUT_SEC + 1.0
@@ -63,7 +94,7 @@ class TestAgainstClusterBroken < TestingWrapper
     refute_nil(sacrifice, "#{sacrifice.config.host}:#{sacrifice.config.port}")
 
     loop do
-      break if kill_attempts <= 0
+      assert_operator(kill_attempts, :>=, 0)
 
       sacrifice.call('SHUTDOWN', 'NOSAVE')
     rescue ::RedisClient::CommandError => e
@@ -74,8 +105,6 @@ class TestAgainstClusterBroken < TestingWrapper
       kill_attempts -= 1
       sleep WAIT_SEC
     end
-
-    assert_raises(::RedisClient::ConnectionError) { sacrifice.call('PING') }
   end
 
   def wait_for_cluster_to_be_ready(wait_attempts:)

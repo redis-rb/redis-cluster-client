@@ -103,9 +103,9 @@ class RedisClient
         [
           { command: %w[SET foo 1], want: true },
           { command: %w[GET foo], want: false },
-          { command: %w[UNKNOWN foo bar], want: nil },
-          { command: [], want: nil },
-          { command: nil, want: nil }
+          { command: %w[UNKNOWN foo bar], want: false },
+          { command: [], want: false },
+          { command: nil, want: false }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
           got = cmd.should_send_to_primary?(c[:command])

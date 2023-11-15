@@ -245,6 +245,11 @@ class ClusterController
     rows.select(&:replica?).sample.client
   end
 
+  def select_sacrifice_by_slot(slot)
+    rows = associate_with_clients_and_nodes(@clients)
+    rows.find { |r| r.primary? && r.include_slot?(slot) }.client
+  end
+
   def close
     @clients.each do |client|
       client.close

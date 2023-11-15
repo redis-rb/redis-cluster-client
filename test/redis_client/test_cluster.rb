@@ -264,7 +264,7 @@ class RedisClient
       end
 
       def test_transaction_with_cross_slot_watch
-        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
+        assert_raises(::RedisClient::CommandError, 'CROSSSLOT keys') do
           @client.multi(watch: Array.new(20) { |i| "key#{i}" }) {}
         end
       end
@@ -343,6 +343,122 @@ class RedisClient
 
         @captured_commands.each do |cmd|
           assert_equal(primary_url_for_slot, cmd.server_url)
+        end
+      end
+
+      def test_implicit_transaction_when_watching
+        @client.call('SET', '{slot}key1', 'value1')
+        @client.call('SET', '{slot}key2', 'value2')
+        @captured_commands.clear
+
+        @client.call_v(['WATCH', '{slot}key1'])
+        @client.call_v(['WATCH', '{slot}key2'])
+        old_value1 = @client.call_v(['GET', '{slot}key1'])
+        old_value2 = @client.call_v(['GET', '{slot}key2'])
+        ret = @client.multi do |txn|
+          txn.call_v(['SET', '{slot}key1', old_value2])
+          txn.call_v(['SET', '{slot}key2', old_value1])
+        end
+
+        assert_equal(%w[OK OK], ret)
+        assert_equal([
+                       %w[WATCH {slot}key1],
+                       %w[WATCH {slot}key2],
+                       %w[GET {slot}key1],
+                       %w[GET {slot}key2],
+                       %w[MULTI],
+                       %w[SET {slot}key1 value2],
+                       %w[SET {slot}key2 value1],
+                       %w[EXEC]
+                     ], @captured_commands.map(&:command))
+        assert_equal('value2', @client.call('GET', '{slot}key1'))
+        assert_equal('value1', @client.call('GET', '{slot}key2'))
+      end
+
+      def test_implicit_transaction_abort
+        other_client = new_test_client(capture_buffer: [])
+        @client.call('SET', '{slot}key1', 'value1')
+        @client.call('SET', '{slot}key2', 'value2')
+        @captured_commands.clear
+
+        @client.call_v(['WATCH', '{slot}key1'])
+        @client.call_v(['WATCH', '{slot}key2'])
+        old_value1 = @client.call_v(['GET', '{slot}key1'])
+        old_value2 = @client.call_v(['GET', '{slot}key2'])
+        other_client.call_v(['SET', '{slot}key1', 'some_conflicting_value'])
+        ret = @client.multi do |txn|
+          txn.call_v(['SET', '{slot}key1', old_value2])
+          txn.call_v(['SET', '{slot}key2', old_value1])
+        end
+
+        assert_nil(ret)
+        assert_equal('some_conflicting_value', @client.call('GET', '{slot}key1'))
+        assert_equal('value2', @client.call('GET', '{slot}key2'))
+      end
+
+      def test_implicit_transaction_unwatch
+        @client.call_v(%w[WATCH key1])
+        ret = @client.call_v(['UNWATCH'])
+        assert_equal('OK', ret)
+      end
+
+      def test_implicit_transaction_get_conflicting_keys
+        @client.call_v(['WATCH', '{slot1}key1'])
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
+          @client.call_v(['GET', '{slot2}key1'])
+        end
+        # It's still OK to unwatch; this is what redis-rb will do if this kind of cross-slot read
+        # is attempted inside a watch do ... end block.
+        ret = @client.call_v(['UNWATCH'])
+        assert_equal('OK', ret)
+      end
+
+      def test_connection_can_be_used_after_transaction
+        @client.multi do |txn|
+          txn.call_v(['SET', '{slota}key1', 'hello'])
+        end
+
+        assert_equal('OK', @client.call_v(['SET', '{slotb}key2', 'hello']))
+        assert_equal('OK', @client.call_v(['SET', '{slotc}key3', 'hello']))
+      end
+
+      def test_multiple_implicit_transactions
+        swap_keys_txn = lambda { |key1, key2|
+          @client.call('SET', key1, 'value1')
+          @client.call('SET', key2, 'value2')
+          @client.call('SET', key1, 'value1')
+          @client.call('SET', key2, 'value2')
+          @client.call_v(['WATCH', key1])
+          @client.call_v(['WATCH', key2])
+          old_value1 = @client.call_v(['GET', key1])
+          old_value2 = @client.call_v(['GET', key2])
+          @client.multi do |txn|
+            txn.call_v(['SET', key1, old_value2])
+            txn.call_v(['SET', key2, old_value1])
+          end
+        }
+
+        ret = swap_keys_txn.call('{slota}key1', '{slota}key2')
+        assert_equal(%w[OK OK], ret)
+        assert_equal('value2', @client.call('GET', '{slota}key1'))
+        assert_equal('value1', @client.call('GET', '{slota}key2'))
+
+        # A second transaction, on the same node
+        ret = swap_keys_txn.call('{slota}key3', '{slota}key4')
+        assert_equal(%w[OK OK], ret)
+        assert_equal('value2', @client.call('GET', '{slota}key3'))
+        assert_equal('value1', @client.call('GET', '{slota}key4'))
+
+        # A third transaction, on a different node
+        ret = swap_keys_txn.call('{slotb}key5', '{slotb}key6')
+        assert_equal(%w[OK OK], ret)
+        assert_equal('value2', @client.call('GET', '{slotb}key5'))
+        assert_equal('value1', @client.call('GET', '{slotb}key6'))
+      end
+
+      def test_bare_unwatch
+        assert_raises(RedisClient::Cluster::AmbiguousNodeError) do
+          @client.call_v(['UNWATCH'])
         end
       end
 
@@ -614,43 +730,15 @@ class RedisClient
       end
     end
 
-    module CommandCaptureMiddleware
-      CapturedCommand = Struct.new(:server_url, :command, :pipelined, keyword_init: true) do
-        def inspect
-          "#<#{self.class.name} [on #{server_url}] #{command.join(' ')} >"
-        end
-      end
-
-      def call(command, redis_config)
-        redis_config.custom[:captured_commands] << CapturedCommand.new(
-          server_url: redis_config.server_url,
-          command: command,
-          pipelined: false
-        )
-        super
-      end
-
-      def call_pipelined(commands, redis_config)
-        commands.map do |command|
-          redis_config.custom[:captured_commands] << CapturedCommand.new(
-            server_url: redis_config.server_url,
-            command: command,
-            pipelined: true
-          )
-        end
-        super
-      end
-    end
-
     class PrimaryOnly < TestingWrapper
       include Mixin
 
-      def new_test_client
+      def new_test_client(capture_buffer: @captured_commands)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
           middlewares: [CommandCaptureMiddleware],
-          custom: { captured_commands: @captured_commands },
+          custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS
         )
         ::RedisClient::Cluster.new(config)
@@ -660,14 +748,14 @@ class RedisClient
     class ScaleReadRandom < TestingWrapper
       include Mixin
 
-      def new_test_client
+      def new_test_client(capture_buffer: @captured_commands)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
           replica_affinity: :random,
           fixed_hostname: TEST_FIXED_HOSTNAME,
           middlewares: [CommandCaptureMiddleware],
-          custom: { captured_commands: @captured_commands },
+          custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS
         )
         ::RedisClient::Cluster.new(config)
@@ -677,14 +765,14 @@ class RedisClient
     class ScaleReadRandomWithPrimary < TestingWrapper
       include Mixin
 
-      def new_test_client
+      def new_test_client(capture_buffer: @captured_commands)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
           replica_affinity: :random_with_primary,
           fixed_hostname: TEST_FIXED_HOSTNAME,
           middlewares: [CommandCaptureMiddleware],
-          custom: { captured_commands: @captured_commands },
+          custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS
         )
         ::RedisClient::Cluster.new(config)
@@ -694,14 +782,14 @@ class RedisClient
     class ScaleReadLatency < TestingWrapper
       include Mixin
 
-      def new_test_client
+      def new_test_client(capture_buffer: @captured_commands)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
           replica_affinity: :latency,
           fixed_hostname: TEST_FIXED_HOSTNAME,
           middlewares: [CommandCaptureMiddleware],
-          custom: { captured_commands: @captured_commands },
+          custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS
         )
         ::RedisClient::Cluster.new(config)
@@ -711,12 +799,12 @@ class RedisClient
     class Pooled < TestingWrapper
       include Mixin
 
-      def new_test_client
+      def new_test_client(capture_buffer: @captured_commands)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
           middlewares: [CommandCaptureMiddleware],
-          custom: { captured_commands: @captured_commands },
+          custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS
         )
         ::RedisClient::Cluster.new(config, pool: { timeout: TEST_TIMEOUT_SEC, size: 2 })

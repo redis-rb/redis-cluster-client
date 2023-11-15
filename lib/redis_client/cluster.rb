@@ -25,36 +25,37 @@ class RedisClient
 
     def call(*args, **kwargs, &block)
       command = @command_builder.generate(args, kwargs)
-      @router.send_command(:call_v, command, &block)
+      send_command(:call_v, command, &block)
     end
 
     def call_v(command, &block)
       command = @command_builder.generate(command)
-      @router.send_command(:call_v, command, &block)
+      send_command(:call_v, command, &block)
     end
 
     def call_once(*args, **kwargs, &block)
       command = @command_builder.generate(args, kwargs)
-      @router.send_command(:call_once_v, command, &block)
+      send_command(:call_once_v, command, &block)
     end
 
     def call_once_v(command, &block)
       command = @command_builder.generate(command)
-      @router.send_command(:call_once_v, command, &block)
+      send_command(:call_once_v, command, &block)
     end
 
     def blocking_call(timeout, *args, **kwargs, &block)
       command = @command_builder.generate(args, kwargs)
-      @router.send_command(:blocking_call_v, command, timeout, &block)
+      send_command(:blocking_call_v, command, timeout, &block)
     end
 
     def blocking_call_v(timeout, command, &block)
       command = @command_builder.generate(command)
-      @router.send_command(:blocking_call_v, command, timeout, &block)
+      send_command(:blocking_call_v, command, timeout, &block)
     end
 
     def scan(*args, **kwargs, &block)
       raise ArgumentError, 'block required' unless block
+      raise ::RedisClient::Cluster::Transaction::ConsistencyError, 'scan is not valid inside a transaction' if @transaction
 
       seed = Random.new_seed
       cursor = ZERO_CURSOR_FOR_SCAN
@@ -66,17 +67,17 @@ class RedisClient
     end
 
     def sscan(key, *args, **kwargs, &block)
-      node = @router.assign_node(['SSCAN', key])
+      node = assign_node(['SSCAN', key])
       @router.try_delegate(node, :sscan, key, *args, **kwargs, &block)
     end
 
     def hscan(key, *args, **kwargs, &block)
-      node = @router.assign_node(['HSCAN', key])
+      node = assign_node(['HSCAN', key])
       @router.try_delegate(node, :hscan, key, *args, **kwargs, &block)
     end
 
     def zscan(key, *args, **kwargs, &block)
-      node = @router.assign_node(['ZSCAN', key])
+      node = assign_node(['ZSCAN', key])
       @router.try_delegate(node, :zscan, key, *args, **kwargs, &block)
     end
 
@@ -90,7 +91,21 @@ class RedisClient
     end
 
     def multi(watch: nil, &block)
-      ::RedisClient::Cluster::Transaction.new(@router, @command_builder).execute(watch: watch, &block)
+      # This is tricky and importnat.
+      # If you call #multi _outside_ of a watch block, you expect that the connection
+      # has returned to its original state at the end of the block; what was watched with the watch:
+      # kwarg is unwatched if the transaction is not committed.
+      # However, if you call #multi in a watch block (from Redis::Cluster), Redis::Cluster#watch actually
+      # calls unwatch if an exception gets thrown, _including an exception from inside a multi block_.
+      # So, we need to record whether a transaction already existed before calling multi; if so, we leave
+      # responsibility for disposing of that transaction to the caller who created it.
+      transaction_was_preexisting = !@transaction.nil?
+      build_transaction!
+      begin
+        @transaction.multi(watch: watch, &block)
+      ensure
+        @transaction = nil if @transaction&.complete? || !transaction_was_preexisting
+      end
     end
 
     def pubsub
@@ -109,7 +124,7 @@ class RedisClient
       if @router.command_exists?(name)
         args.unshift(name)
         command = @command_builder.generate(args, kwargs)
-        return @router.send_command(:call_v, command, &block)
+        return send_command(:call_v, command, &block)
       end
 
       super
@@ -119,6 +134,29 @@ class RedisClient
       return true if @router.command_exists?(name)
 
       super
+    end
+
+    def build_transaction!
+      return if @transaction
+
+      @transaction = ::RedisClient::Cluster::Transaction.new(@router, @command_builder)
+    end
+
+    def send_command(method, command, *args, &block)
+      build_transaction! if ::RedisClient::Cluster::Transaction.command_starts_transaction?(command)
+      if @transaction
+        begin
+          @transaction.send_command(method, command, *args, &block)
+        ensure
+          @transaction = nil if @transaction&.complete?
+        end
+      else
+        @router.send_command(method, command, *args, &block)
+      end
+    end
+
+    def assign_node(command)
+      @transaction ? @transaction.node : @router.assign_node(command)
     end
   end
 end
