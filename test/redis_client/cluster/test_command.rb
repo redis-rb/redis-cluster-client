@@ -49,20 +49,20 @@ class RedisClient
         [
           {
             rows: [
-              ['get', 2, Set['readonly', 'fast'], 1, 1, 1, Set['@read', '@string', '@fast'], Set[], Set[], Set[]],
-              ['set', -3, Set['write', 'denyoom', 'movablekeys'], 1, 1, 1, Set['@write', '@string', '@slow'], Set[], Set[], Set[]]
+              ['get', 2, Set['readonly', 'fast'], 1, -1, 1, Set['@read', '@string', '@fast'], Set[], Set[], Set[]],
+              ['set', -3, Set['write', 'denyoom', 'movablekeys'], 1, -1, 2, Set['@write', '@string', '@slow'], Set[], Set[], Set[]]
             ],
             want: {
-              'get' => { first_key_position: 1, write?: false, readonly?: true },
-              'set' => { first_key_position: 1, write?: true, readonly?: false }
+              'get' => { first_key_position: 1, last_key_position: -1, key_step: 1, write?: false, readonly?: true },
+              'set' => { first_key_position: 1, last_key_position: -1, key_step: 2, write?: true, readonly?: false }
             }
           },
           {
             rows: [
-              ['GET', 2, Set['readonly', 'fast'], 1, 1, 1, Set['@read', '@string', '@fast'], Set[], Set[], Set[]]
+              ['GET', 2, Set['readonly', 'fast'], 1, -1, 1, Set['@read', '@string', '@fast'], Set[], Set[], Set[]]
             ],
             want: {
-              'get' => { first_key_position: 1, write?: false, readonly?: true }
+              'get' => { first_key_position: 1, last_key_position: -1, key_step: 1, write?: false, readonly?: true }
             }
           },
           { rows: [[]], want: {} },
@@ -209,6 +209,36 @@ class RedisClient
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
           got = cmd.send(:extract_hash_tag, c[:key])
+          assert_equal(c[:want], got, msg)
+        end
+      end
+
+      def test_extract_all_keys
+        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
+        [
+          { command: ['EVAL', 'return ARGV[1]', '0', 'hello'], want: [] },
+          { command: ['EVAL', 'return ARGV[1]', '3', 'key1', 'key2', 'key3', 'arg1', 'arg2'], want: %w[key1 key2 key3] },
+          { command: [['EVAL'], '"return ARGV[1]"', 0, 'hello'], want: [] },
+          { command: %w[EVALSHA sha1 2 foo bar baz zap], want: %w[foo bar] },
+          { command: %w[MIGRATE host port key 0 5 COPY], want: %w[key] },
+          { command: ['MIGRATE', 'host', 'port', '', '0', '5', 'COPY', 'KEYS', 'key1'], want: %w[key1] },
+          { command: ['MIGRATE', 'host', 'port', '', '0', '5', 'COPY', 'KEYS', 'key1', 'key2'], want: %w[key1 key2] },
+          { command: %w[ZINTERSTORE out 2 zset1 zset2 WEIGHTS 2 3], want: %w[zset1 zset2] },
+          { command: %w[ZUNIONSTORE out 2 zset1 zset2 WEIGHTS 2 3], want: %w[zset1 zset2] },
+          { command: %w[OBJECT HELP], want: [] },
+          { command: %w[MEMORY HELP], want: [] },
+          { command: %w[MEMORY USAGE key], want: %w[key] },
+          { command: %w[XREAD COUNT 2 STREAMS mystream writers 0-0 0-0], want: %w[mystream writers] },
+          { command: %w[XREADGROUP GROUP group consumer STREAMS key id], want: %w[key] },
+          { command: %w[SET foo 1], want: %w[foo] },
+          { command: %w[set foo 1], want: %w[foo] },
+          { command: [['SET'], 'foo', 1], want: %w[foo] },
+          { command: %w[GET foo], want: %w[foo] },
+          { command: %w[MGET foo bar baz], want: %w[foo bar baz] },
+          { command: %w[MSET foo val bar val baz val], want: %w[foo bar baz] }
+        ].each_with_index do |c, idx|
+          msg = "Case: #{idx}"
+          got = cmd.send(:extract_all_keys, c[:command])
           assert_equal(c[:want], got, msg)
         end
       end
