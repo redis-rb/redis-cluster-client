@@ -809,6 +809,38 @@ class RedisClient
         )
         ::RedisClient::Cluster.new(config, pool: { timeout: TEST_TIMEOUT_SEC, size: 2 })
       end
+
+      # This test only makes sense for pooled connections; each fiber should check out
+      # a different connection
+      def test_two_concurrent_transactions
+        # This actually can't work unless we store the current transaction for a RedisClient::Cluster
+        # in a fiber-local variable. The best way to do that would be to add a dependency on concurrent-ruby,
+        # since otherwise fiber-local variables are prone to collisions and require finalizers to properly
+        # avoid leaks.
+        skip 'requires dependency on concurrent-ruby'
+
+        swap_keys_txn_factory = lambda { |key1, key2|
+          lambda {
+            @client.call('SET', key1, 'value1')
+            @client.call('SET', key2, 'value2')
+            @client.call_v(['WATCH', key1])
+            @client.call_v(['WATCH', key2])
+            old_value1 = @client.call_v(['GET', key1])
+            old_value2 = @client.call_v(['GET', key2])
+            Fiber.yield
+            @client.multi do |txn|
+              txn.call_v(['SET', key1, old_value2])
+              txn.call_v(['SET', key2, old_value1])
+            end
+          }
+        }
+
+        txn1 = Fiber.new(&swap_keys_txn_factory.call('{slota}key1', '{slota}key2'))
+        txn2 = Fiber.new(&swap_keys_txn_factory.call('{slotb}key3', '{slotb}key4'))
+        [txn1, txn2, txn1, txn2].each(&:resume)
+        # [txn1, txn1, txn2, txn2].each(&:resume)
+        [txn1, txn2].join
+      end
     end
   end
 end
