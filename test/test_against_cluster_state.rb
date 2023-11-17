@@ -59,6 +59,31 @@ class TestAgainstClusterState < TestingWrapper
       end
     end
 
+    def test_the_state_of_cluster_resharding_with_pipelining_on_new_connection
+      # This test is excercising a very delicate race condition; i think the use of @client to set
+      # the keys in do_resharding_test is actually causing the race condition not to happen, so this
+      # test is actually performing the resharding on its own.
+      key_count = 10
+      key_count.times do |i|
+        key = "key#{i}"
+        slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
+        src, dest = @controller.select_resharding_target(slot)
+        @controller.start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+        @controller.finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+      end
+
+      res = @client.pipelined do |p|
+        key_count.times do |i|
+          p.call_v(['SET', "key#{i}", "value#{i}"])
+        end
+      end
+
+      key_count.times do |i|
+        assert_equal('OK', res[i])
+        assert_equal("value#{i}", @client.call_v(['GET', "key#{i}"]))
+      end
+    end
+
     private
 
     def wait_for_replication
