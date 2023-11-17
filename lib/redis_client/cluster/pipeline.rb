@@ -158,15 +158,13 @@ class RedisClient
           end
         end
 
-        all_replies = errors = nil
+        all_replies = errors = required_redirections = nil
 
         work_group.each do |node_key, v|
           case v
           when ::RedisClient::Cluster::Pipeline::RedirectionNeeded
-            all_replies ||= Array.new(@size)
-            pipeline = @pipelines[node_key]
-            v.indices.each { |i| v.replies[i] = handle_redirection(v.replies[i], pipeline, i) }
-            pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
+            required_redirections ||= {}
+            required_redirections[node_key] = v
           when StandardError
             errors ||= {}
             errors[node_key] = v
@@ -177,8 +175,14 @@ class RedisClient
         end
 
         work_group.close
-
         raise ::RedisClient::Cluster::ErrorCollection, errors unless errors.nil?
+
+        required_redirections&.each do |node_key, v|
+          all_replies ||= Array.new(@size)
+          pipeline = @pipelines[node_key]
+          v.indices.each { |i| v.replies[i] = handle_redirection(v.replies[i], pipeline, i) }
+          pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
+        end
 
         all_replies
       end
