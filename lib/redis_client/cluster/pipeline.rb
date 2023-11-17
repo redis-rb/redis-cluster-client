@@ -50,28 +50,31 @@ class RedisClient
       end
 
       ::RedisClient::ConnectionMixin.module_eval do
-        def call_pipelined_aware_of_redirection(commands, timeouts) # rubocop:disable Metrics/AbcSize
+        def call_pipelined_aware_of_redirection(commands, timeouts) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
           size = commands.size
           results = Array.new(commands.size)
           @pending_reads += size
           write_multi(commands)
 
           redirection_indices = nil
+          exception = nil
           size.times do |index|
             timeout = timeouts && timeouts[index]
             result = read(timeout)
             @pending_reads -= 1
-            if result.is_a?(CommandError)
+            if result.is_a?(::RedisClient::Error)
               result._set_command(commands[index])
-              if result.message.start_with?('MOVED', 'ASK')
+              if result.is_a?(::RedisClient::CommandError) && result.message.start_with?('MOVED', 'ASK')
                 redirection_indices ||= []
                 redirection_indices << index
+              else
+                exception ||= result
               end
             end
-
             results[index] = result
           end
 
+          raise exception if exception
           return results if redirection_indices.nil?
 
           err = ::RedisClient::Cluster::Pipeline::RedirectionNeeded.new
@@ -217,19 +220,13 @@ class RedisClient
 
         if err.message.start_with?('MOVED')
           node = @router.assign_redirection_node(err.message)
-          try_redirection(node, pipeline, inner_index)
+          redirect_command(node, pipeline, inner_index)
         elsif err.message.start_with?('ASK')
           node = @router.assign_asking_node(err.message)
-          try_asking(node) ? try_redirection(node, pipeline, inner_index) : err
+          try_asking(node) ? redirect_command(node, pipeline, inner_index) : err
         else
           err
         end
-      end
-
-      def try_redirection(node, pipeline, inner_index)
-        redirect_command(node, pipeline, inner_index)
-      rescue StandardError => e
-        e
       end
 
       def redirect_command(node, pipeline, inner_index)
