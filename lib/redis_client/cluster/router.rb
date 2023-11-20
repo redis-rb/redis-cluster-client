@@ -83,60 +83,62 @@ class RedisClient
       rescue ::RedisClient::CircuitBreaker::OpenCircuitError
         raise
       rescue ::RedisClient::CommandError => e
-        raise if retry_count <= 0
-
         if e.message.start_with?('MOVED')
           node = assign_redirection_node(e.message)
           retry_count -= 1
-          retry
+          retry if retry_count >= 0
         elsif e.message.start_with?('ASK')
           node = assign_asking_node(e.message)
-          node.call('ASKING')
           retry_count -= 1
-          retry
+          if retry_count >= 0
+            # Don't actually prepend our next command with ASKING unless we're going to retry.
+            node.call('ASKING')
+            retry
+          end
         elsif e.message.start_with?('CLUSTERDOWN Hash slot not served')
           update_cluster_info!
           retry_count -= 1
-          retry
-        else
-          raise
+          retry if retry_count >= 0
         end
+        raise
       rescue ::RedisClient::ConnectionError => e
         raise if METHODS_FOR_BLOCKING_CMD.include?(method) && e.is_a?(RedisClient::ReadTimeoutError)
-        raise if retry_count <= 0
 
         update_cluster_info!
+
+        raise if retry_count <= 0
+
         retry_count -= 1
         retry
       end
 
-      def try_delegate(node, method, *args, retry_count: 3, **kwargs, &block) # rubocop:disable Metrics/AbcSize
+      def try_delegate(node, method, *args, retry_count: 3, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         node.public_send(method, *args, **kwargs, &block)
       rescue ::RedisClient::CircuitBreaker::OpenCircuitError
         raise
       rescue ::RedisClient::CommandError => e
-        raise if retry_count <= 0
-
         if e.message.start_with?('MOVED')
           node = assign_redirection_node(e.message)
           retry_count -= 1
-          retry
+          retry if retry_count >= 0
         elsif e.message.start_with?('ASK')
           node = assign_asking_node(e.message)
-          node.call('ASKING')
           retry_count -= 1
-          retry
+          if retry_count >= 0
+            node.call('ASKING')
+            retry
+          end
         elsif e.message.start_with?('CLUSTERDOWN Hash slot not served')
           update_cluster_info!
           retry_count -= 1
-          retry
-        else
-          raise
+          retry if retry_count >= 0
         end
+        raise
       rescue ::RedisClient::ConnectionError
+        update_cluster_info!
+
         raise if retry_count <= 0
 
-        update_cluster_info!
         retry_count -= 1
         retry
       end
