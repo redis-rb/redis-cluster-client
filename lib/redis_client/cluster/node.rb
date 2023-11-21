@@ -80,7 +80,7 @@ class RedisClient
       class Config < ::RedisClient::Config
         def initialize(scale_read: false, **kwargs)
           @scale_read = scale_read
-          super(**kwargs)
+          super(**kwargs, client_implementation: Client)
         end
 
         private
@@ -89,6 +89,22 @@ class RedisClient
           prelude = super.dup
           prelude << ['READONLY'] if @scale_read
           prelude.freeze
+        end
+      end
+
+      class Client < ::RedisClient
+        # We need to be able to differentiate between timeout errors caused by blocking read timeouts
+        # (which should NOT cause a cluster topology update) with normal read timeouts (which should)
+        def blocking_call(timeout, *command, **kwargs)
+          super
+        rescue ::RedisClient::TimeoutError => e
+          raise ::RedisClient::Cluster::BlockingReadTimeoutError, e.message
+        end
+
+        def blocking_call_v(timeout, command)
+          super
+        rescue ::RedisClient::TimeoutError => e
+          raise ::RedisClient::Cluster::BlockingReadTimeoutError, e.message
         end
       end
 
