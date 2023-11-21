@@ -167,21 +167,25 @@ class RedisClient
         find_node(node_key)
       end
 
+      def find_node_key_by_key(key, seed: nil, primary: false)
+        if key && !key.empty?
+          slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
+          primary ? @node.find_node_key_of_primary(slot) : @node.find_node_key_of_replica(slot)
+        else
+          primary ? @node.any_primary_node_key(seed: seed) : @node.any_replica_node_key(seed: seed)
+        end
+      end
+
       def find_node_key(command, seed: nil)
         key = @command.extract_first_key(command)
-        slot = key.empty? ? nil : ::RedisClient::Cluster::KeySlotConverter.convert(key)
-
-        if @command.should_send_to_primary?(command)
-          @node.find_node_key_of_primary(slot) || @node.any_primary_node_key(seed: seed)
-        else
-          @node.find_node_key_of_replica(slot, seed: seed) || @node.any_replica_node_key(seed: seed)
-        end
+        find_node_key_by_key(key, seed: seed, primary: @command.should_send_to_primary?(command))
       end
 
       def find_primary_node_key(command)
         key = @command.extract_first_key(command)
-        slot = key.empty? ? nil : ::RedisClient::Cluster::KeySlotConverter.convert(key)
-        @node.find_node_key_of_primary(slot)
+        return nil unless key&.size&.> 0
+
+        find_node_key_by_key(key, primary: true)
       end
 
       def find_node(node_key, retry_count: 3)

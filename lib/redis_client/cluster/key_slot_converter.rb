@@ -3,6 +3,9 @@
 class RedisClient
   class Cluster
     module KeySlotConverter
+      EMPTY_STRING = ''
+      LEFT_BRACKET = '{'
+      RIGHT_BRACKET = '}'
       XMODEM_CRC16_LOOKUP = [
         0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7,
         0x8108, 0x9129, 0xa14a, 0xb16b, 0xc18c, 0xd1ad, 0xe1ce, 0xf1ef,
@@ -45,12 +48,27 @@ class RedisClient
       def convert(key)
         return nil if key.nil?
 
+        hash_tag = extract_hash_tag(key)
+        key = hash_tag unless hash_tag.empty?
+
         crc = 0
         key.each_byte do |b|
           crc = ((crc << 8) & 0xffff) ^ XMODEM_CRC16_LOOKUP[((crc >> 8) ^ b) & 0xff]
         end
 
         crc % HASH_SLOTS
+      end
+
+      # @see https://redis.io/topics/cluster-spec#keys-hash-tags Keys hash tags
+      def extract_hash_tag(key)
+        key = key.to_s
+        s = key.index(LEFT_BRACKET)
+        return EMPTY_STRING if s.nil?
+
+        e = key.index(RIGHT_BRACKET, s + 1)
+        return EMPTY_STRING if e.nil?
+
+        key[s + 1..e - 1]
       end
     end
   end
