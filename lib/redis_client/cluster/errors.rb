@@ -55,5 +55,7 @@ class RedisClient
         )
       end
     end
+
+    class BlockingReadTimeoutError < ::RedisClient::ReadTimeoutError; end
   end
 end

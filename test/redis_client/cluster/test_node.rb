@@ -331,14 +331,14 @@ class RedisClient
           msg = "Case: primary only: #{info.node_key}"
           got = -> { @test_node.find_by(info.node_key) }
           if info.primary?
-            assert_instance_of(::RedisClient, got.call, msg)
+            assert_kind_of(::RedisClient, got.call, msg)
           else
             assert_raises(::RedisClient::Cluster::Node::ReloadNeeded, msg, &got)
           end
 
           msg = "Case: scale read: #{info.node_key}"
           got = @test_node_with_scale_read.find_by(info.node_key)
-          assert_instance_of(::RedisClient, got, msg)
+          assert_kind_of(::RedisClient, got, msg)
         end
       end
 

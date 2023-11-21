@@ -12,7 +12,7 @@ class RedisClient
         def test_clients_with_redis_client
           got = @test_topology.clients
           got.each_value do |client|
-            assert_instance_of(::RedisClient, client)
+            assert_kind_of(::RedisClient, client)
             assert_equal('master', client.call('ROLE').first)
           end
         end
@@ -28,7 +28,7 @@ class RedisClient
 
           got = test_topology.clients
           got.each_value do |client|
-            assert_instance_of(::RedisClient::Pooled, client)
+            assert_kind_of(::RedisClient::Pooled, client)
             assert_equal('master', client.call('ROLE').first)
           end
         ensure
@@ -38,7 +38,7 @@ class RedisClient
         def test_primary_clients
           got = @test_topology.primary_clients
           got.each_value do |client|
-            assert_instance_of(::RedisClient, client)
+            assert_kind_of(::RedisClient, client)
             assert_equal('master', client.call('ROLE').first)
           end
         end
@@ -46,7 +46,7 @@ class RedisClient
         def test_replica_clients
           got = @test_topology.replica_clients
           got.each_value do |client|
-            assert_instance_of(::RedisClient, client)
+            assert_kind_of(::RedisClient, client)
             assert_equal('master', client.call('ROLE').first)
           end
         end
@@ -54,7 +54,7 @@ class RedisClient
         def test_clients_for_scanning
           got = @test_topology.clients_for_scanning
           got.each_value do |client|
-            assert_instance_of(::RedisClient, client)
+            assert_kind_of(::RedisClient, client)
             assert_equal('master', client.call('ROLE').first)
           end
         end
