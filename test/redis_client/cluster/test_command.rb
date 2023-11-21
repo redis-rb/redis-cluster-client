@@ -84,7 +84,7 @@ class RedisClient
         [
           { command: %w[SET foo 1], want: 'foo' },
           { command: %w[GET foo], want: 'foo' },
-          { command: %w[GET foo{bar}baz], want: 'bar' },
+          { command: %w[GET foo{bar}baz], want: 'foo{bar}baz' },
           { command: %w[MGET foo bar baz], want: 'foo' },
           { command: %w[UNKNOWN foo bar], want: '' },
           { command: [['GET'], 'foo'], want: 'foo' },
@@ -187,28 +187,6 @@ class RedisClient
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
           got = cmd.send(:determine_optional_key_position, c[:params][:command], c[:params][:option_name])
-          assert_equal(c[:want], got, msg)
-        end
-      end
-
-      def test_extract_hash_tag
-        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
-        [
-          { key: 'foo', want: '' },
-          { key: 'foo{bar}baz', want: 'bar' },
-          { key: 'foo{bar}baz{qux}quuc', want: 'bar' },
-          { key: 'foo}bar{baz', want: '' },
-          { key: 'foo{bar', want: '' },
-          { key: 'foo}bar', want: '' },
-          { key: 'foo{}bar', want: '' },
-          { key: '{}foo', want: '' },
-          { key: 'foo{}', want: '' },
-          { key: '{}', want: '' },
-          { key: '', want: '' },
-          { key: nil, want: '' }
-        ].each_with_index do |c, idx|
-          msg = "Case: #{idx}"
-          got = cmd.send(:extract_hash_tag, c[:key])
           assert_equal(c[:want], got, msg)
         end
       end
