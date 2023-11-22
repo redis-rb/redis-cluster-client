@@ -168,6 +168,94 @@ cli.call('MGET', '{key}1', '{key}2', '{key}3')
 #=> [nil, nil, nil]
 ```
 
+## Transactions
+This gem supports [Redis transactions](https://redis.io/topics/transactions), including atomicity with `MULTI`/`EXEC`,
+and conditional execution with `WATCH`. Redis does not support cross-slot transactions, so all keys used within a
+transaction must live in the same key slot. To use transactions, you must thus "pin" your client to a single slot using
+`#with`. Pass a key to `#with`, and the yielded connection object will enforce that all keys used in the block must
+belong to the same slot.
+
+```ruby
+cli.with(key: '{key}1') do |conn|
+  conn.call('SET', '{key}1', 'This is OK')
+  #=> "OK"
+  conn.call('SET', '{key}2', 'This is also OK; it has the same hashtag, and so the same slot')
+  #=> "OK"
+  conn.call('SET', '{otherslot}3', 'This will raise an exception; this key is not in the same slot as {key}1')
+  #=> Connection pinned to slot 12539 but command ["SET", "{otherslot}3", "..."] includes key {otherslot}3 in slot 10271 (RedisClient::Cluster::Transaction::ConsistencyError)
+end
+```
+
+When using hash tags to enforce same-slot key hashing, it's often neat to simply pass the hashtag _only_ to `#with`:
+
+```ruby
+cli.with(key: '{myslot}') do |conn|
+  # You can use any key starting with {myslot} in this block
+end
+```
+
+Once you have pinned a client to a particular slot, you can use the same transaction APIs as the
+[redis-client](https://github.com/redis-rb/redis-client#usage) gem allows.
+
+```ruby
+# No concurrent client will ever see the value 1 in 'mykey'; it will see either zero or two.
+cli.call('SET', 'key', 0)
+cli.with(key: 'key') do |conn|
+  conn.multi do |txn|
+    txn.call('INCR', 'key')
+    txn.call('INCR', 'key')
+  end
+  #=> ['OK', 'OK']
+end
+
+# Conditional execution with WATCH can be used to e.g. atomically swap two keys
+cli.call('MSET', '{key}1', 'v1', '{key}2', 'v2')
+cli.with(key: '{key}') do |conn|
+  conn.call('WATCH', '{key}1', '{key}2')
+  conn.multi do |txn|
+    old_key1 = conn.call('GET', '{key}1')
+    old_key2 = conn.call('GET', '{key}2')
+    txn.call('SET', '{key}1', old_key2)
+    txn.call('SET', '{key}2', old_key1)
+  end
+  # This transaction will swap the values of {key}1 and {key}2 only if no concurrent connection modified
+  # either of the values
+end
+
+# You can also pass watch: to #multi as a shortcut
+cli.call('MSET', '{key}1', 'v1', '{key}2', 'v2')
+cli.with(key: '{key}') do |conn|
+  conn.multi(watch: ['{key}1', '{key}2']) do |txn|
+    old_key1, old_key2 = conn.call('MGET', '{key}1', '{key}2')
+    txn.call('MSET', '{key}1', old_key2, '{key}2', old_key1)
+  end
+end
+```
+
+Pinned connections are aware of redirections and node failures like ordinary calls to `RedisClient::Cluster`, but because
+you may have written non-idempotent code inside your block, the block is not automatically retried if e.g. the slot
+it is operating on moves to a different node. If you want this, you can opt-in to retries by passing nonzero
+`retry_count` to `#with`.
+
+```ruby
+cli.with(key: '{key}', retry_count: 1) do |conn|
+  conn.call('GET', '{key}1')
+  #=> "value1"
+
+  # Now, some changes in cluster topology mean that {key} is moved to a different node!
+
+  conn.call('GET', '{key}2')
+  #=> MOVED 9039 127.0.0.1:16381 (RedisClient::CommandError)
+
+  # Luckily, the block will get retried (once) and so both GETs will be re-executed on the newly-discovered
+  # correct node.
+end
+```
+
+Because `RedisClient` from the redis-client gem implements `#with` as simply `yield self` and ignores all of its
+arguments, it's possible to write code which is compatible with both redis-client and redis-cluster-client; the `#with`
+call will pin the connection to a slot when using clustering, or be a no-op when not.
+
 ## ACL
 The cluster client internally calls [COMMAND](https://redis.io/commands/command/) and [CLUSTER NODES](https://redis.io/commands/cluster-nodes/) commands to operate correctly.
 So please permit it like the followings.

@@ -84,6 +84,52 @@ class TestAgainstClusterState < TestingWrapper
       end
     end
 
+    def test_aborts_pinning_on_resharding
+      @client.call_v(['SET', '{slot}counter', 0])
+      slot = ::RedisClient::Cluster::KeySlotConverter.convert('{slot}')
+
+      assert_raises(::RedisClient::CommandError) do
+        @client.with(key: '{slot}') do |conn|
+          conn.call_v(['INCR', '{slot}counter']) # should work
+          src, dest = @controller.select_resharding_target(slot)
+          @controller.start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+          @controller.finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+          # this should now fail for want of being on the wrong slot.
+          conn.call_v(['INCR', '{slot}counter'])
+        end
+      end
+
+      # The second one will now work though, because we processed the resharding.
+      @client.with(key: '{slot}') do |conn|
+        conn.call_v(['INCR', '{slot}counter'])
+      end
+
+      # There were two INCRs which should work.
+      assert_equal(2, @client.call_v(['GET', '{slot}counter']).to_i)
+    end
+
+    def test_can_retry_pinning_on_resharding
+      @client.call_v(['SET', '{slot}counter', 0])
+      slot = ::RedisClient::Cluster::KeySlotConverter.convert('{slot}')
+      first_time = true
+      @client.with(key: '{slot}', retry_count: 1) do |conn|
+        conn.call_v(['INCR', '{slot}counter']) # should work
+
+        if first_time
+          src, dest = @controller.select_resharding_target(slot)
+          @controller.start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+          @controller.finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+          first_time = false
+        end
+
+        # this should now fail for want of being on the wrong slot (the first time)
+        conn.call_v(['INCR', '{slot}counter'])
+      end
+
+      # There were three INCRs which should work.
+      assert_equal(3, @client.call_v(['GET', '{slot}counter']).to_i)
+    end
+
     private
 
     def wait_for_replication

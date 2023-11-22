@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'redis_client/cluster/concurrent_worker'
+require 'redis_client/cluster/pinning'
 require 'redis_client/cluster/pipeline'
 require 'redis_client/cluster/pub_sub'
 require 'redis_client/cluster/router'
@@ -95,6 +96,20 @@ class RedisClient
 
     def pubsub
       ::RedisClient::Cluster::PubSub.new(@router, @command_builder)
+    end
+
+    def with(key:, write: true, retry_count: 0)
+      raise ArgumentError, 'key must be provided' if key.nil? || key.empty?
+
+      slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
+      node_key = @router.find_node_key_by_key(key, primary: write)
+      node = @router.find_node(node_key)
+      # Calling #with checks out the underlying connection if this is a pooled connection
+      # Calling it through #try_delegate ensures we handle any redirections and retry the entire
+      # transaction if so.
+      @router.try_delegate(node, :with, retry_count: retry_count) do |conn|
+        yield ::RedisClient::Cluster::Pinning::ConnectionProxy.new(conn, slot, @router, @command_builder)
+      end
     end
 
     def close
