@@ -178,7 +178,7 @@ class RedisClient
       end
 
       def test_transaction_with_single_key
-        got = @client.multi do |t|
+        got = @client.multi(key: 'counter') do |t|
           t.call('SET', 'counter', '0')
           t.call('INCR', 'counter')
           t.call('INCR', 'counter')
@@ -190,7 +190,7 @@ class RedisClient
 
       def test_transaction_with_multiple_key
         assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
-          @client.multi do |t|
+          @client.multi(key: 'key1') do |t|
             t.call('SET', 'key1', '1')
             t.call('SET', 'key2', '2')
             t.call('SET', 'key3', '3')
@@ -204,20 +204,19 @@ class RedisClient
 
       def test_transaction_with_empty_block
         assert_raises(ArgumentError) { @client.multi {} }
-        assert_raises(LocalJumpError) { @client.multi }
+        assert_raises(LocalJumpError) { @client.multi(key: 'foo') }
       end
 
       def test_transaction_with_keyless_commands
-        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
-          @client.multi do |t|
-            t.call('ECHO', 'foo')
-            t.call('ECHO', 'bar')
-          end
+        got = @client.multi(key: 'hello') do |t|
+          t.call('ECHO', 'foo')
+          t.call('ECHO', 'bar')
         end
+        assert_equal %w[foo bar], got
       end
 
       def test_transaction_with_hashtag
-        got = @client.multi do |t|
+        got = @client.multi(key: '{key}') do |t|
           t.call('MSET', '{key}1', '1', '{key}2', '2')
           t.call('MSET', '{key}3', '3', '{key}4', '4')
         end
@@ -228,14 +227,14 @@ class RedisClient
 
       def test_transaction_without_hashtag
         assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
-          @client.multi do |t|
+          @client.multi(key: 'key1') do |t|
             t.call('MSET', 'key1', '1', 'key2', '2')
             t.call('MSET', 'key3', '3', 'key4', '4')
           end
         end
 
-        assert_raises(::RedisClient::CommandError, 'CROSSSLOT keys') do
-          @client.multi do |t|
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
+          @client.multi(key: 'key1') do |t|
             t.call('MSET', 'key1', '1', 'key2', '2')
             t.call('MSET', 'key1', '1', 'key3', '3')
             t.call('MSET', 'key1', '1', 'key4', '4')

@@ -5,7 +5,6 @@ require 'redis_client/cluster/pinning'
 require 'redis_client/cluster/pipeline'
 require 'redis_client/cluster/pub_sub'
 require 'redis_client/cluster/router'
-require 'redis_client/cluster/transaction'
 
 class RedisClient
   class Cluster
@@ -90,8 +89,14 @@ class RedisClient
       pipeline.execute
     end
 
-    def multi(watch: nil, &block)
-      ::RedisClient::Cluster::Transaction.new(@router, @command_builder).execute(watch: watch, &block)
+    def multi(watch: nil, key: nil, &block)
+      slot_key = key
+      slot_key = watch&.first if slot_key.nil?
+      raise ArgumentError, 'watch or key must be provided' if slot_key.nil?
+
+      with(key: slot_key) do |conn|
+        conn.multi(watch: watch, &block)
+      end
     end
 
     def pubsub

@@ -57,5 +57,9 @@ class RedisClient
     end
 
     class BlockingReadTimeoutError < ::RedisClient::ReadTimeoutError; end
+
+    module Transaction
+      ConsistencyError = Class.new(::RedisClient::Error)
+    end
   end
 end
