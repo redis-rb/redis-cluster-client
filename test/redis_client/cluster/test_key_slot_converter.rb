@@ -27,6 +27,27 @@ class RedisClient
         got = ::RedisClient::Cluster::KeySlotConverter.convert(multi_byte_key)
         assert_equal(want, got, "Case: #{multi_byte_key}")
       end
+
+      def test_extract_hash_tag
+        [
+          { key: 'foo', want: '' },
+          { key: 'foo{bar}baz', want: 'bar' },
+          { key: 'foo{bar}baz{qux}quuc', want: 'bar' },
+          { key: 'foo}bar{baz', want: '' },
+          { key: 'foo{bar', want: '' },
+          { key: 'foo}bar', want: '' },
+          { key: 'foo{}bar', want: '' },
+          { key: '{}foo', want: '' },
+          { key: 'foo{}', want: '' },
+          { key: '{}', want: '' },
+          { key: '', want: '' },
+          { key: nil, want: '' }
+        ].each_with_index do |c, idx|
+          msg = "Case: #{idx}"
+          got = ::RedisClient::Cluster::KeySlotConverter.extract_hash_tag(c[:key])
+          assert_equal(c[:want], got, msg)
+        end
+      end
     end
   end
 end

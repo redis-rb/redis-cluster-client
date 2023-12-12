@@ -2,14 +2,13 @@
 
 require 'redis_client'
 require 'redis_client/cluster/errors'
+require 'redis_client/cluster/key_slot_converter'
 require 'redis_client/cluster/normalized_cmd_name'
 
 class RedisClient
   class Cluster
     class Command
       EMPTY_STRING = ''
-      LEFT_BRACKET = '{'
-      RIGHT_BRACKET = '}'
       EMPTY_HASH = {}.freeze
 
       Detail = Struct.new(
@@ -65,9 +64,7 @@ class RedisClient
         i = determine_first_key_position(command)
         return EMPTY_STRING if i == 0
 
-        key = (command[i].is_a?(Array) ? command[i].flatten.first : command[i]).to_s
-        hash_tag = extract_hash_tag(key)
-        hash_tag.empty? ? key : hash_tag
+        (command[i].is_a?(Array) ? command[i].flatten.first : command[i]).to_s
       end
 
       def should_send_to_primary?(command)
@@ -104,18 +101,6 @@ class RedisClient
       def determine_optional_key_position(command, option_name) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         idx = command&.flatten&.map(&:to_s)&.map(&:downcase)&.index(option_name&.downcase)
         idx.nil? ? 0 : idx + 1
-      end
-
-      # @see https://redis.io/topics/cluster-spec#keys-hash-tags Keys hash tags
-      def extract_hash_tag(key)
-        key = key.to_s
-        s = key.index(LEFT_BRACKET)
-        return EMPTY_STRING if s.nil?
-
-        e = key.index(RIGHT_BRACKET, s + 1)
-        return EMPTY_STRING if e.nil?
-
-        key[s + 1..e - 1]
       end
     end
   end
