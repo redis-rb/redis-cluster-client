@@ -22,7 +22,7 @@ class RedisClient
           want = Array.new(size) { |i| i * 2 }
           got = []
 
-          group.each do |_, v|
+          group.each do |_, v| # rubocop:disable Style/HashEachMethods
             got << v
           end
 
@@ -36,7 +36,7 @@ class RedisClient
           5.times { |i| group.push(i, i) { |n| n } }
           assert_raises(InvalidNumberOfTasks) { group.push(5, 5) { |n| n } }
           sum = 0
-          group.each { |_, v| sum += v }
+          group.each { |_, v| sum += v } # rubocop:disable Style/HashEachMethods
           assert_equal(10, sum)
           group.close
         end
@@ -45,9 +45,9 @@ class RedisClient
           group = @worker.new_group(size: 5)
           4.times { |i| group.push(i, i) { |n| n } }
           sum = 0
-          assert_raises(InvalidNumberOfTasks) { group.each { |_, v| sum += v } }
+          assert_raises(InvalidNumberOfTasks) { group.each { |_, v| sum += v } } # rubocop:disable Style/HashEachMethods
           group.push(4, 4) { |n| n }
-          group.each { |_, v| sum += v }
+          group.each { |_, v| sum += v } # rubocop:disable Style/HashEachMethods
           assert_equal(10, sum)
           group.close
         end
