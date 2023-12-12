@@ -48,7 +48,7 @@ module IpsConcurrentWorker
           end
 
           sum = 0
-          group.each do |_, n|
+          group.each_value do |n|
             sum += n
           end
 
