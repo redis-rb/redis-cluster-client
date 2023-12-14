@@ -13,7 +13,6 @@ class RedisClient
   class Cluster
     class Router
       ZERO_CURSOR_FOR_SCAN = '0'
-      METHODS_FOR_BLOCKING_CMD = %i[blocking_call_v blocking_call].freeze
       TSF = ->(f, x) { f.nil? ? x : f.call(x) }.curry
 
       def initialize(config, concurrent_worker, pool: nil, **kwargs)
@@ -102,8 +101,6 @@ class RedisClient
         end
         raise
       rescue ::RedisClient::ConnectionError => e
-        raise if METHODS_FOR_BLOCKING_CMD.include?(method) && e.is_a?(RedisClient::ReadTimeoutError)
-
         update_cluster_info!
 
         raise if retry_count <= 0
