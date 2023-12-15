@@ -72,45 +72,25 @@ class RedisClient
       end
 
       # @see https://redis.io/docs/reference/cluster-spec/#redirection-and-resharding Redirection and resharding
-      def try_send(node, method, command, args, retry_count: 3, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        if args.empty?
-          # prevent memory allocation for variable-length args
-          node.public_send(method, command, &block)
-        else
-          node.public_send(method, *args, command, &block)
-        end
-      rescue ::RedisClient::CircuitBreaker::OpenCircuitError
-        raise
-      rescue ::RedisClient::CommandError => e
-        if e.message.start_with?('MOVED')
-          node = assign_redirection_node(e.message)
-          retry_count -= 1
-          retry if retry_count >= 0
-        elsif e.message.start_with?('ASK')
-          node = assign_asking_node(e.message)
-          retry_count -= 1
-          if retry_count >= 0
-            # Don't actually prepend our next command with ASKING unless we're going to retry.
-            node.call('ASKING')
-            retry
+      def try_send(node, method, command, args, retry_count: 3, &block)
+        handle_redirection(node, retry_count: retry_count) do |on_node|
+          if args.empty?
+            # prevent memory allocation for variable-length args
+            on_node.public_send(method, command, &block)
+          else
+            on_node.public_send(method, *args, command, &block)
           end
-        elsif e.message.start_with?('CLUSTERDOWN Hash slot not served')
-          update_cluster_info!
-          retry_count -= 1
-          retry if retry_count >= 0
         end
-        raise
-      rescue ::RedisClient::ConnectionError => e
-        update_cluster_info!
-
-        raise if retry_count <= 0
-
-        retry_count -= 1
-        retry
       end
 
-      def try_delegate(node, method, *args, retry_count: 3, **kwargs, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        node.public_send(method, *args, **kwargs, &block)
+      def try_delegate(node, method, *args, retry_count: 3, **kwargs, &block)
+        handle_redirection(node, retry_count: retry_count) do |on_node|
+          on_node.public_send(method, *args, **kwargs, &block)
+        end
+      end
+
+      def handle_redirection(node, retry_count:) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        yield node
       rescue ::RedisClient::CircuitBreaker::OpenCircuitError
         raise
       rescue ::RedisClient::CommandError => e
