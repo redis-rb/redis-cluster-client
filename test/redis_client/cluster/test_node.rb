@@ -29,7 +29,7 @@ class RedisClient
           **TEST_GENERIC_OPTIONS
         )
         @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
-        @test_node_info_list = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key, @concurrent_worker)
+        @test_node_info_list = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key, @concurrent_worker, config: @test_config)
         if TEST_FIXED_HOSTNAME
           @test_node_info_list.each do |info|
             _, port = ::RedisClient::Cluster::NodeKey.split(info.node_key)
@@ -41,13 +41,18 @@ class RedisClient
         @test_node = ::RedisClient::Cluster::Node.new(
           @test_config.per_node_key,
           @concurrent_worker,
+          config: @test_config,
           node_info_list: @test_node_info_list
         )
+        @test_config_with_scale_read = @test_config.dup
+        @test_config_with_scale_read.instance_exec do
+          @replica = true
+        end
         @test_node_with_scale_read = ::RedisClient::Cluster::Node.new(
-          @test_config.per_node_key,
+          @test_config_with_scale_read.per_node_key,
           @concurrent_worker,
-          node_info_list: @test_node_info_list,
-          with_replica: true
+          config: @test_config_with_scale_read,
+          node_info_list: @test_node_info_list
         )
       end
 
@@ -72,7 +77,7 @@ class RedisClient
           }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
-          got = -> { ::RedisClient::Cluster::Node.load_info(c[:params][:options], @concurrent_worker, **c[:params][:kwargs]) }
+          got = -> { ::RedisClient::Cluster::Node.load_info(c[:params][:options], @concurrent_worker, config: @test_config, **c[:params][:kwargs]) }
           if c[:want].key?(:error)
             assert_raises(c[:want][:error], msg, &got)
           else

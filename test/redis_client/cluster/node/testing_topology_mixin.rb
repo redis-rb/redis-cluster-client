@@ -11,7 +11,7 @@ class RedisClient
             **TEST_GENERIC_OPTIONS
           )
           @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
-          test_node_info_list = ::RedisClient::Cluster::Node.load_info(test_config.per_node_key, @concurrent_worker)
+          test_node_info_list = ::RedisClient::Cluster::Node.load_info(test_config.per_node_key, @concurrent_worker, config: test_config)
           if TEST_FIXED_HOSTNAME
             test_node_info_list.each do |info|
               _, port = ::RedisClient::Cluster::NodeKey.split(info.node_key)
@@ -21,7 +21,7 @@ class RedisClient
           node_addrs = test_node_info_list.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info.node_key) }
           test_config.update_node(node_addrs)
           @options = test_config.per_node_key
-          test_node = ::RedisClient::Cluster::Node.new(@options, @concurrent_worker, node_info_list: test_node_info_list)
+          test_node = ::RedisClient::Cluster::Node.new(@options, @concurrent_worker, config: test_config, node_info_list: test_node_info_list)
           @replications = test_node.instance_variable_get(:@replications)
           test_node&.each(&:close)
           @test_topology = topology_class.new(@replications, @options, nil, @concurrent_worker, **TEST_GENERIC_OPTIONS)

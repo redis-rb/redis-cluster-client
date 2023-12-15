@@ -92,18 +92,18 @@ class RedisClient
       end
 
       class << self
-        def load_info(options, concurrent_worker, slow_command_timeout: -1, **kwargs) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        def load_info(options, concurrent_worker, config:, **kwargs) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
           raise ::RedisClient::Cluster::InitialSetupError, [] if options.nil? || options.empty?
 
           startup_size = options.size > MAX_STARTUP_SAMPLE ? MAX_STARTUP_SAMPLE : options.size
           startup_options = options.to_a.sample(startup_size).to_h
-          startup_nodes = ::RedisClient::Cluster::Node.new(startup_options, concurrent_worker, **kwargs)
+          startup_nodes = ::RedisClient::Cluster::Node.new(startup_options, concurrent_worker, config: config, **kwargs)
           work_group = concurrent_worker.new_group(size: startup_size)
 
           startup_nodes.each_with_index do |raw_client, i|
             work_group.push(i, raw_client) do |client|
               regular_timeout = client.read_timeout
-              client.read_timeout = slow_command_timeout > 0.0 ? slow_command_timeout : regular_timeout
+              client.read_timeout = config.slow_command_timeout > 0.0 ? config.slow_command_timeout : regular_timeout
               reply = client.call('CLUSTER', 'NODES')
               client.read_timeout = regular_timeout
               parse_cluster_node_reply(reply)
@@ -192,9 +192,8 @@ class RedisClient
       def initialize(
         options,
         concurrent_worker,
+        config:,
         node_info_list: [],
-        with_replica: false,
-        replica_affinity: :random,
         pool: nil,
         **kwargs
       )
@@ -202,8 +201,9 @@ class RedisClient
         @concurrent_worker = concurrent_worker
         @slots = build_slot_node_mappings(node_info_list)
         @replications = build_replication_mappings(node_info_list)
-        klass = make_topology_class(with_replica, replica_affinity)
+        klass = make_topology_class(config.use_replica?, config.replica_affinity)
         @topology = klass.new(@replications, options, pool, @concurrent_worker, **kwargs)
+        @config = config
         @mutex = Mutex.new
       end
 
