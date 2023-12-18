@@ -26,7 +26,7 @@ class RedisClient
     attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout,
                 :connect_with_original_config, :startup_nodes
 
-    def initialize( # rubocop:disable Metrics/AbcSize
+    def initialize(
       nodes: DEFAULT_NODES,
       replica: false,
       replica_affinity: :random,
@@ -42,7 +42,6 @@ class RedisClient
       @replica_affinity = replica_affinity.to_s.to_sym
       @fixed_hostname = fixed_hostname.to_s
       @node_configs = build_node_configs(nodes.dup)
-      client_config = client_config.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) }
       @command_builder = client_config.fetch(:command_builder, ::RedisClient::CommandBuilder)
       @client_config = merge_generic_config(client_config, @node_configs)
       # Keep tabs on the original startup nodes we were constructed with
@@ -184,11 +183,9 @@ class RedisClient
     end
 
     def merge_generic_config(client_config, node_configs)
-      return client_config if node_configs.empty?
-
-      cfg = node_configs.first
-      MERGE_CONFIG_KEYS.each { |k| client_config[k] = cfg[k] if cfg.key?(k) }
-      client_config
+      cfg = node_configs.first || {}
+      client_config.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) }
+                   .merge(cfg.slice(*MERGE_CONFIG_KEYS))
     end
 
     def build_startup_nodes(configs)
