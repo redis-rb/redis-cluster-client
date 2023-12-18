@@ -35,14 +35,15 @@ class RedisClient
       connect_with_original_config: false,
       client_implementation: ::RedisClient::Cluster, # for redis gem
       slow_command_timeout: SLOW_COMMAND_TIMEOUT,
+      command_builder: ::RedisClient::CommandBuilder,
       **client_config
     )
 
       @replica = true & replica
       @replica_affinity = replica_affinity.to_s.to_sym
       @fixed_hostname = fixed_hostname.to_s
+      @command_builder = command_builder
       @node_configs = build_node_configs(nodes.dup)
-      @command_builder = client_config.fetch(:command_builder, ::RedisClient::CommandBuilder)
       @client_config = merge_generic_config(client_config, @node_configs)
       # Keep tabs on the original startup nodes we were constructed with
       @startup_nodes = build_startup_nodes(@node_configs)
