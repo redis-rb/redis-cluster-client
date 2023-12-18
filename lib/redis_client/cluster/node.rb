@@ -254,6 +254,14 @@ class RedisClient
         @topology.clients_for_scanning(seed: seed).values.sort_by { |c| "#{c.config.host}-#{c.config.port}" }
       end
 
+      def clients
+        @topology.clients.values
+      end
+
+      def primary_clients
+        @topology.primary_clients.values
+      end
+
       def replica_clients
         @topology.replica_clients.values
       end
