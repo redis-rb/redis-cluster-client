@@ -377,6 +377,94 @@ class RedisClient
 
         [results, errors]
       end
+
+      def refetch_node_info_list(startup_clients) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        startup_size = startup_clients.size
+        work_group = @concurrent_worker.new_group(size: startup_size)
+
+        startup_clients.each_with_index do |raw_client, i|
+          work_group.push(i, raw_client) do |client|
+            regular_timeout = client.read_timeout
+            client.read_timeout = @config.slow_command_timeout > 0.0 ? @config.slow_command_timeout : regular_timeout
+            reply = client.call('CLUSTER', 'NODES')
+            client.read_timeout = regular_timeout
+            parse_cluster_node_reply(reply)
+          rescue StandardError => e
+            e
+          ensure
+            client&.close
+          end
+        end
+
+        node_info_list = errors = nil
+
+        work_group.each do |i, v|
+          case v
+          when StandardError
+            errors ||= Array.new(startup_size)
+            errors[i] = v
+          else
+            node_info_list ||= Array.new(startup_size)
+            node_info_list[i] = v
+          end
+        end
+
+        work_group.close
+
+        raise ::RedisClient::Cluster::InitialSetupError, errors if node_info_list.nil?
+
+        grouped = node_info_list.compact.group_by do |info_list|
+          info_list.sort_by!(&:id)
+          info_list.each_with_object(String.new(capacity: 128 * info_list.size)) do |e, a|
+            a << e.id << e.node_key << e.role << e.primary_id << e.config_epoch
+          end
+        end
+
+        grouped.max_by { |_, v| v.size }[1].first
+      end
+
+      def parse_cluster_node_reply(reply) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        reply.each_line("\n", chomp: true).filter_map do |line|
+          fields = line.split
+          flags = fields[2].split(',')
+          next unless fields[7] == 'connected' && (flags & DEAD_FLAGS).empty?
+
+          slots = if fields[8].nil?
+                    EMPTY_ARRAY
+                  else
+                    fields[8..].reject { |str| str.start_with?('[') }
+                               .map { |str| str.split('-').map { |s| Integer(s) } }
+                               .map { |a| a.size == 1 ? a << a.first : a }
+                               .map(&:sort)
+                  end
+
+          ::RedisClient::Cluster::Node::Info.new(
+            id: fields[0],
+            node_key: parse_node_key(fields[1]),
+            role: (flags & ROLE_FLAGS).first,
+            primary_id: fields[3],
+            ping_sent: fields[4],
+            pong_recv: fields[5],
+            config_epoch: fields[6],
+            link_state: fields[7],
+            slots: slots
+          )
+        end
+      end
+
+      # As redirection node_key is dependent on `cluster-preferred-endpoint-type` config,
+      # node_key should use hostname if present in CLUSTER NODES output.
+      #
+      # See https://redis.io/commands/cluster-nodes/ for details on the output format.
+      # node_address matches fhe format: <ip:port@cport[,hostname[,auxiliary_field=value]*]>
+      def parse_node_key(node_address)
+        ip_chunk, hostname, _auxiliaries = node_address.split(',')
+        ip_port_string = ip_chunk.split('@').first
+        return ip_port_string if hostname.nil? || hostname.empty?
+
+        port = ip_port_string.split(':')[1]
+        "#{hostname}:#{port}"
+      end
     end
   end
 end
