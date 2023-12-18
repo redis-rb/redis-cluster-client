@@ -47,38 +47,6 @@ class RedisClient
         end
       end
 
-      def test_load_info
-        test_config = ::RedisClient::ClusterConfig.new(
-          nodes: TEST_NODE_URIS,
-          fixed_hostname: TEST_FIXED_HOSTNAME,
-          **TEST_GENERIC_OPTIONS
-        )
-        concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
-
-        [
-          {
-            params: { options: TEST_NODE_OPTIONS, kwargs: TEST_GENERIC_OPTIONS },
-            want: { size: TEST_NUMBER_OF_NODES }
-          },
-          {
-            params: { options: { '127.0.0.1:11211' => { host: '127.0.0.1', port: 11_211 } }, kwargs: TEST_GENERIC_OPTIONS },
-            want: { error: ::RedisClient::Cluster::InitialSetupError }
-          },
-          {
-            params: { options: {}, kwargs: TEST_GENERIC_OPTIONS },
-            want: { error: ::RedisClient::Cluster::InitialSetupError }
-          }
-        ].each_with_index do |c, idx|
-          msg = "Case: #{idx}"
-          got = -> { ::RedisClient::Cluster::Node.load_info(c[:params][:options], concurrent_worker, config: test_config, **c[:params][:kwargs]) }
-          if c[:want].key?(:error)
-            assert_raises(c[:want][:error], msg, &got)
-          else
-            assert_equal(c[:want][:size], got.call.size, msg)
-          end
-        end
-      end
-
       def test_parse_cluster_node_reply_continuous_slots
         info = <<~INFO
           07c37dfeb235213a872192d90877d0cd55635b91 127.0.0.1:30004@31004 slave e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 0 1426238317239 4 connected
@@ -109,7 +77,7 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 5460]] }
         ]
 
-        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        got = @test_node.send(:parse_cluster_node_reply, info)
         assert_equal(want, got.map(&:to_h))
       end
 
@@ -143,7 +111,7 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 3000], [3002, 5460], [15_001, 15_001]] }
         ]
 
-        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        got = @test_node.send(:parse_cluster_node_reply, info)
         assert_equal(want, got.map(&:to_h))
       end
 
@@ -177,7 +145,7 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 3000], [3002, 5460], [15_001, 15_001]] }
         ]
 
-        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        got = @test_node.send(:parse_cluster_node_reply, info)
         assert_equal(want, got.map(&:to_h))
       end
 
@@ -211,7 +179,7 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 5460]] }
         ]
 
-        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        got = @test_node.send(:parse_cluster_node_reply, info)
         assert_equal(want, got.map(&:to_h))
       end
 
@@ -245,7 +213,7 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 5460]] }
         ]
 
-        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        got = @test_node.send(:parse_cluster_node_reply, info)
         assert_equal(want, got.map(&:to_h))
       end
 
@@ -279,7 +247,7 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 5460]] }
         ]
 
-        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        got = @test_node.send(:parse_cluster_node_reply, info)
         assert_equal(want, got.map(&:to_h))
       end
 
@@ -293,7 +261,7 @@ class RedisClient
           e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 127.0.0.1:30001@31001 myself,master - 0 0 1 disconnected 0-5460
         INFO
 
-        assert_empty(::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info))
+        assert_empty(@test_node.send(:parse_cluster_node_reply, info))
       end
 
       def test_parse_cluster_node_reply_failure_flags
@@ -306,7 +274,7 @@ class RedisClient
           e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 127.0.0.1:30001@31001 myself,fail,master - 0 0 1 connected 0-5460
         INFO
 
-        assert_empty(::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info))
+        assert_empty(@test_node.send(:parse_cluster_node_reply, info))
       end
 
       def test_inspect
