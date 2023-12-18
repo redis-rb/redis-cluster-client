@@ -23,7 +23,8 @@ class RedisClient
 
     InvalidClientConfigError = Class.new(::RedisClient::Error)
 
-    attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout, :connect_with_original_config
+    attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout,
+                :connect_with_original_config, :startup_nodes
 
     def initialize( # rubocop:disable Metrics/AbcSize
       nodes: DEFAULT_NODES,
@@ -44,6 +45,8 @@ class RedisClient
       client_config = client_config.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) }
       @command_builder = client_config.fetch(:command_builder, ::RedisClient::CommandBuilder)
       @client_config = merge_generic_config(client_config, @node_configs)
+      # Keep tabs on the original startup nodes we were constructed with
+      @startup_nodes = build_startup_nodes(@node_configs)
       @concurrency = merge_concurrency_option(concurrency)
       @connect_with_original_config = connect_with_original_config
       @client_implementation = client_implementation
@@ -62,7 +65,12 @@ class RedisClient
         client_implementation: @client_implementation,
         slow_command_timeout: @slow_command_timeout,
         **@client_config
-      )
+      ).tap do |clone|
+        # This is needed because we #dup the config in router.rb; this will go away shortly once we move
+        # responsibility for tracking node updates to RedisClient::Cluster::Node and out of ClusterConfig (at that
+        # point, ClusterConfig will _only_ know about the startup nodes).
+        clone.instance_variable_set(:@startup_nodes, @startup_nodes)
+      end
     end
 
     def inspect
@@ -181,6 +189,20 @@ class RedisClient
       cfg = node_configs.first
       MERGE_CONFIG_KEYS.each { |k| client_config[k] = cfg[k] if cfg.key?(k) }
       client_config
+    end
+
+    def build_startup_nodes(configs)
+      configs.to_h do |config|
+        node_key = ::RedisClient::Cluster::NodeKey.build_from_host_port(config[:host], config[:port])
+        config = augment_client_config(config)
+        [node_key, config]
+      end
+    end
+
+    def augment_client_config(config)
+      config = @client_config.merge(config)
+      config = config.merge(host: @fixed_hostname) unless @fixed_hostname.empty?
+      config
     end
   end
 end

@@ -194,5 +194,25 @@ class RedisClient
         assert_equal(c[:want], got, msg)
       end
     end
+
+    def test_startup_nodes
+      config = ::RedisClient::ClusterConfig.new(
+        nodes: ['redis://1.2.3.4:1234', 'rediss://5.6.7.8:5678'],
+        custom: { foo: 'bar' }
+      )
+      assert_equal({
+                     '1.2.3.4:1234' => {
+                       host: '1.2.3.4',
+                       port: 1234,
+                       custom: { foo: 'bar' }
+                     },
+                     '5.6.7.8:5678' => {
+                       host: '5.6.7.8',
+                       port: 5678,
+                       ssl: true,
+                       custom: { foo: 'bar' }
+                     }
+                   }, config.startup_nodes)
+    end
   end
 end
