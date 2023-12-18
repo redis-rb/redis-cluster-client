@@ -652,6 +652,29 @@ class RedisClient
         new_client_ids = test_node.to_a.map(&:object_id).to_set
         assert_equal original_client_ids, new_client_ids
       end
+
+      def test_reload_with_original_config
+        bootstrap_node = TEST_NODE_URIS.first
+        capture_buffer = []
+        test_node = make_node(
+          nodes: [bootstrap_node],
+          replica: true,
+          connect_with_original_config: true,
+          capture_buffer: capture_buffer
+        )
+
+        test_node.reload!
+        # After reloading the first time, our Node object knows about all hosts, despite only starting with one:
+        assert_equal TEST_NUMBER_OF_NODES, test_node.to_a.size
+
+        # When we reload, it will only call CLUSTER NODES against a single node, the bootstrap node.
+        capture_buffer.clear
+        test_node.reload!
+
+        cluster_node_cmds = capture_buffer.select { |c| c.command == %w[CLUSTER NODES] }
+        assert_equal 1, cluster_node_cmds.size
+        assert_equal bootstrap_node, cluster_node_cmds.first.server_url
+      end
     end
     # rubocop:enable Metrics/ClassLength
   end

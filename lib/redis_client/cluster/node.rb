@@ -478,12 +478,29 @@ class RedisClient
         "#{hostname}:#{port}"
       end
 
-      def with_startup_clients(count)
-        # (re-)connect using nodes we already know about.
-        # If this is the first time we're connecting to the cluster, we need to seed the topology with the
-        # startup clients though.
-        @topology.process_topology_update!({}, @config.startup_nodes) if @topology.clients.empty?
-        yield @topology.clients.values.sample(count)
+      def with_startup_clients(count) # rubocop:disable Metrics/AbcSize
+        if @config.connect_with_original_config
+          # If connect_with_original_config is set, that means we need to build actual client objects
+          # and close them, so that we e.g. re-resolve a DNS entry with the cluster nodes in it.
+          begin
+            # Memoize the startup clients, so we maintain RedisClient's internal circuit breaker configuration
+            # if it's set.
+            @startup_clients ||= @config.startup_nodes.values.sample(count).map do |node_config|
+              ::RedisClient::Cluster::Node::Config.new(**node_config).new_client
+            end
+            yield @startup_clients
+          ensure
+            # Close the startup clients when we're done, so we don't maintain pointless open connections to
+            # the cluster though
+            @startup_clients&.each(&:close)
+          end
+        else
+          # (re-)connect using nodes we already know about.
+          # If this is the first time we're connecting to the cluster, we need to seed the topology with the
+          # startup clients though.
+          @topology.process_topology_update!({}, @config.startup_nodes) if @topology.clients.empty?
+          yield @topology.clients.values.sample(count)
+        end
       end
     end
   end
