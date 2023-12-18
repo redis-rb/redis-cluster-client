@@ -291,6 +291,18 @@ class RedisClient
         end
       end
 
+      def reload!
+        with_startup_clients(MAX_STARTUP_SAMPLE) do |startup_clients|
+          @node_info = refetch_node_info_list(startup_clients)
+          @node_configs = @node_info.to_h do |node_info|
+            [node_info.node_key, @config.client_config_for_node(node_info.node_key)]
+          end
+          @slots = build_slot_node_mappings(@node_info)
+          @replications = build_replication_mappings(@node_info)
+          @topology.process_topology_update!(@replications, @node_configs)
+        end
+      end
+
       private
 
       def make_topology_class(with_replica, replica_affinity)
@@ -464,6 +476,14 @@ class RedisClient
 
         port = ip_port_string.split(':')[1]
         "#{hostname}:#{port}"
+      end
+
+      def with_startup_clients(count)
+        # (re-)connect using nodes we already know about.
+        # If this is the first time we're connecting to the cluster, we need to seed the topology with the
+        # startup clients though.
+        @topology.process_topology_update!({}, @config.startup_nodes) if @topology.clients.empty?
+        yield @topology.clients.values.sample(count)
       end
     end
   end

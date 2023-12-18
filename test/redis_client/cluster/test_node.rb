@@ -56,9 +56,24 @@ class RedisClient
         )
       end
 
-      def teardown
+      def teardown # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         @test_node&.each(&:close)
         @test_node_with_scale_read&.each(&:close)
+        @extra_nodes&.each { |n| n&.each(&:close) }
+      end
+
+      def make_node(opts = {}, capture_buffer: [])
+        config = ::RedisClient::ClusterConfig.new(**{
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          middlewares: [CommandCaptureMiddleware],
+          custom: { captured_commands: capture_buffer },
+          **TEST_GENERIC_OPTIONS
+        }.merge(opts))
+        ::RedisClient::Cluster::Node.new({}, @concurrent_worker, config: config).tap do |node|
+          @extra_nodes ||= []
+          @extra_nodes << node
+        end
       end
 
       def test_load_info
@@ -615,6 +630,27 @@ class RedisClient
             assert_equal(c[:results], results, msg)
           end
         end
+      end
+
+      def test_reload
+        capture_buffer = []
+        test_node = make_node(replica: true, capture_buffer: capture_buffer)
+
+        capture_buffer.clear
+        test_node.reload!
+
+        # It should have reloaded by calling CLUSTER NODES on three of the startup nodes
+        cluster_node_cmds = capture_buffer.select { |c| c.command == %w[CLUSTER NODES] }
+        assert_equal RedisClient::Cluster::Node::MAX_STARTUP_SAMPLE, cluster_node_cmds.size
+
+        # It should have connected to all of the clients.
+        assert_equal TEST_NUMBER_OF_NODES, test_node.to_a.size
+
+        # If we reload again, it should NOT change the redis client instances we have.
+        original_client_ids = test_node.to_a.map(&:object_id).to_set
+        test_node.reload!
+        new_client_ids = test_node.to_a.map(&:object_id).to_set
+        assert_equal original_client_ids, new_client_ids
       end
     end
     # rubocop:enable Metrics/ClassLength
