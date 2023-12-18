@@ -43,38 +43,18 @@ class RedisClient
       @replica_affinity = replica_affinity.to_s.to_sym
       @fixed_hostname = fixed_hostname.to_s
       @command_builder = command_builder
-      @node_configs = build_node_configs(nodes.dup)
-      @client_config = merge_generic_config(client_config, @node_configs)
+      node_configs = build_node_configs(nodes.dup)
+      @client_config = merge_generic_config(client_config, node_configs)
       # Keep tabs on the original startup nodes we were constructed with
-      @startup_nodes = build_startup_nodes(@node_configs)
+      @startup_nodes = build_startup_nodes(node_configs)
       @concurrency = merge_concurrency_option(concurrency)
       @connect_with_original_config = connect_with_original_config
       @client_implementation = client_implementation
       @slow_command_timeout = slow_command_timeout
-      @mutex = Mutex.new
-    end
-
-    def dup
-      self.class.new(
-        nodes: @node_configs,
-        replica: @replica,
-        replica_affinity: @replica_affinity,
-        fixed_hostname: @fixed_hostname,
-        concurrency: @concurrency,
-        connect_with_original_config: @connect_with_original_config,
-        client_implementation: @client_implementation,
-        slow_command_timeout: @slow_command_timeout,
-        **@client_config
-      ).tap do |clone|
-        # This is needed because we #dup the config in router.rb; this will go away shortly once we move
-        # responsibility for tracking node updates to RedisClient::Cluster::Node and out of ClusterConfig (at that
-        # point, ClusterConfig will _only_ know about the startup nodes).
-        clone.instance_variable_set(:@startup_nodes, @startup_nodes)
-      end
     end
 
     def inspect
-      "#<#{self.class.name} #{per_node_key.values}>"
+      "#<#{self.class.name} #{startup_nodes.values}>"
     end
 
     def read_timeout
@@ -94,29 +74,8 @@ class RedisClient
       @client_implementation.new(self, concurrency: @concurrency, **kwargs)
     end
 
-    def per_node_key
-      @node_configs.to_h do |config|
-        node_key = ::RedisClient::Cluster::NodeKey.build_from_host_port(config[:host], config[:port])
-        config = @client_config.merge(config)
-        config = config.merge(host: @fixed_hostname) unless @fixed_hostname.empty?
-        [node_key, config]
-      end
-    end
-
     def use_replica?
       @replica
-    end
-
-    def update_node(addrs)
-      return if @mutex.locked?
-
-      @mutex.synchronize { @node_configs = build_node_configs(addrs) }
-    end
-
-    def add_node(host, port)
-      return if @mutex.locked?
-
-      @mutex.synchronize { @node_configs << { host: host, port: port } }
     end
 
     def client_config_for_node(node_key)
