@@ -119,6 +119,12 @@ class RedisClient
       @mutex.synchronize { @node_configs << { host: host, port: port } }
     end
 
+    def client_config_for_node(node_key)
+      config = ::RedisClient::Cluster::NodeKey.hashify(node_key)
+      config[:port] = ensure_integer(config[:port])
+      augment_client_config(config)
+    end
+
     private
 
     def merge_concurrency_option(option)

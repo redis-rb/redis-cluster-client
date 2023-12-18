@@ -214,5 +214,19 @@ class RedisClient
                      }
                    }, config.startup_nodes)
     end
+
+    def test_client_config_for_node
+      config = ::RedisClient::ClusterConfig.new(
+        nodes: ['redis://username:password@1.2.3.4:1234', 'rediss://5.6.7.8:5678'],
+        custom: { foo: 'bar' }
+      )
+      assert_equal({
+                     host: '9.9.9.9',
+                     port: 9999,
+                     username: 'username',
+                     password: 'password',
+                     custom: { foo: 'bar' }
+                   }, config.client_config_for_node('9.9.9.9:9999'))
+    end
   end
 end
