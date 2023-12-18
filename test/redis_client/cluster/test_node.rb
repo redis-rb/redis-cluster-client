@@ -62,7 +62,7 @@ class RedisClient
         @extra_nodes&.each { |n| n&.each(&:close) }
       end
 
-      def make_node(opts = {}, capture_buffer: [])
+      def make_node(capture_buffer: [], pool: nil, **kwargs)
         config = ::RedisClient::ClusterConfig.new(**{
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
@@ -70,7 +70,7 @@ class RedisClient
           custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS
         }.merge(opts))
-        ::RedisClient::Cluster::Node.new({}, @concurrent_worker, config: config).tap do |node|
+        ::RedisClient::Cluster::Node.new({}, @concurrent_worker, pool: pool, config: config).tap do |node|
           @extra_nodes ||= []
           @extra_nodes << node
         end
@@ -674,6 +674,30 @@ class RedisClient
         cluster_node_cmds = capture_buffer.select { |c| c.command == %w[CLUSTER NODES] }
         assert_equal 1, cluster_node_cmds.size
         assert_equal bootstrap_node, cluster_node_cmds.first.server_url
+      end
+
+      def test_reload_concurrently
+        capture_buffer = []
+        test_node = make_node(replica: true, pool: { size: 2 }, capture_buffer: capture_buffer)
+
+        # Simulate refetch_node_info_list taking a long time
+        test_node.singleton_class.prepend(Module.new do
+          def refetch_node_info_list(...)
+            r = super
+            sleep 2
+            r
+          end
+        end)
+
+        capture_buffer.clear
+        t1 = Thread.new { test_node.reload! }
+        t2 = Thread.new { test_node.reload! }
+        [t1, t2].each(&:join)
+
+        # We should only have reloaded once, which is to say, we only called CLUSTER NODES command MAX_STARTUP_SAMPLE
+        # times
+        cluster_node_cmds = capture_buffer.select { |c| c.command == %w[CLUSTER NODES] }
+        assert_equal RedisClient::Cluster::Node::MAX_STARTUP_SAMPLE, cluster_node_cmds.size
       end
     end
     # rubocop:enable Metrics/ClassLength

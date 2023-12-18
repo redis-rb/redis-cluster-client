@@ -292,14 +292,16 @@ class RedisClient
       end
 
       def reload!
-        with_startup_clients(MAX_STARTUP_SAMPLE) do |startup_clients|
-          @node_info = refetch_node_info_list(startup_clients)
-          @node_configs = @node_info.to_h do |node_info|
-            [node_info.node_key, @config.client_config_for_node(node_info.node_key)]
+        with_reload_lock do
+          with_startup_clients(MAX_STARTUP_SAMPLE) do |startup_clients|
+            @node_info = refetch_node_info_list(startup_clients)
+            @node_configs = @node_info.to_h do |node_info|
+              [node_info.node_key, @config.client_config_for_node(node_info.node_key)]
+            end
+            @slots = build_slot_node_mappings(@node_info)
+            @replications = build_replication_mappings(@node_info)
+            @topology.process_topology_update!(@replications, @node_configs)
           end
-          @slots = build_slot_node_mappings(@node_info)
-          @replications = build_replication_mappings(@node_info)
-          @topology.process_topology_update!(@replications, @node_configs)
         end
       end
 
@@ -500,6 +502,24 @@ class RedisClient
           # startup clients though.
           @topology.process_topology_update!({}, @config.startup_nodes) if @topology.clients.empty?
           yield @topology.clients.values.sample(count)
+        end
+      end
+
+      def with_reload_lock
+        # What should happen with concurrent calls #reload? This is a realistic possibility if the cluster goes into
+        # a CLUSTERDOWN state, and we're using a pooled backend. Every thread will independently discover this, and
+        # call reload!.
+        # For now, if a reload is in progress, wait for that to complete, and consider that the same as us having
+        # performed the reload.
+        # Probably in the future we should add a circuit breaker to #reload itself, and stop trying if the cluster is
+        # obviously not working.
+        wait_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        @mutex.synchronize do
+          return if @last_reloaded_at && @last_reloaded_at > wait_start
+
+          r = yield
+          @last_reloaded_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          r
         end
       end
     end
