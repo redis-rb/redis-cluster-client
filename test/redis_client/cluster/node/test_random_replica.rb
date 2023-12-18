@@ -7,49 +7,41 @@ class RedisClient
   class Cluster
     class Node
       class TestRandomReplica < TestingWrapper
+        TESTING_TOPOLOGY_OPTIONS = { replica: true, replica_affinity: :random }.freeze
         include TestingTopologyMixin
 
         def test_clients_with_redis_client
-          got = @test_topology.clients
-          got.each_value { |client| assert_instance_of(::RedisClient, client) }
-          assert_equal(%w[master slave], got.map { |_, v| v.call('ROLE').first }.uniq.sort)
+          got = @test_node.clients
+          got.each { |client| assert_instance_of(::RedisClient, client) }
+          assert_equal(%w[master slave], got.map { |v| v.call('ROLE').first }.uniq.sort)
         end
 
         def test_clients_with_pooled_redis_client
-          test_topology = ::RedisClient::Cluster::Node::RandomReplica.new(
-            @replications,
-            @options,
-            { timeout: 3, size: 2 },
-            @concurrent_worker,
-            **TEST_GENERIC_OPTIONS
-          )
-
-          got = test_topology.clients
-          got.each_value { |client| assert_instance_of(::RedisClient::Pooled, client) }
-          assert_equal(%w[master slave], got.map { |_, v| v.call('ROLE').first }.uniq.sort)
-        ensure
-          test_topology&.clients&.each_value(&:close)
+          test_node = make_node(pool: { timeout: 3, size: 2 })
+          got = test_node.clients
+          got.each { |client| assert_instance_of(::RedisClient::Pooled, client) }
+          assert_equal(%w[master slave], got.map { |v| v.call('ROLE').first }.uniq.sort)
         end
 
         def test_primary_clients
-          got = @test_topology.primary_clients
-          got.each_value do |client|
+          got = @test_node.primary_clients
+          got.each do |client|
             assert_instance_of(::RedisClient, client)
             assert_equal('master', client.call('ROLE').first)
           end
         end
 
         def test_replica_clients
-          got = @test_topology.replica_clients
-          got.each_value do |client|
+          got = @test_node.replica_clients
+          got.each do |client|
             assert_instance_of(::RedisClient, client)
             assert_equal('slave', client.call('ROLE').first)
           end
         end
 
         def test_clients_for_scanning
-          got = @test_topology.clients_for_scanning
-          got.each_value { |client| assert_instance_of(::RedisClient, client) }
+          got = @test_node.clients_for_scanning
+          got.each { |client| assert_instance_of(::RedisClient, client) }
           assert_equal(TEST_SHARD_SIZE, got.size)
         end
 
@@ -72,12 +64,6 @@ class RedisClient
         def test_any_replica_node_key
           got = @test_topology.any_replica_node_key
           assert_includes(@replications.values.flatten, got)
-        end
-
-        private
-
-        def topology_class
-          ::RedisClient::Cluster::Node::RandomReplica
         end
       end
     end
