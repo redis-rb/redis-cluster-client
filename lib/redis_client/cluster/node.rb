@@ -92,17 +92,15 @@ class RedisClient
       end
 
       def initialize(
-        _options,
         concurrent_worker,
         config:,
-        node_info_list: [],
         pool: nil,
         **kwargs
       )
 
         @concurrent_worker = concurrent_worker
-        @slots = build_slot_node_mappings(node_info_list)
-        @replications = build_replication_mappings(node_info_list)
+        @slots = build_slot_node_mappings([])
+        @replications = build_replication_mappings([])
         klass = make_topology_class(config.use_replica?, config.replica_affinity)
         @topology = klass.new(pool, @concurrent_worker, **kwargs)
         @config = config

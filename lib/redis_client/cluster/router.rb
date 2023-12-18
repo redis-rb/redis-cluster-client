@@ -22,7 +22,7 @@ class RedisClient
         @concurrent_worker = concurrent_worker
         @pool = pool
         @client_kwargs = kwargs
-        @node = ::RedisClient::Cluster::Node.new({}, concurrent_worker, config: config, pool: pool, **kwargs)
+        @node = ::RedisClient::Cluster::Node.new(concurrent_worker, config: config, pool: pool, **kwargs)
         update_cluster_info!
         @command = ::RedisClient::Cluster::Command.load(@node.replica_clients.shuffle, slow_command_timeout: config.slow_command_timeout)
         @command_builder = @config.command_builder

@@ -12,7 +12,7 @@ class RedisClient
             **self.class::TESTING_TOPOLOGY_OPTIONS
           }.merge(kwargs))
           concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
-          ::RedisClient::Cluster::Node.new({}, concurrent_worker, pool: pool, config: config).tap do |node|
+          ::RedisClient::Cluster::Node.new(concurrent_worker, pool: pool, config: config).tap do |node|
             node.reload!
             @test_nodes ||= []
             @test_nodes << node
