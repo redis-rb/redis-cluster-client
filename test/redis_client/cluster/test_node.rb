@@ -23,43 +23,13 @@ class RedisClient
     # rubocop:disable Metrics/ClassLength
     class TestNode < TestingWrapper
       def setup
-        @test_config = ::RedisClient::ClusterConfig.new(
-          nodes: TEST_NODE_URIS,
-          fixed_hostname: TEST_FIXED_HOSTNAME,
-          **TEST_GENERIC_OPTIONS
-        )
-        @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
-        @test_node_info_list = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key, @concurrent_worker, config: @test_config)
-        if TEST_FIXED_HOSTNAME
-          @test_node_info_list.each do |info|
-            _, port = ::RedisClient::Cluster::NodeKey.split(info.node_key)
-            info.node_key = ::RedisClient::Cluster::NodeKey.build_from_host_port(TEST_FIXED_HOSTNAME, port)
-          end
-        end
-        node_addrs = @test_node_info_list.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info.node_key) }
-        @test_config.update_node(node_addrs)
-        @test_node = ::RedisClient::Cluster::Node.new(
-          @test_config.per_node_key,
-          @concurrent_worker,
-          config: @test_config,
-          node_info_list: @test_node_info_list
-        )
-        @test_config_with_scale_read = @test_config.dup
-        @test_config_with_scale_read.instance_exec do
-          @replica = true
-        end
-        @test_node_with_scale_read = ::RedisClient::Cluster::Node.new(
-          @test_config_with_scale_read.per_node_key,
-          @concurrent_worker,
-          config: @test_config_with_scale_read,
-          node_info_list: @test_node_info_list
-        )
+        @test_node = make_node.tap(&:reload!)
+        @test_node_with_scale_read = make_node(replica: true).tap(&:reload!)
+        @test_node_info_list = @test_node.instance_variable_get(:@node_info)
       end
 
-      def teardown # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        @test_node&.each(&:close)
-        @test_node_with_scale_read&.each(&:close)
-        @extra_nodes&.each { |n| n&.each(&:close) }
+      def teardown
+        @test_nodes&.each { |n| n&.each(&:close) }
       end
 
       def make_node(capture_buffer: [], pool: nil, **kwargs)
@@ -69,14 +39,22 @@ class RedisClient
           middlewares: [CommandCaptureMiddleware],
           custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS
-        }.merge(opts))
-        ::RedisClient::Cluster::Node.new({}, @concurrent_worker, pool: pool, config: config).tap do |node|
-          @extra_nodes ||= []
-          @extra_nodes << node
+        }.merge(kwargs))
+        concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
+        ::RedisClient::Cluster::Node.new({}, concurrent_worker, pool: pool, config: config).tap do |node|
+          @test_nodes ||= []
+          @test_nodes << node
         end
       end
 
       def test_load_info
+        test_config = ::RedisClient::ClusterConfig.new(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        )
+        concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
+
         [
           {
             params: { options: TEST_NODE_OPTIONS, kwargs: TEST_GENERIC_OPTIONS },
@@ -92,7 +70,7 @@ class RedisClient
           }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
-          got = -> { ::RedisClient::Cluster::Node.load_info(c[:params][:options], @concurrent_worker, config: @test_config, **c[:params][:kwargs]) }
+          got = -> { ::RedisClient::Cluster::Node.load_info(c[:params][:options], concurrent_worker, config: test_config, **c[:params][:kwargs]) }
           if c[:want].key?(:error)
             assert_raises(c[:want][:error], msg, &got)
           else
@@ -402,12 +380,25 @@ class RedisClient
         assert_equal(want, got, 'Case: scale read')
       end
 
-      def test_clients_for_scanning # rubocop:disable Metrics/CyclomaticComplexity
-        want = @test_node_info_list.select(&:primary?).map(&:node_key).sort
-        got = @test_node.clients_for_scanning.map { |client| "#{client.config.host}:#{client.config.port}" }
+      def test_clients_for_scanning # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        test_config = @test_node.instance_variable_get(:@config)
+        want = @test_node_info_list.select(&:primary?)
+                                   .map(&:node_key)
+                                   # need to call client_config_for_node so that if we're using fixed_hostname in this test,
+                                   # we get the actual hostname we're connecting to, not the one returned by the cluster API
+                                   .map { |key| test_config.client_config_for_node(key) }
+                                   .map { |cfg| "#{cfg[:host]}:#{cfg[:port]}" }
+                                   .sort
+        got = @test_node.clients_for_scanning.map { |client| "#{client.config.host}:#{client.config.port}" }.sort
         assert_equal(want, got, 'Case: primary only')
 
-        want = @test_node_info_list.select(&:replica?).map(&:node_key)
+        want = @test_node_info_list.select(&:replica?)
+                                   .map(&:node_key)
+                                   # As per above, we need to get the real hostname, not that reported by Redis,
+                                   # if fixed_hostname is set.
+                                   .map { |key| test_config.client_config_for_node(key) }
+                                   .map { |cfg| "#{cfg[:host]}:#{cfg[:port]}" }
+                                   .sort
         got = @test_node_with_scale_read.clients_for_scanning.map { |client| "#{client.config.host}:#{client.config.port}" }
         got.each { |e| assert_includes(want, e, 'Case: scale read') }
       end
