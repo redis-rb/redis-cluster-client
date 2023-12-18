@@ -1,28 +1,13 @@
 # frozen_string_literal: true
 
-require 'redis_client/cluster/node/replica_mixin'
+require 'redis_client/cluster/node/base_topology'
 
 class RedisClient
   class Cluster
     class Node
-      class LatencyReplica
-        include ::RedisClient::Cluster::Node::ReplicaMixin
-
-        attr_reader :replica_clients
-
+      class LatencyReplica < BaseTopology
         DUMMY_LATENCY_MSEC = 100 * 1000 * 1000
         MEASURE_ATTEMPT_COUNT = 10
-
-        def initialize(replications, options, pool, concurrent_worker, **kwargs)
-          super
-
-          all_replica_clients = @clients.select { |k, _| @replica_node_keys.include?(k) }
-          latencies = measure_latencies(all_replica_clients, concurrent_worker)
-          @replications.each_value { |keys| keys.sort_by! { |k| latencies.fetch(k) } }
-          @replica_clients = select_replica_clients(@replications, @clients)
-          @clients_for_scanning = select_clients_for_scanning(@replications, @clients)
-          @existed_replicas = @replications.values.reject(&:empty?)
-        end
 
         def clients_for_scanning(seed: nil) # rubocop:disable Lint/UnusedMethodArgument
           @clients_for_scanning
@@ -35,6 +20,17 @@ class RedisClient
         def any_replica_node_key(seed: nil)
           random = seed.nil? ? Random : Random.new(seed)
           @existed_replicas.sample(random: random)&.first || any_primary_node_key(seed: seed)
+        end
+
+        def process_topology_update!(replications, options)
+          super
+
+          all_replica_clients = @clients.select { |k, _| @replica_node_keys.include?(k) }
+          latencies = measure_latencies(all_replica_clients, @concurrent_worker)
+          @replications.each_value { |keys| keys.sort_by! { |k| latencies.fetch(k) } }
+          @replica_clients = select_replica_clients(@replications, @clients)
+          @clients_for_scanning = select_clients_for_scanning(@replications, @clients)
+          @existed_replicas = @replications.values.reject(&:empty?)
         end
 
         private

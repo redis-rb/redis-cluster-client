@@ -1,16 +1,11 @@
 # frozen_string_literal: true
 
+require 'redis_client/cluster/node/base_topology'
+
 class RedisClient
   class Cluster
     class Node
-      class PrimaryOnly
-        attr_reader :clients
-
-        def initialize(replications, options, pool, _concurrent_worker, **kwargs)
-          @primary_node_keys = replications.keys.sort
-          @clients = build_clients(@primary_node_keys, options, pool, **kwargs)
-        end
-
+      class PrimaryOnly < BaseTopology
         alias primary_clients clients
         alias replica_clients clients
 
@@ -29,17 +24,10 @@ class RedisClient
 
         alias any_replica_node_key any_primary_node_key
 
-        private
-
-        def build_clients(primary_node_keys, options, pool, **kwargs)
-          options.filter_map do |node_key, option|
-            next if !primary_node_keys.empty? && !primary_node_keys.include?(node_key)
-
-            option = option.merge(kwargs.reject { |k, _| ::RedisClient::Cluster::Node::IGNORE_GENERIC_CONFIG_KEYS.include?(k) })
-            config = ::RedisClient::Cluster::Node::Config.new(**option)
-            client = pool.nil? ? config.new_client : config.new_pool(**pool)
-            [node_key, client]
-          end.to_h
+        def process_topology_update!(replications, options)
+          # Remove non-primary nodes from options (provided that we actually have any primaries at all)
+          options = options.select { |node_key, _| replications.key?(node_key) } if replications.keys.any?
+          super(replications, options)
         end
       end
     end

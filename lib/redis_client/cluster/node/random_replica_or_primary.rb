@@ -1,13 +1,11 @@
 # frozen_string_literal: true
 
-require 'redis_client/cluster/node/replica_mixin'
+require 'redis_client/cluster/node/base_topology'
 
 class RedisClient
   class Cluster
     class Node
-      class RandomReplicaOrPrimary
-        include ::RedisClient::Cluster::Node::ReplicaMixin
-
+      class RandomReplicaOrPrimary < BaseTopology
         def replica_clients
           keys = @replications.values.filter_map(&:sample)
           @clients.select { |k, _| keys.include?(k) }

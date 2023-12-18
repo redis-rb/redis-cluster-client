@@ -22,7 +22,6 @@ class RedisClient
       SLOT_SIZE = 16_384
       MIN_SLOT = 0
       MAX_SLOT = SLOT_SIZE - 1
-      IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
       DEAD_FLAGS = %w[fail? fail handshake noaddr noflags].freeze
       ROLE_FLAGS = %w[master slave].freeze
       EMPTY_ARRAY = [].freeze
