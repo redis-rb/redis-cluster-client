@@ -7,12 +7,16 @@ class RedisClient
         IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
         attr_reader :clients, :primary_clients, :replica_clients
 
-        def initialize(replications, options, pool, concurrent_worker, **kwargs)
+        def initialize(pool, concurrent_worker, **kwargs)
           @pool = pool
           @clients = {}
           @client_options = kwargs.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) }
           @concurrent_worker = concurrent_worker
-          process_topology_update!(replications, options)
+          @replications = {}
+          @primary_node_keys = []
+          @replica_node_keys = []
+          @primary_clients = []
+          @replica_clients = []
         end
 
         def any_primary_node_key(seed: nil)
