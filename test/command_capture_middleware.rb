@@ -7,6 +7,34 @@ module CommandCaptureMiddleware
     end
   end
 
+  # The CommandBuffer is what should be set as the :captured_commands custom option.
+  # It needs to be threadsafe, because redis-cluster-client performs some redis operations on
+  # multiple nodes in parallel, and in e.g. jruby it's not safe to concurrently manipulate the same array.
+  class CommandBuffer
+    def initialize
+      @array = []
+      @mutex = Mutex.new
+    end
+
+    def to_a
+      @mutex.synchronize do
+        @array.dup
+      end
+    end
+
+    def <<(command)
+      @mutex.synchronize do
+        @array << command
+      end
+    end
+
+    def clear
+      @mutex.synchronize do
+        @array.clear
+      end
+    end
+  end
+
   def call(command, redis_config)
     redis_config.custom[:captured_commands] << CapturedCommand.new(
       server_url: CommandCaptureMiddleware.normalize_captured_url(redis_config.server_url),

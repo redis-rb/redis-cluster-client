@@ -32,7 +32,7 @@ class RedisClient
         @test_nodes&.each { |n| n&.each(&:close) }
       end
 
-      def make_node(capture_buffer: [], pool: nil, **kwargs)
+      def make_node(capture_buffer: CommandCaptureMiddleware::CommandBuffer.new, pool: nil, **kwargs)
         config = ::RedisClient::ClusterConfig.new(**{
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
@@ -592,14 +592,14 @@ class RedisClient
       end
 
       def test_reload
-        capture_buffer = []
+        capture_buffer = CommandCaptureMiddleware::CommandBuffer.new
         test_node = make_node(replica: true, capture_buffer: capture_buffer)
 
         capture_buffer.clear
         test_node.reload!
 
         # It should have reloaded by calling CLUSTER NODES on three of the startup nodes
-        cluster_node_cmds = capture_buffer.select { |c| c.command == %w[CLUSTER NODES] }
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
         assert_equal RedisClient::Cluster::Node::MAX_STARTUP_SAMPLE, cluster_node_cmds.size
 
         # It should have connected to all of the clients.
@@ -614,7 +614,7 @@ class RedisClient
 
       def test_reload_with_original_config
         bootstrap_node = TEST_NODE_URIS.first
-        capture_buffer = []
+        capture_buffer = CommandCaptureMiddleware::CommandBuffer.new
         test_node = make_node(
           nodes: [bootstrap_node],
           replica: true,
@@ -630,13 +630,13 @@ class RedisClient
         capture_buffer.clear
         test_node.reload!
 
-        cluster_node_cmds = capture_buffer.select { |c| c.command == %w[CLUSTER NODES] }
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
         assert_equal 1, cluster_node_cmds.size
         assert_equal bootstrap_node, cluster_node_cmds.first.server_url
       end
 
       def test_reload_concurrently
-        capture_buffer = []
+        capture_buffer = CommandCaptureMiddleware::CommandBuffer.new
         test_node = make_node(replica: true, pool: { size: 2 }, capture_buffer: capture_buffer)
 
         # Simulate refetch_node_info_list taking a long time
@@ -655,7 +655,7 @@ class RedisClient
 
         # We should only have reloaded once, which is to say, we only called CLUSTER NODES command MAX_STARTUP_SAMPLE
         # times
-        cluster_node_cmds = capture_buffer.select { |c| c.command == %w[CLUSTER NODES] }
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
         assert_equal RedisClient::Cluster::Node::MAX_STARTUP_SAMPLE, cluster_node_cmds.size
       end
     end

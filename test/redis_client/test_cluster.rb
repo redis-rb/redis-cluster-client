@@ -6,7 +6,7 @@ class RedisClient
   class TestCluster
     module Mixin
       def setup
-        @captured_commands = []
+        @captured_commands = CommandCaptureMiddleware::CommandBuffer.new
         @client = new_test_client
         @client.call('FLUSHDB')
         wait_for_replication
