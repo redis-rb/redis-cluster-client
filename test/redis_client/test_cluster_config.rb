@@ -5,23 +5,6 @@ require 'testing_helper'
 
 class RedisClient
   class TestClusterConfig < TestingWrapper
-    def test_dup
-      orig = ::RedisClient::ClusterConfig.new
-      copy = orig.dup
-      refute_equal(orig.object_id, copy.object_id)
-
-      ::RedisClient::ClusterConfig.instance_method(:initialize).parameters.each do |type, name|
-        case type
-        when :key
-          want = orig.instance_variable_get("@#{name}".to_sym)
-          got = copy.instance_variable_get("@#{name}".to_sym)
-          next if got.nil?
-
-          assert_equal(want, got, "Case: #{type}=#{name}")
-        end
-      end
-    end
-
     def test_inspect
       want = '#<RedisClient::ClusterConfig [{:host=>"127.0.0.1", :port=>6379}]>'
       got = ::RedisClient::ClusterConfig.new.inspect
@@ -50,7 +33,7 @@ class RedisClient
       )
     end
 
-    def test_per_node_key
+    def test_startup_nodes
       [
         {
           config: ::RedisClient::ClusterConfig.new,
@@ -75,9 +58,22 @@ class RedisClient
           want: {
             '127.0.0.1:6379' => { host: '127.0.0.1', port: 6379, timeout: 1 }
           }
+        },
+        {
+          config: ::RedisClient::ClusterConfig.new(nodes: ['redis://1.2.3.4:1234', 'rediss://5.6.7.8:5678']),
+          want: {
+            '1.2.3.4:1234' => { host: '1.2.3.4', port: 1234 },
+            '5.6.7.8:5678' => { host: '5.6.7.8', port: 5678, ssl: true }
+          }
+        },
+        {
+          config: ::RedisClient::ClusterConfig.new(custom: { foo: 'bar' }),
+          want: {
+            '127.0.0.1:6379' => { host: '127.0.0.1', port: 6379, custom: { foo: 'bar' } }
+          }
         }
       ].each_with_index do |c, idx|
-        assert_equal(c[:want], c[:config].per_node_key, "Case: #{idx}")
+        assert_equal(c[:want], c[:config].startup_nodes, "Case: #{idx}")
       end
     end
 
@@ -101,20 +97,6 @@ class RedisClient
         cfg = ::RedisClient::ClusterConfig.new(replica_affinity: c[:value])
         assert_equal(c[:want], cfg.replica_affinity)
       end
-    end
-
-    def test_update_node
-      config = ::RedisClient::ClusterConfig.new(nodes: %w[redis://127.0.0.1:6379])
-      assert_equal([{ host: '127.0.0.1', port: 6379 }], config.instance_variable_get(:@node_configs))
-      config.update_node(%w[redis://127.0.0.2:6380])
-      assert_equal([{ host: '127.0.0.2', port: 6380 }], config.instance_variable_get(:@node_configs))
-    end
-
-    def test_add_node
-      config = ::RedisClient::ClusterConfig.new(nodes: %w[redis://127.0.0.1:6379])
-      assert_equal([{ host: '127.0.0.1', port: 6379 }], config.instance_variable_get(:@node_configs))
-      config.add_node('127.0.0.2', 6380)
-      assert_equal([{ host: '127.0.0.1', port: 6379 }, { host: '127.0.0.2', port: 6380 }], config.instance_variable_get(:@node_configs))
     end
 
     def test_command_builder
@@ -193,6 +175,20 @@ class RedisClient
         got = config.send(:merge_generic_config, c[:params][:client_config], c[:params][:node_configs])
         assert_equal(c[:want], got, msg)
       end
+    end
+
+    def test_client_config_for_node
+      config = ::RedisClient::ClusterConfig.new(
+        nodes: ['redis://username:password@1.2.3.4:1234', 'rediss://5.6.7.8:5678'],
+        custom: { foo: 'bar' }
+      )
+      assert_equal({
+                     host: '9.9.9.9',
+                     port: 9999,
+                     username: 'username',
+                     password: 'password',
+                     custom: { foo: 'bar' }
+                   }, config.client_config_for_node('9.9.9.9:9999'))
     end
   end
 end

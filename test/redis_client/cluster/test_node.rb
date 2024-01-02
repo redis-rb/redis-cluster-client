@@ -23,61 +23,27 @@ class RedisClient
     # rubocop:disable Metrics/ClassLength
     class TestNode < TestingWrapper
       def setup
-        @test_config = ::RedisClient::ClusterConfig.new(
-          nodes: TEST_NODE_URIS,
-          fixed_hostname: TEST_FIXED_HOSTNAME,
-          **TEST_GENERIC_OPTIONS
-        )
-        @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
-        @test_node_info_list = ::RedisClient::Cluster::Node.load_info(@test_config.per_node_key, @concurrent_worker)
-        if TEST_FIXED_HOSTNAME
-          @test_node_info_list.each do |info|
-            _, port = ::RedisClient::Cluster::NodeKey.split(info.node_key)
-            info.node_key = ::RedisClient::Cluster::NodeKey.build_from_host_port(TEST_FIXED_HOSTNAME, port)
-          end
-        end
-        node_addrs = @test_node_info_list.map { |info| ::RedisClient::Cluster::NodeKey.hashify(info.node_key) }
-        @test_config.update_node(node_addrs)
-        @test_node = ::RedisClient::Cluster::Node.new(
-          @test_config.per_node_key,
-          @concurrent_worker,
-          node_info_list: @test_node_info_list
-        )
-        @test_node_with_scale_read = ::RedisClient::Cluster::Node.new(
-          @test_config.per_node_key,
-          @concurrent_worker,
-          node_info_list: @test_node_info_list,
-          with_replica: true
-        )
+        @test_node = make_node.tap(&:reload!)
+        @test_node_with_scale_read = make_node(replica: true).tap(&:reload!)
+        @test_node_info_list = @test_node.instance_variable_get(:@node_info)
       end
 
       def teardown
-        @test_node&.each(&:close)
-        @test_node_with_scale_read&.each(&:close)
+        @test_nodes&.each { |n| n&.each(&:close) }
       end
 
-      def test_load_info
-        [
-          {
-            params: { options: TEST_NODE_OPTIONS, kwargs: TEST_GENERIC_OPTIONS },
-            want: { size: TEST_NUMBER_OF_NODES }
-          },
-          {
-            params: { options: { '127.0.0.1:11211' => { host: '127.0.0.1', port: 11_211 } }, kwargs: TEST_GENERIC_OPTIONS },
-            want: { error: ::RedisClient::Cluster::InitialSetupError }
-          },
-          {
-            params: { options: {}, kwargs: TEST_GENERIC_OPTIONS },
-            want: { error: ::RedisClient::Cluster::InitialSetupError }
-          }
-        ].each_with_index do |c, idx|
-          msg = "Case: #{idx}"
-          got = -> { ::RedisClient::Cluster::Node.load_info(c[:params][:options], @concurrent_worker, **c[:params][:kwargs]) }
-          if c[:want].key?(:error)
-            assert_raises(c[:want][:error], msg, &got)
-          else
-            assert_equal(c[:want][:size], got.call.size, msg)
-          end
+      def make_node(capture_buffer: CommandCaptureMiddleware::CommandBuffer.new, pool: nil, **kwargs)
+        config = ::RedisClient::ClusterConfig.new(**{
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          middlewares: [CommandCaptureMiddleware],
+          custom: { captured_commands: capture_buffer },
+          **TEST_GENERIC_OPTIONS
+        }.merge(kwargs))
+        concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
+        ::RedisClient::Cluster::Node.new(concurrent_worker, pool: pool, config: config).tap do |node|
+          @test_nodes ||= []
+          @test_nodes << node
         end
       end
 
@@ -111,7 +77,7 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 5460]] }
         ]
 
-        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        got = @test_node.send(:parse_cluster_node_reply, info)
         assert_equal(want, got.map(&:to_h))
       end
 
@@ -145,7 +111,7 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 3000], [3002, 5460], [15_001, 15_001]] }
         ]
 
-        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        got = @test_node.send(:parse_cluster_node_reply, info)
         assert_equal(want, got.map(&:to_h))
       end
 
@@ -179,7 +145,7 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 3000], [3002, 5460], [15_001, 15_001]] }
         ]
 
-        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        got = @test_node.send(:parse_cluster_node_reply, info)
         assert_equal(want, got.map(&:to_h))
       end
 
@@ -213,7 +179,7 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 5460]] }
         ]
 
-        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        got = @test_node.send(:parse_cluster_node_reply, info)
         assert_equal(want, got.map(&:to_h))
       end
 
@@ -247,7 +213,7 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 5460]] }
         ]
 
-        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        got = @test_node.send(:parse_cluster_node_reply, info)
         assert_equal(want, got.map(&:to_h))
       end
 
@@ -281,7 +247,7 @@ class RedisClient
             primary_id: '-', ping_sent: '0', pong_recv: '0', config_epoch: '1', link_state: 'connected', slots: [[0, 5460]] }
         ]
 
-        got = ::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info)
+        got = @test_node.send(:parse_cluster_node_reply, info)
         assert_equal(want, got.map(&:to_h))
       end
 
@@ -295,7 +261,7 @@ class RedisClient
           e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 127.0.0.1:30001@31001 myself,master - 0 0 1 disconnected 0-5460
         INFO
 
-        assert_empty(::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info))
+        assert_empty(@test_node.send(:parse_cluster_node_reply, info))
       end
 
       def test_parse_cluster_node_reply_failure_flags
@@ -308,7 +274,7 @@ class RedisClient
           e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 127.0.0.1:30001@31001 myself,fail,master - 0 0 1 connected 0-5460
         INFO
 
-        assert_empty(::RedisClient::Cluster::Node.send(:parse_cluster_node_reply, info))
+        assert_empty(@test_node.send(:parse_cluster_node_reply, info))
       end
 
       def test_inspect
@@ -382,12 +348,25 @@ class RedisClient
         assert_equal(want, got, 'Case: scale read')
       end
 
-      def test_clients_for_scanning # rubocop:disable Metrics/CyclomaticComplexity
-        want = @test_node_info_list.select(&:primary?).map(&:node_key).sort
-        got = @test_node.clients_for_scanning.map { |client| "#{client.config.host}:#{client.config.port}" }
+      def test_clients_for_scanning # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        test_config = @test_node.instance_variable_get(:@config)
+        want = @test_node_info_list.select(&:primary?)
+                                   .map(&:node_key)
+                                   # need to call client_config_for_node so that if we're using fixed_hostname in this test,
+                                   # we get the actual hostname we're connecting to, not the one returned by the cluster API
+                                   .map { |key| test_config.client_config_for_node(key) }
+                                   .map { |cfg| "#{cfg[:host]}:#{cfg[:port]}" }
+                                   .sort
+        got = @test_node.clients_for_scanning.map { |client| "#{client.config.host}:#{client.config.port}" }.sort
         assert_equal(want, got, 'Case: primary only')
 
-        want = @test_node_info_list.select(&:replica?).map(&:node_key)
+        want = @test_node_info_list.select(&:replica?)
+                                   .map(&:node_key)
+                                   # As per above, we need to get the real hostname, not that reported by Redis,
+                                   # if fixed_hostname is set.
+                                   .map { |key| test_config.client_config_for_node(key) }
+                                   .map { |cfg| "#{cfg[:host]}:#{cfg[:port]}" }
+                                   .sort
         got = @test_node_with_scale_read.clients_for_scanning.map { |client| "#{client.config.host}:#{client.config.port}" }
         got.each { |e| assert_includes(want, e, 'Case: scale read') }
       end
@@ -610,6 +589,74 @@ class RedisClient
             assert_equal(c[:results], results, msg)
           end
         end
+      end
+
+      def test_reload
+        capture_buffer = CommandCaptureMiddleware::CommandBuffer.new
+        test_node = make_node(replica: true, capture_buffer: capture_buffer)
+
+        capture_buffer.clear
+        test_node.reload!
+
+        # It should have reloaded by calling CLUSTER NODES on three of the startup nodes
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
+        assert_equal RedisClient::Cluster::Node::MAX_STARTUP_SAMPLE, cluster_node_cmds.size
+
+        # It should have connected to all of the clients.
+        assert_equal TEST_NUMBER_OF_NODES, test_node.to_a.size
+
+        # If we reload again, it should NOT change the redis client instances we have.
+        original_client_ids = test_node.to_a.map(&:object_id).to_set
+        test_node.reload!
+        new_client_ids = test_node.to_a.map(&:object_id).to_set
+        assert_equal original_client_ids, new_client_ids
+      end
+
+      def test_reload_with_original_config
+        bootstrap_node = TEST_NODE_URIS.first
+        capture_buffer = CommandCaptureMiddleware::CommandBuffer.new
+        test_node = make_node(
+          nodes: [bootstrap_node],
+          replica: true,
+          connect_with_original_config: true,
+          capture_buffer: capture_buffer
+        )
+
+        test_node.reload!
+        # After reloading the first time, our Node object knows about all hosts, despite only starting with one:
+        assert_equal TEST_NUMBER_OF_NODES, test_node.to_a.size
+
+        # When we reload, it will only call CLUSTER NODES against a single node, the bootstrap node.
+        capture_buffer.clear
+        test_node.reload!
+
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
+        assert_equal 1, cluster_node_cmds.size
+        assert_equal bootstrap_node, cluster_node_cmds.first.server_url
+      end
+
+      def test_reload_concurrently
+        capture_buffer = CommandCaptureMiddleware::CommandBuffer.new
+        test_node = make_node(replica: true, pool: { size: 2 }, capture_buffer: capture_buffer)
+
+        # Simulate refetch_node_info_list taking a long time
+        test_node.singleton_class.prepend(Module.new do
+          def refetch_node_info_list(...)
+            r = super
+            sleep 2
+            r
+          end
+        end)
+
+        capture_buffer.clear
+        t1 = Thread.new { test_node.reload! }
+        t2 = Thread.new { test_node.reload! }
+        [t1, t2].each(&:join)
+
+        # We should only have reloaded once, which is to say, we only called CLUSTER NODES command MAX_STARTUP_SAMPLE
+        # times
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
+        assert_equal RedisClient::Cluster::Node::MAX_STARTUP_SAMPLE, cluster_node_cmds.size
       end
     end
     # rubocop:enable Metrics/ClassLength

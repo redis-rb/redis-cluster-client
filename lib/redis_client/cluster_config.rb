@@ -23,9 +23,10 @@ class RedisClient
 
     InvalidClientConfigError = Class.new(::RedisClient::Error)
 
-    attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout, :connect_with_original_config
+    attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout,
+                :connect_with_original_config, :startup_nodes
 
-    def initialize( # rubocop:disable Metrics/AbcSize
+    def initialize(
       nodes: DEFAULT_NODES,
       replica: false,
       replica_affinity: :random,
@@ -34,39 +35,26 @@ class RedisClient
       connect_with_original_config: false,
       client_implementation: ::RedisClient::Cluster, # for redis gem
       slow_command_timeout: SLOW_COMMAND_TIMEOUT,
+      command_builder: ::RedisClient::CommandBuilder,
       **client_config
     )
 
       @replica = true & replica
       @replica_affinity = replica_affinity.to_s.to_sym
       @fixed_hostname = fixed_hostname.to_s
-      @node_configs = build_node_configs(nodes.dup)
-      client_config = client_config.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) }
-      @command_builder = client_config.fetch(:command_builder, ::RedisClient::CommandBuilder)
-      @client_config = merge_generic_config(client_config, @node_configs)
+      @command_builder = command_builder
+      node_configs = build_node_configs(nodes.dup)
+      @client_config = merge_generic_config(client_config, node_configs)
+      # Keep tabs on the original startup nodes we were constructed with
+      @startup_nodes = build_startup_nodes(node_configs)
       @concurrency = merge_concurrency_option(concurrency)
       @connect_with_original_config = connect_with_original_config
       @client_implementation = client_implementation
       @slow_command_timeout = slow_command_timeout
-      @mutex = Mutex.new
-    end
-
-    def dup
-      self.class.new(
-        nodes: @node_configs,
-        replica: @replica,
-        replica_affinity: @replica_affinity,
-        fixed_hostname: @fixed_hostname,
-        concurrency: @concurrency,
-        connect_with_original_config: @connect_with_original_config,
-        client_implementation: @client_implementation,
-        slow_command_timeout: @slow_command_timeout,
-        **@client_config
-      )
     end
 
     def inspect
-      "#<#{self.class.name} #{per_node_key.values}>"
+      "#<#{self.class.name} #{startup_nodes.values}>"
     end
 
     def read_timeout
@@ -86,29 +74,14 @@ class RedisClient
       @client_implementation.new(self, concurrency: @concurrency, **kwargs)
     end
 
-    def per_node_key
-      @node_configs.to_h do |config|
-        node_key = ::RedisClient::Cluster::NodeKey.build_from_host_port(config[:host], config[:port])
-        config = @client_config.merge(config)
-        config = config.merge(host: @fixed_hostname) unless @fixed_hostname.empty?
-        [node_key, config]
-      end
-    end
-
     def use_replica?
       @replica
     end
 
-    def update_node(addrs)
-      return if @mutex.locked?
-
-      @mutex.synchronize { @node_configs = build_node_configs(addrs) }
-    end
-
-    def add_node(host, port)
-      return if @mutex.locked?
-
-      @mutex.synchronize { @node_configs << { host: host, port: port } }
+    def client_config_for_node(node_key)
+      config = ::RedisClient::Cluster::NodeKey.hashify(node_key)
+      config[:port] = ensure_integer(config[:port])
+      augment_client_config(config)
     end
 
     private
@@ -176,11 +149,23 @@ class RedisClient
     end
 
     def merge_generic_config(client_config, node_configs)
-      return client_config if node_configs.empty?
+      cfg = node_configs.first || {}
+      client_config.reject { |k, _| IGNORE_GENERIC_CONFIG_KEYS.include?(k) }
+                   .merge(cfg.slice(*MERGE_CONFIG_KEYS))
+    end
 
-      cfg = node_configs.first
-      MERGE_CONFIG_KEYS.each { |k| client_config[k] = cfg[k] if cfg.key?(k) }
-      client_config
+    def build_startup_nodes(configs)
+      configs.to_h do |config|
+        node_key = ::RedisClient::Cluster::NodeKey.build_from_host_port(config[:host], config[:port])
+        config = augment_client_config(config)
+        [node_key, config]
+      end
+    end
+
+    def augment_client_config(config)
+      config = @client_config.merge(config)
+      config = config.merge(host: @fixed_hostname) unless @fixed_hostname.empty?
+      config
     end
   end
 end

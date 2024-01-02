@@ -6,7 +6,7 @@ class RedisClient
   class TestCluster
     module Mixin
       def setup
-        @captured_commands = []
+        @captured_commands = CommandCaptureMiddleware::CommandBuffer.new
         @client = new_test_client
         @client.call('FLUSHDB')
         wait_for_replication
@@ -459,6 +459,30 @@ class RedisClient
         wait_for_replication
         assert_equal('100', @client.get('foo'))
         assert_raises(NoMethodError) { @client.densaugeo('1m') }
+      end
+
+      def test_circuit_breakers
+        cli = ::RedisClient.cluster(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          # This option is important - need to make sure that the reloads happen on different connections
+          # to the timeouts, so that they don't count against the circuit breaker (they'll have their own breakers).
+          connect_with_original_config: true,
+          **TEST_GENERIC_OPTIONS.merge(
+            circuit_breaker: {
+              # Also important - the retry_count on resharding errors is set to 3, so we have to allow at lest
+              # that many errors to avoid tripping the breaker in the first call.
+              error_threshold: 4,
+              error_timeout: 60,
+              success_threshold: 10
+            }
+          )
+        ).new_client
+
+        assert_raises(::RedisClient::ReadTimeoutError) { cli.blocking_call(0.1, 'BRPOP', 'foo', 0) }
+        assert_raises(::RedisClient::CircuitBreaker::OpenCircuitError) { cli.blocking_call(0.1, 'BRPOP', 'foo', 0) }
+
+        cli&.close
       end
 
       private
