@@ -25,6 +25,7 @@ class RedisClient
       DEAD_FLAGS = %w[fail? fail handshake noaddr noflags].freeze
       ROLE_FLAGS = %w[master slave].freeze
       EMPTY_ARRAY = [].freeze
+      EMPTY_HASH = {}.freeze
 
       ReloadNeeded = Class.new(::RedisClient::Error)
 
@@ -99,8 +100,8 @@ class RedisClient
       )
 
         @concurrent_worker = concurrent_worker
-        @slots = build_slot_node_mappings([])
-        @replications = build_replication_mappings([])
+        @slots = build_slot_node_mappings(EMPTY_ARRAY)
+        @replications = build_replication_mappings(EMPTY_ARRAY)
         klass = make_topology_class(config.use_replica?, config.replica_affinity)
         @topology = klass.new(pool, @concurrent_worker, **kwargs)
         @config = config
