@@ -65,7 +65,7 @@ class RedisClient
         raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
 
         update_cluster_info! if e.errors.values.any? do |err|
-          err.message.start_with?('CLUSTERDOWN Hash slot not served')
+          @node.owns_error?(err) && err.message.start_with?('CLUSTERDOWN Hash slot not served')
         end
 
         raise
@@ -94,6 +94,8 @@ class RedisClient
       rescue ::RedisClient::CircuitBreaker::OpenCircuitError
         raise
       rescue ::RedisClient::CommandError => e
+        raise unless ErrorIdentification.client_owns_error?(e, node)
+
         if e.message.start_with?('MOVED')
           node = assign_redirection_node(e.message)
           retry_count -= 1
@@ -111,7 +113,9 @@ class RedisClient
           retry if retry_count >= 0
         end
         raise
-      rescue ::RedisClient::ConnectionError
+      rescue ::RedisClient::ConnectionError => e
+        raise unless ErrorIdentification.client_owns_error?(e, node)
+
         update_cluster_info!
 
         raise if retry_count <= 0

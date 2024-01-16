@@ -485,6 +485,24 @@ class RedisClient
         cli&.close
       end
 
+      def test_only_reshards_own_errors
+        @client.call_v(%w[SADD testkey testvalue1])
+        @client.call_v(%w[SADD testkey testvalue2])
+        slot = ::RedisClient::Cluster::KeySlotConverter.convert('testkey')
+        router = @client.instance_variable_get(:@router)
+        correct_primary_key = router.find_node_key_by_key('testkey', primary: true)
+        broken_primary_key = (router.node_keys - [correct_primary_key]).first
+        assert_raises(RedisClient::CommandError) do
+          @client.sscan('testkey', retry_count: 0) do
+            raise RedisClient::CommandError, "MOVED #{slot} #{broken_primary_key}"
+          end
+        end
+
+        # The exception should not have causes @client to update its shard mappings, because it didn't
+        # come from a RedisClient instance that @client knows about.
+        assert_equal correct_primary_key, router.find_node_key_by_key('testkey', primary: true)
+      end
+
       private
 
       def wait_for_replication
