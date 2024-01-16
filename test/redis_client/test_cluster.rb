@@ -541,13 +541,14 @@ class RedisClient
     class PrimaryOnly < TestingWrapper
       include Mixin
 
-      def new_test_client(capture_buffer: @captured_commands)
+      def new_test_client(capture_buffer: @captured_commands, **opts)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
           middlewares: [CommandCaptureMiddleware],
           custom: { captured_commands: capture_buffer },
-          **TEST_GENERIC_OPTIONS
+          **TEST_GENERIC_OPTIONS,
+          **opts
         )
         ::RedisClient::Cluster.new(config)
       end
@@ -556,7 +557,7 @@ class RedisClient
     class ScaleReadRandom < TestingWrapper
       include Mixin
 
-      def new_test_client(capture_buffer: @captured_commands)
+      def new_test_client(capture_buffer: @captured_commands, **opts)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
@@ -564,7 +565,8 @@ class RedisClient
           fixed_hostname: TEST_FIXED_HOSTNAME,
           middlewares: [CommandCaptureMiddleware],
           custom: { captured_commands: capture_buffer },
-          **TEST_GENERIC_OPTIONS
+          **TEST_GENERIC_OPTIONS,
+          **opts
         )
         ::RedisClient::Cluster.new(config)
       end
@@ -573,7 +575,7 @@ class RedisClient
     class ScaleReadRandomWithPrimary < TestingWrapper
       include Mixin
 
-      def new_test_client(capture_buffer: @captured_commands)
+      def new_test_client(capture_buffer: @captured_commands, **opts)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
@@ -581,7 +583,8 @@ class RedisClient
           fixed_hostname: TEST_FIXED_HOSTNAME,
           middlewares: [CommandCaptureMiddleware],
           custom: { captured_commands: capture_buffer },
-          **TEST_GENERIC_OPTIONS
+          **TEST_GENERIC_OPTIONS,
+          **opts
         )
         ::RedisClient::Cluster.new(config)
       end
@@ -590,7 +593,7 @@ class RedisClient
     class ScaleReadLatency < TestingWrapper
       include Mixin
 
-      def new_test_client(capture_buffer: @captured_commands)
+      def new_test_client(capture_buffer: @captured_commands, **opts)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
@@ -598,7 +601,8 @@ class RedisClient
           fixed_hostname: TEST_FIXED_HOSTNAME,
           middlewares: [CommandCaptureMiddleware],
           custom: { captured_commands: capture_buffer },
-          **TEST_GENERIC_OPTIONS
+          **TEST_GENERIC_OPTIONS,
+          **opts
         )
         ::RedisClient::Cluster.new(config)
       end
@@ -607,13 +611,14 @@ class RedisClient
     class Pooled < TestingWrapper
       include Mixin
 
-      def new_test_client(capture_buffer: @captured_commands)
+      def new_test_client(capture_buffer: @captured_commands, **opts)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
           middlewares: [CommandCaptureMiddleware],
           custom: { captured_commands: capture_buffer },
-          **TEST_GENERIC_OPTIONS
+          **TEST_GENERIC_OPTIONS,
+          **opts
         )
         ::RedisClient::Cluster.new(config, pool: { timeout: TEST_TIMEOUT_SEC, size: 2 })
       end
