@@ -93,6 +93,17 @@ class RedisClient
       ::RedisClient::Cluster::Transaction.new(@router, @command_builder).execute(watch: watch, &block)
     end
 
+    def with(key: nil, hashtag: nil, write: true, retry_count: 0, &block)
+      key = process_with_arguments(key, hashtag)
+
+      node_key = @router.find_node_key_by_key(key, primary: write)
+      node = @router.find_node(node_key)
+      # Calling #with checks out the underlying connection if this is a pooled connection
+      # Calling it through #try_delegate ensures we handle any redirections and retry the entire
+      # transaction if so.
+      @router.try_delegate(node, :with, retry_count: retry_count, &block)
+    end
+
     def pubsub
       ::RedisClient::Cluster::PubSub.new(@router, @command_builder)
     end
@@ -104,6 +115,19 @@ class RedisClient
     end
 
     private
+
+    def process_with_arguments(key, hashtag) # rubocop:disable Metrics/CyclomaticComplexity
+      raise ArgumentError, 'Only one of key or hashtag may be provided' if key && hashtag
+
+      if hashtag
+        # The documentation says not to wrap your hashtag in {}, but people will probably
+        # do it anyway and it's easy for us to fix here.
+        key = hashtag&.match?(/^{.*}$/) ? hashtag : "{#{hashtag}}"
+      end
+      raise ArgumentError, 'One of key or hashtag must be provided' if key.nil? || key.empty?
+
+      key
+    end
 
     def method_missing(name, *args, **kwargs, &block)
       if @router.command_exists?(name)
