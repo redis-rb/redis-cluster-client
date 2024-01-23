@@ -78,12 +78,18 @@ class RedisClient
         end
       end
 
+      class SingleNodeRedisClient < ::RedisClient
+      end
+
       class Config < ::RedisClient::Config
         def initialize(scale_read: false, middlewares: nil, **kwargs)
           @scale_read = scale_read
           middlewares ||= []
           middlewares.unshift ErrorIdentification::Middleware
-          super(middlewares: middlewares, **kwargs)
+          super(
+            middlewares: middlewares,
+            client_implementation: SingleNodeRedisClient,
+            **kwargs)
         end
 
         private

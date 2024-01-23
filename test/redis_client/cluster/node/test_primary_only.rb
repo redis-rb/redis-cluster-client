@@ -13,7 +13,7 @@ class RedisClient
         def test_clients_with_redis_client
           got = @test_node.clients
           got.each do |client|
-            assert_instance_of(::RedisClient, client)
+            assert_kind_of(::RedisClient, client)
             assert_equal('master', client.call('ROLE').first)
           end
         end
@@ -22,7 +22,7 @@ class RedisClient
           test_node = make_node(pool: { timeout: 3, size: 2 })
           got = test_node.clients
           got.each do |client|
-            assert_instance_of(::RedisClient::Pooled, client)
+            assert_kind_of(::RedisClient::Pooled, client)
             assert_equal('master', client.call('ROLE').first)
           end
         end
@@ -30,7 +30,7 @@ class RedisClient
         def test_primary_clients
           got = @test_node.primary_clients
           got.each do |client|
-            assert_instance_of(::RedisClient, client)
+            assert_kind_of(::RedisClient, client)
             assert_equal('master', client.call('ROLE').first)
           end
         end
@@ -38,7 +38,7 @@ class RedisClient
         def test_replica_clients
           got = @test_node.replica_clients
           got.each do |client|
-            assert_instance_of(::RedisClient, client)
+            assert_kind_of(::RedisClient, client)
             assert_equal('master', client.call('ROLE').first)
           end
         end
@@ -46,7 +46,7 @@ class RedisClient
         def test_clients_for_scanning
           got = @test_node.clients_for_scanning
           got.each do |client|
-            assert_instance_of(::RedisClient, client)
+            assert_kind_of(::RedisClient, client)
             assert_equal('master', client.call('ROLE').first)
           end
         end
