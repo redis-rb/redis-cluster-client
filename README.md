@@ -1,5 +1,6 @@
 [![Gem Version](https://badge.fury.io/rb/redis-cluster-client.svg)](https://badge.fury.io/rb/redis-cluster-client)
 ![Test status](https://github.com/redis-rb/redis-cluster-client/workflows/Test/badge.svg?branch=master)
+![Release status](https://github.com/redis-rb/redis-cluster-client/workflows/Release/badge.svg)
 
 Redis Cluster Client
 ===============================================================================
