@@ -22,47 +22,33 @@ class RedisClient
         keyword_init: true
       )
 
-      class << self
-        def load(nodes, slow_command_timeout: -1)
-          cmd = errors = nil
-
-          nodes&.each do |node|
-            regular_timeout = node.read_timeout
-            node.read_timeout = slow_command_timeout > 0.0 ? slow_command_timeout : regular_timeout
-            reply = node.call('COMMAND')
-            node.read_timeout = regular_timeout
-            commands = parse_command_reply(reply)
-            cmd = ::RedisClient::Cluster::Command.new(commands)
-            break
-          rescue ::RedisClient::Error => e
-            errors ||= []
-            errors << e
-          end
-
-          return cmd unless cmd.nil?
-
-          raise ::RedisClient::Cluster::InitialSetupError, errors
-        end
-
-        private
-
-        def parse_command_reply(rows)
-          rows&.each_with_object({}) do |row, acc|
-            next if row[0].nil?
-
-            acc[row[0].downcase] = ::RedisClient::Cluster::Command::Detail.new(
-              first_key_position: row[3],
-              last_key_position: row[4],
-              key_step: row[5],
-              write?: row[2].include?('write'),
-              readonly?: row[2].include?('readonly')
-            )
-          end.freeze || EMPTY_HASH
-        end
+      def initialize
+        @commands = EMPTY_HASH
       end
 
-      def initialize(commands)
-        @commands = commands || EMPTY_HASH
+      # n.b. this is not thread safe; it's called under a lock in Node#reload! though.
+      def load!(nodes, slow_command_timeout: -1)
+        commands = errors = nil
+
+        nodes&.each do |node|
+          regular_timeout = node.read_timeout
+          node.read_timeout = slow_command_timeout > 0.0 ? slow_command_timeout : regular_timeout
+          reply = node.call('COMMAND')
+          node.read_timeout = regular_timeout
+          commands = parse_command_reply(reply)
+          break
+        rescue ::RedisClient::Error => e
+          errors ||= []
+          errors << e
+        end
+
+        raise ::RedisClient::Cluster::InitialSetupError, errors unless commands
+
+        @commands = commands
+      end
+
+      def loaded?
+        @commands.any?
       end
 
       def extract_first_key(command)
@@ -152,6 +138,20 @@ class RedisClient
       def determine_optional_key_position(command, option_name) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         idx = command&.flatten&.map(&:to_s)&.map(&:downcase)&.index(option_name&.downcase)
         idx.nil? ? 0 : idx + 1
+      end
+
+      def parse_command_reply(rows)
+        rows&.each_with_object({}) do |row, acc|
+          next if row[0].nil?
+
+          acc[row[0].downcase] = ::RedisClient::Cluster::Command::Detail.new(
+            first_key_position: row[3],
+            last_key_position: row[4],
+            key_step: row[5],
+            write?: row[2].include?('write'),
+            readonly?: row[2].include?('readonly')
+          )
+        end.freeze || EMPTY_HASH
       end
     end
   end

@@ -22,7 +22,7 @@ class RedisClient
           { nodes: nil, error: ::RedisClient::Cluster::InitialSetupError }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
-          got = -> { ::RedisClient::Cluster::Command.load(c[:nodes]) }
+          got = -> { ::RedisClient::Cluster::Command.new.tap { |cmd| cmd.load!(c[:nodes]) } }
           if c[:error].nil?
             assert_instance_of(::RedisClient::Cluster::Command, got.call, msg)
           else
@@ -40,7 +40,7 @@ class RedisClient
             super
           end
         end)
-        ::RedisClient::Cluster::Command.load(nodes, slow_command_timeout: 9)
+        ::RedisClient::Cluster::Command.new.tap { |c| c.load!(nodes, slow_command_timeout: 9) }
         assert_equal(9, nodes.first.instance_variable_get(:@slow_timeout))
         assert_equal(TEST_TIMEOUT_SEC, nodes.first.read_timeout)
       end
@@ -70,7 +70,7 @@ class RedisClient
           { rows: nil, want: {} }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
-          got = ::RedisClient::Cluster::Command.send(:parse_command_reply, c[:rows])
+          got = ::RedisClient::Cluster::Command.new.send(:parse_command_reply, c[:rows])
           assert_equal(c[:want].size, got.size, msg)
           assert_equal(c[:want].keys.sort, got.keys.sort, msg)
           c[:want].each do |k, v|
@@ -80,7 +80,7 @@ class RedisClient
       end
 
       def test_extract_first_key
-        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
+        cmd = ::RedisClient::Cluster::Command.new.tap { |c| c.load!(@raw_clients) }
         [
           { command: %w[SET foo 1], want: 'foo' },
           { command: %w[GET foo], want: 'foo' },
@@ -99,7 +99,7 @@ class RedisClient
       end
 
       def test_should_send_to_primary?
-        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
+        cmd = ::RedisClient::Cluster::Command.new.tap { |c| c.load!(@raw_clients) }
         [
           { command: %w[SET foo 1], want: true },
           { command: %w[GET foo], want: false },
@@ -114,7 +114,7 @@ class RedisClient
       end
 
       def test_should_send_to_replica?
-        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
+        cmd = ::RedisClient::Cluster::Command.new.tap { |c| c.load!(@raw_clients) }
         [
           { command: %w[SET foo 1], want: false },
           { command: %w[GET foo], want: true },
@@ -129,7 +129,7 @@ class RedisClient
       end
 
       def test_exists?
-        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
+        cmd = ::RedisClient::Cluster::Command.new.tap { |c| c.load!(@raw_clients) }
         [
           { name: 'ping', want: true },
           { name: :ping, want: true },
@@ -148,7 +148,7 @@ class RedisClient
       end
 
       def test_determine_first_key_position
-        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
+        cmd = ::RedisClient::Cluster::Command.new.tap { |c| c.load!(@raw_clients) }
         [
           { command: %w[EVAL "return ARGV[1]" 0 hello], want: 3 },
           { command: [['EVAL'], '"return ARGV[1]"', 0, 'hello'], want: 3 },
@@ -174,7 +174,7 @@ class RedisClient
       end
 
       def test_determine_optional_key_position
-        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
+        cmd = ::RedisClient::Cluster::Command.new.tap { |c| c.load!(@raw_clients) }
         [
           { params: { command: %w[XREAD COUNT 2 STREAMS mystream writers 0-0 0-0], option_name: 'streams' }, want: 4 },
           { params: { command: %w[XREADGROUP GROUP group consumer STREAMS key id], option_name: 'streams' }, want: 5 },
@@ -192,7 +192,7 @@ class RedisClient
       end
 
       def test_extract_all_keys
-        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
+        cmd = ::RedisClient::Cluster::Command.new.tap { |c| c.load!(@raw_clients) }
         [
           { command: ['EVAL', 'return ARGV[1]', '0', 'hello'], want: [] },
           { command: ['EVAL', 'return ARGV[1]', '3', 'key1', 'key2', 'key3', 'arg1', 'arg2'], want: %w[key1 key2 key3] },

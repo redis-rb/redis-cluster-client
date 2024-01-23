@@ -114,7 +114,7 @@ class RedisClient
         klass = make_topology_class(config.use_replica?, config.replica_affinity)
         @topology = klass.new(pool, @concurrent_worker, **kwargs)
         @config = config
-        @command = nil
+        @command = ::RedisClient::Cluster::Command.new
         @mutex = Mutex.new
       end
 
@@ -226,9 +226,7 @@ class RedisClient
             # the first time the client is constructed; if you perform a rolling update to a new version
             # of Redis, for example, applications won't know about the new commands available until they
             # construct new client objects (or, more likely, are restarted).
-            @command ||= ::RedisClient::Cluster::Command.load(
-              startup_clients, slow_command_timeout: @config.slow_command_timeout
-            )
+            @command.load!(startup_clients, slow_command_timeout: @config.slow_command_timeout) unless @command.loaded?
 
             @topology.process_topology_update!(@replications, @node_configs)
           end
