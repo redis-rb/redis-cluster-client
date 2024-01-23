@@ -29,7 +29,13 @@ class RedisClient
           identify_error(e, config)
           raise
         end
-        alias call_pipelined call
+
+        def call_pipelined(_command, config)
+          super
+        rescue RedisClient::Error => e
+          identify_error(e, config)
+          raise
+        end
 
         private
 
