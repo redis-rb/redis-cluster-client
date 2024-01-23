@@ -1,0 +1,26 @@
+---
+# https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
+# https://github.com/actions/virtual-environments
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+concurrency: ${{ github.workflow }}
+jobs:
+  gem:
+    name: Gem
+    if: github.repository == 'redis-rb/redis-cluster-client'
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ruby
+          bundler-cache: true
+      - uses: rubygems/release-gem@v1
