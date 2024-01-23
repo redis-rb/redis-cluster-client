@@ -24,7 +24,6 @@ class RedisClient
         @client_kwargs = kwargs
         @node = ::RedisClient::Cluster::Node.new(concurrent_worker, config: config, pool: pool, **kwargs)
         update_cluster_info!
-        @command = ::RedisClient::Cluster::Command.load(@node.replica_clients.shuffle, slow_command_timeout: config.slow_command_timeout)
         @command_builder = @config.command_builder
       end
 
@@ -163,12 +162,12 @@ class RedisClient
       end
 
       def find_node_key(command, seed: nil)
-        key = @command.extract_first_key(command)
-        find_node_key_by_key(key, seed: seed, primary: @command.should_send_to_primary?(command))
+        key = cluster_commands.extract_first_key(command)
+        find_node_key_by_key(key, seed: seed, primary: cluster_commands.should_send_to_primary?(command))
       end
 
       def find_primary_node_key(command)
-        key = @command.extract_first_key(command)
+        key = cluster_commands.extract_first_key(command)
         return nil unless key&.size&.> 0
 
         find_node_key_by_key(key, primary: true)
@@ -184,8 +183,12 @@ class RedisClient
         retry
       end
 
+      def cluster_commands
+        @node.command
+      end
+
       def command_exists?(name)
-        @command.exists?(name)
+        cluster_commands.exists?(name)
       end
 
       def assign_redirection_node(err_msg)

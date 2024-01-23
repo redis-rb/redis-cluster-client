@@ -114,8 +114,11 @@ class RedisClient
         klass = make_topology_class(config.use_replica?, config.replica_affinity)
         @topology = klass.new(pool, @concurrent_worker, **kwargs)
         @config = config
+        @command = nil
         @mutex = Mutex.new
       end
+
+      attr_reader :command
 
       def inspect
         "#<#{self.class.name} #{node_keys.join(', ')}>"
@@ -218,6 +221,15 @@ class RedisClient
             end
             @slots = build_slot_node_mappings(@node_info)
             @replications = build_replication_mappings(@node_info)
+
+            # Call COMMAND to find out the commands available on this cluster. We only call this once
+            # the first time the client is constructed; if you perform a rolling update to a new version
+            # of Redis, for example, applications won't know about the new commands available until they
+            # construct new client objects (or, more likely, are restarted).
+            @command ||= ::RedisClient::Cluster::Command.load(
+              startup_clients, slow_command_timeout: @config.slow_command_timeout
+            )
+
             @topology.process_topology_update!(@replications, @node_configs)
           end
         end
