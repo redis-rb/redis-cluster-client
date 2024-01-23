@@ -5,21 +5,6 @@ require 'testing_helper'
 
 class RedisClient
   class Cluster
-    class Node
-      class TestConfig < TestingWrapper
-        def test_connection_prelude
-          [
-            { params: { scale_read: true }, want: [%w[HELLO 3], %w[READONLY]] },
-            { params: { scale_read: false }, want: [%w[HELLO 3]] },
-            { params: {}, want: [%w[HELLO 3]] }
-          ].each_with_index do |c, idx|
-            got = ::RedisClient::Cluster::Node::Config.new(**c[:params]).connection_prelude
-            assert_equal(c[:want], got, "Case: #{idx}")
-          end
-        end
-      end
-    end
-
     # rubocop:disable Metrics/ClassLength
     class TestNode < TestingWrapper
       def setup
@@ -44,6 +29,19 @@ class RedisClient
         ::RedisClient::Cluster::Node.new(concurrent_worker, pool: pool, config: config).tap do |node|
           @test_nodes ||= []
           @test_nodes << node
+        end
+      end
+
+      def test_connection_prelude
+        [
+          { params: { scale_read: true }, want: [%w[HELLO 3], %w[READONLY]] },
+          { params: { scale_read: false }, want: [%w[HELLO 3]] },
+          { params: {}, want: [%w[HELLO 3]] }
+        ].each_with_index do |c, idx|
+          make_node(**c[:params]).clients.each do |conn|
+            got = conn.config.connection_prelude
+            assert_equal(c[:want], got, "Case: #{idx}")
+          end
         end
       end
 

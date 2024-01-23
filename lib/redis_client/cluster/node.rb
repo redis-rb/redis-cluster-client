@@ -82,8 +82,9 @@ class RedisClient
       end
 
       class Config < ::RedisClient::Config
-        def initialize(scale_read: false, middlewares: nil, **kwargs)
+        def initialize(cluster_commands:, scale_read: false, middlewares: nil, **kwargs)
           @scale_read = scale_read
+          @cluster_commands = cluster_commands
           middlewares ||= []
           middlewares.unshift ErrorIdentification::Middleware
           super(
@@ -91,6 +92,8 @@ class RedisClient
             client_implementation: SingleNodeRedisClient,
             **kwargs)
         end
+
+        attr_reader :cluster_commands
 
         private
 
@@ -112,9 +115,10 @@ class RedisClient
         @slots = build_slot_node_mappings(EMPTY_ARRAY)
         @replications = build_replication_mappings(EMPTY_ARRAY)
         klass = make_topology_class(config.use_replica?, config.replica_affinity)
-        @topology = klass.new(pool, @concurrent_worker, **kwargs)
-        @config = config
         @command = ::RedisClient::Cluster::Command.new
+        @base_connection_configuration = { **kwargs, cluster_commands: @command }
+        @topology = klass.new(pool, @concurrent_worker, **@base_connection_configuration)
+        @config = config
         @mutex = Mutex.new
       end
 
@@ -420,7 +424,7 @@ class RedisClient
             # Memoize the startup clients, so we maintain RedisClient's internal circuit breaker configuration
             # if it's set.
             @startup_clients ||= @config.startup_nodes.values.sample(count).map do |node_config|
-              ::RedisClient::Cluster::Node::Config.new(**node_config).new_client
+              ::RedisClient::Cluster::Node::Config.new(**@base_connection_configuration.merge(node_config)).new_client
             end
             yield @startup_clients
           ensure
