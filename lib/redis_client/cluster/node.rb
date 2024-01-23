@@ -8,6 +8,7 @@ require 'redis_client/cluster/node/primary_only'
 require 'redis_client/cluster/node/random_replica'
 require 'redis_client/cluster/node/random_replica_or_primary'
 require 'redis_client/cluster/node/latency_replica'
+require 'redis_client/cluster/pinning'
 
 class RedisClient
   class Cluster
@@ -79,6 +80,7 @@ class RedisClient
       end
 
       class SingleNodeRedisClient < ::RedisClient
+        include Pinning::ClientMixin
       end
 
       class Config < ::RedisClient::Config
@@ -86,6 +88,7 @@ class RedisClient
           @scale_read = scale_read
           @cluster_commands = cluster_commands
           middlewares ||= []
+          middlewares.unshift Pinning::ClientMiddleware
           middlewares.unshift ErrorIdentification::Middleware
           super(
             middlewares: middlewares,

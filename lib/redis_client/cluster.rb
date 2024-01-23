@@ -93,7 +93,7 @@ class RedisClient
       ::RedisClient::Cluster::Transaction.new(@router, @command_builder).execute(watch: watch, &block)
     end
 
-    def with(key: nil, hashtag: nil, write: true, retry_count: 0, &block)
+    def with(key: nil, hashtag: nil, write: true, retry_count: 0)
       key = process_with_arguments(key, hashtag)
 
       node_key = @router.find_node_key_by_key(key, primary: write)
@@ -101,7 +101,11 @@ class RedisClient
       # Calling #with checks out the underlying connection if this is a pooled connection
       # Calling it through #try_delegate ensures we handle any redirections and retry the entire
       # transaction if so.
-      @router.try_delegate(node, :with, retry_count: retry_count, &block)
+      @router.try_delegate(node, :with, retry_count: retry_count) do |conn|
+        conn.locked_to_key_slot(key) do
+          yield conn
+        end
+      end
     end
 
     def pubsub

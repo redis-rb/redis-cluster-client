@@ -533,8 +533,6 @@ class RedisClient
       end
 
       def test_pinning_cross_slot
-        skip 'This is not implemented yet!'
-
         assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
           @client.with(hashtag: 'slot1') do |conn|
             conn.call('GET', '{slot2}')
