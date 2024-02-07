@@ -533,13 +533,28 @@ class RedisClient
       end
 
       def test_pinning_cross_slot
-        skip 'This is not implemented yet!'
-
         assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
           @client.with(hashtag: 'slot1') do |conn|
             conn.call('GET', '{slot2}')
           end
         end
+      end
+
+      def test_pinning_cross_slot_without_validation
+        client = new_test_client(client_side_slot_validation: false)
+        assert_raises(::RedisClient::CommandError) do
+          client.with(hashtag: 'slot1') do |conn|
+            conn.call('GET', '{slot2}')
+          end
+        end
+      end
+
+      def test_pinning_blocking_call
+        got = @client.with(key: 'key1') do |conn|
+          conn.blocking_call(1, 'SET', 'key1', 'hello')
+          conn.blocking_call_v(1, %w[GET key1])
+        end
+        assert_equal('hello', got)
       end
 
       def test_pinning_hashtag_with_braces
@@ -563,6 +578,16 @@ class RedisClient
         end
 
         assert_equal(3, got)
+      end
+
+      def test_pinning_pipeline_cross_slot
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
+          @client.with(hashtag: 'slot1') do |conn|
+            conn.pipelined do |pipe|
+              pipe.call('GET', '{slot2}foo')
+            end
+          end
+        end
       end
 
       def test_pinning_pipeline_with_error
@@ -589,6 +614,30 @@ class RedisClient
         end
 
         assert_equal(%w[OK OK], got)
+      end
+
+      def test_pinning_transaction_cross_slot
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
+          @client.with(hashtag: 'slot1') do |conn|
+            conn.multi do |txn|
+              txn.call('GET', '{slot2}foo')
+            end
+          end
+        end
+      end
+
+      def test_pinning_multi_does_not_respond_to_blocking
+        @client.with(hashtag: 'slot1') do |conn|
+          assert_respond_to conn, :blocking_call_v
+          conn.multi do |txn|
+            refute_respond_to txn.__getobj__, :blocking_call_v
+            refute_respond_to txn, :blocking_call_v
+            # i.e. does not raise Transaction::ConsistencyError
+            assert_raises(NoMethodError) do
+              txn.blocking_call_v('SET', '{slot}key1', 'value1')
+            end
+          end
+        end
       end
 
       def test_pinning_transaction_watch_arg
@@ -667,6 +716,19 @@ class RedisClient
         end
 
         assert_equal('OK', got)
+      end
+
+      def test_pinning_transaction_can_coerce_with_block
+        @client.call('MSET', '{slot}key1', 1, '{slot}key2', 2)
+        got = @client.with(hashtag: 'slot') do |conn|
+          conn.multi do |txn|
+            # This tests a RedisClient behaviour where blocks can be used to modify the return results
+            # of multi/pipeliend blocks
+            txn.call('GET', '{slot}key1') { |res| res.to_i + 5 }
+            txn.call_v(['GET', '{slot}key2']) { |res| res.to_i + 2 }
+          end
+        end
+        assert_equal([6, 4], got)
       end
 
       def test_pinning_timeouts_update_topology

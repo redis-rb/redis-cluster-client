@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'redis_client/cluster/concurrent_worker'
+require 'redis_client/cluster/pinned_connection_delegator'
 require 'redis_client/cluster/pipeline'
 require 'redis_client/cluster/pub_sub'
 require 'redis_client/cluster/router'
@@ -93,7 +94,7 @@ class RedisClient
       ::RedisClient::Cluster::Transaction.new(@router, @command_builder).execute(watch: watch, &block)
     end
 
-    def with(key: nil, hashtag: nil, write: true, retry_count: 0, &block)
+    def with(key: nil, hashtag: nil, write: true, retry_count: 0)
       key = process_with_arguments(key, hashtag)
 
       node_key = @router.find_node_key_by_key(key, primary: write)
@@ -101,7 +102,13 @@ class RedisClient
       # Calling #with checks out the underlying connection if this is a pooled connection
       # Calling it through #try_delegate ensures we handle any redirections and retry the entire
       # transaction if so.
-      @router.try_delegate(node, :with, retry_count: retry_count, &block)
+      @router.try_delegate(node, :with, retry_count: retry_count) do |raw_client|
+        if @config.client_side_slot_validation
+          yield PinnedConnectionDelegator.new(raw_client, locked_key_slot: key, cluster_commands: @router.cluster_commands)
+        else
+          yield raw_client
+        end
+      end
     end
 
     def pubsub

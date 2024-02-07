@@ -188,6 +188,10 @@ class RedisClient
         @command.exists?(name)
       end
 
+      def cluster_commands
+        @command
+      end
+
       def assign_redirection_node(err_msg)
         _, slot, node_key = err_msg.split
         slot = slot.to_i
