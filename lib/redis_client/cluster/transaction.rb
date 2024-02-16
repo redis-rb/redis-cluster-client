@@ -12,62 +12,82 @@ class RedisClient
         @router = router
         @command_builder = command_builder
         @watch = watch
-        @pipeline = ::RedisClient::Pipeline.new(@command_builder)
-        @node = nil
         @retryable = true
+        @pipeline = ::RedisClient::Pipeline.new(@command_builder)
+        @buffer = []
+        @node = nil
       end
 
       def call(*command, **kwargs, &block)
         command = @command_builder.generate(command, kwargs)
-        prepare_once(command)
-        @pipeline.call_v(command, &block)
+        if prepare(command)
+          @pipeline.call_v(command, &block)
+        else
+          @buffer << -> { @pipeline.call_v(command, &block) }
+        end
       end
 
       def call_v(command, &block)
         command = @command_builder.generate(command)
-        prepare_once(command)
-        @pipeline.call_v(command, &block)
+        if prepare(command)
+          @pipeline.call_v(command, &block)
+        else
+          @buffer << -> { @pipeline.call_v(command, &block) }
+        end
       end
 
       def call_once(*command, **kwargs, &block)
         @retryable = false
         command = @command_builder.generate(command, kwargs)
-        prepare_once(command)
-        @pipeline.call_once_v(command, &block)
+        if prepare(command)
+          @pipeline.call_once_v(command, &block)
+        else
+          @buffer << -> { @pipeline.call_once_v(command, &block) }
+        end
       end
 
       def call_once_v(command, &block)
         @retryable = false
         command = @command_builder.generate(command)
-        prepare_once(command)
-        @pipeline.call_once_v(command, &block)
+        if prepare(command)
+          @pipeline.call_once_v(command, &block)
+        else
+          @buffer << -> { @pipeline.call_once_v(command, &block) }
+        end
       end
 
       def execute
+        @buffer.each(&:call)
+
+        raise ArgumentError, 'empty transaction' if @pipeline._empty?
+        raise ConsistencyError, "couldn't determine the node: #{@pipeline._commands}" if @node.nil?
+
         case @node
         when ::RedisClient then settle(@node)
-        when ::RedisClient::Pooled then @node.with { |node| settle(node) }
-        when nil then raise ArgumentError, 'empty transaction'
+        when ::RedisClient::Pooled then @node.with { |nd| settle(nd) }
         else raise NotImplementedError, "#{client.class.name}#multi for cluster client"
         end
       end
 
       private
 
-      def prepare_once(command)
-        return unless @node.nil?
+      def prepare(command)
+        return true unless @node.nil?
 
         node_key = @router.find_primary_node_key(command)
-        raise ConsistencyError, "cloud not find the node: #{command.join(' ')}" if node_key.nil?
+        return false if node_key.nil?
 
         @node = @router.find_node(node_key)
-        @pipeline.call('WATCH', *@watch) if watch?
+        @node.call('WATCH', *@watch) if watch?
         @pipeline.call('MULTI')
+        @buffer.each(&:call)
+        @buffer.clear
+        true
       end
 
       def settle(client)
         @pipeline.call('EXEC')
-        @pipeline.call('UNWATCH') if watch?
+        @node.call('UNWATCH') if watch?
         send_pipeline(client)
       end
 
@@ -84,12 +104,12 @@ class RedisClient
         end
 
         @pipeline._coerce!(results)
-        results[watch? ? -2 : -1]
+        results[-1]
       end
 
       def handle_command_error!(commands, err)
         if err.message.start_with?('CROSSSLOT')
-          raise ConsistencyError, err.message
+          raise ConsistencyError, "#{err.message}: #{err.command}"
         elsif err.message.start_with?('MOVED', 'ASK')
           ensure_the_same_node!(commands)
           handle_redirection(err)
@@ -106,7 +126,7 @@ class RedisClient
           node = @router.find_node(node_key)
           next if @node == node
 
-          raise ConsistencyError, 'the transaction should be executed to the same slot in the same node'
+          raise ConsistencyError, "the transaction should be executed to a slot in a node: #{commands}"
         end
       end
 
