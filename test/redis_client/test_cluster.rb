@@ -247,6 +247,20 @@ class RedisClient
         end
       end
 
+      def test_transaction_with_watch
+        got = @client.multi(watch: %w[{key}1 {key}2]) do |tx|
+          tx.call('SET', '{key}1', '1')
+          tx.call('SET', '{key}2', '2')
+        end
+
+        assert_equal(%w[OK OK], got)
+        assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
+      end
+
+      def test_transaction_against_optimistic_locking
+        skip("TODO: It's hard to hook in the middle of the transaction.")
+      end
+
       def test_pubsub_without_subscription
         pubsub = @client.pubsub
         assert_nil(pubsub.next_event(0.01))

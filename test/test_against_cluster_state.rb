@@ -59,6 +59,20 @@ class TestAgainstClusterState < TestingWrapper
       end
     end
 
+    def test_the_state_of_cluster_resharding_with_transaction
+      do_resharding_test do |keys|
+        @client.multi do |tx|
+          keys.each { |key| tx.call('SET', key, key) }
+        end
+
+        keys.each do |key|
+          want = key
+          got = @client.call('GET', key)
+          assert_equal(want, got, "Case: GET: #{key}")
+        end
+      end
+    end
+
     def test_the_state_of_cluster_resharding_with_pipelining_on_new_connection
       # This test is excercising a very delicate race condition; i think the use of @client to set
       # the keys in do_resharding_test is actually causing the race condition not to happen, so this

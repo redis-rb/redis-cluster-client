@@ -45,8 +45,8 @@ class RedisClient
 
       def execute
         case @node
-        when ::RedisClient then send_pipeline(@node, @pipeline, @watch, @retryable)
-        when ::RedisClient::Pooled then @node.with { |node| send_pipeline(node, @pipeline, @watch, @retryable) }
+        when ::RedisClient then settle(@node)
+        when ::RedisClient::Pooled then @node.with { |node| settle(node) }
         when nil then raise ArgumentError, 'empty transaction'
         else raise NotImplementedError, "#{client.class.name}#multi for cluster client"
         end
@@ -61,43 +61,41 @@ class RedisClient
         raise ConsistencyError, "cloud not find the node: #{command.join(' ')}" if node_key.nil?
 
         @node = @router.find_node(node_key)
-        @pipeline.call('WATCH', *@watch) unless @watch.nil? || @watch.empty?
+        @pipeline.call('WATCH', *@watch) if watch?
         @pipeline.call('MULTI')
       end
 
-      def send_pipeline(client, pipeline, watch, retryable)
-        pipeline.call('EXEC')
-        pipeline.call('UNWATCH', *watch) unless watch.nil? || watch.empty?
+      def settle(client)
+        @pipeline.call('EXEC')
+        @pipeline.call('UNWATCH') if watch?
+        send_pipeline(client)
+      end
 
-        results = client.ensure_connected_cluster_scoped(retryable: retryable) do |connection|
-          commands = pipeline._commands
+      def send_pipeline(client, redirect: true)
+        results = client.ensure_connected_cluster_scoped(retryable: @retryable) do |connection|
+          commands = @pipeline._commands
           client.middlewares.call_pipelined(commands, client.config) do
             connection.call_pipelined(commands, nil)
           rescue ::RedisClient::CommandError => e
-            handle_command_error!(commands, e)
+            return handle_command_error!(commands, e) if redirect
+
+            raise
           end
         end
 
-        pipeline._coerce!(results)
-        idx = watch.nil? || watch.empty? ? -1 : -2
-        results[idx]
+        @pipeline._coerce!(results)
+        results[watch? ? -2 : -1]
       end
 
       def handle_command_error!(commands, err)
         if err.message.start_with?('CROSSSLOT')
           raise ConsistencyError, err.message
         elsif err.message.start_with?('MOVED', 'ASK')
-          handle_redirection(commands, err)
+          ensure_the_same_node!(commands)
+          handle_redirection(err)
         else
           raise err
         end
-      end
-
-      def handle_redirection(commands, err)
-        ensure_the_same_node!(commands)
-
-        # TODO: fix the handling
-        raise ConsistencyError, err.message
       end
 
       def ensure_the_same_node!(commands)
@@ -106,8 +104,32 @@ class RedisClient
           next if node_key.nil?
 
           node = @router.find_node(node_key)
-          raise ConsistencyError, 'the transaction should be executed to the same slot in the same node' if @node != node
+          next if @node == node
+
+          raise ConsistencyError, 'the transaction should be executed to the same slot in the same node'
         end
+      end
+
+      def handle_redirection(err)
+        if err.message.start_with?('MOVED')
+          node = @router.assign_redirection_node(err.message)
+          send_pipeline(node, redirect: false)
+        elsif err.message.start_with?('ASK')
+          node = @router.assign_asking_node(err.message)
+          try_asking(node) ? send_pipeline(node, redirect: false) : err
+        else
+          raise err
+        end
+      end
+
+      def try_asking(node)
+        node.call('ASKING') == 'OK'
+      rescue StandardError
+        false
+      end
+
+      def watch?
+        !@watch.nil? && !@watch.empty?
       end
     end
   end
