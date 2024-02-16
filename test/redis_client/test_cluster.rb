@@ -234,7 +234,7 @@ class RedisClient
           end
         end
 
-        assert_raises(::RedisClient::CommandError, 'CROSSSLOT keys') do
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
           @client.multi do |t|
             t.call('MSET', 'key1', '1', 'key2', '2')
             t.call('MSET', 'key1', '1', 'key3', '3')

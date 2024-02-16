@@ -89,8 +89,10 @@ class RedisClient
       pipeline.execute
     end
 
-    def multi(watch: nil, &block)
-      ::RedisClient::Cluster::Transaction.new(@router, @command_builder).execute(watch: watch, &block)
+    def multi(watch: nil)
+      transaction = ::RedisClient::Cluster::Transaction.new(@router, @command_builder, watch)
+      yield transaction
+      transaction.execute
     end
 
     def with(key: nil, hashtag: nil, write: true, retry_count: 0, &block)
