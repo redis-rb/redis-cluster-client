@@ -15,7 +15,7 @@ class RedisClient
         @watch = watch
         @retryable = true
         @pipeline = ::RedisClient::Pipeline.new(@command_builder)
-        @buffer = []
+        @pending_commands = []
         @node = nil
       end
 
@@ -24,7 +24,7 @@ class RedisClient
         if prepare(command)
           @pipeline.call_v(command, &block)
         else
-          @buffer << -> { @pipeline.call_v(command, &block) }
+          defer { @pipeline.call_v(command, &block) }
         end
       end
 
@@ -33,7 +33,7 @@ class RedisClient
         if prepare(command)
           @pipeline.call_v(command, &block)
         else
-          @buffer << -> { @pipeline.call_v(command, &block) }
+          defer { @pipeline.call_v(command, &block) }
         end
       end
 
@@ -43,7 +43,7 @@ class RedisClient
         if prepare(command)
           @pipeline.call_once_v(command, &block)
         else
-          @buffer << -> { @pipeline.call_once_v(command, &block) }
+          defer { @pipeline.call_once_v(command, &block) }
         end
       end
 
@@ -53,12 +53,12 @@ class RedisClient
         if prepare(command)
           @pipeline.call_once_v(command, &block)
         else
-          @buffer << -> { @pipeline.call_once_v(command, &block) }
+          defer { @pipeline.call_once_v(command, &block) }
         end
       end
 
       def execute
-        @buffer.each(&:call)
+        @pending_commands.each(&:call)
 
         raise ArgumentError, 'empty transaction' if @pipeline._empty?
         raise ConsistencyError, "couldn't determine the node: #{@pipeline._commands}" if @node.nil?
@@ -68,6 +68,11 @@ class RedisClient
       end
 
       private
+
+      def defer(&block)
+        @pending_commands << block
+        nil
+      end
 
       def watch?
         !@watch.nil? && !@watch.empty?
@@ -97,8 +102,8 @@ class RedisClient
         @node = @router.find_node(node_key)
         @pipeline.call('WATCH', *@watch) if watch?
         @pipeline.call('MULTI')
-        @buffer.each(&:call)
-        @buffer.clear
+        @pending_commands.each(&:call)
+        @pending_commands.clear
         true
       end
 
