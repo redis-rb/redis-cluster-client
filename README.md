@@ -212,7 +212,7 @@ end
 ```
 
 `RedisClient::Cluster#multi` is aware of redirections and node failures like ordinary calls to `RedisClient::Cluster`,
-but because you may have written non-idempotent code inside your block, the block is called twice if e.g. the slot
+but because you may have written non-idempotent code inside your block, the block is called once if e.g. the slot
 it is operating on moves to a different node.
 
 #### IMO
