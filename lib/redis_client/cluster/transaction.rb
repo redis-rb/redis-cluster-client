@@ -117,7 +117,7 @@ class RedisClient
       end
 
       def send_pipeline(client, redirect:)
-        results = client.ensure_connected_cluster_scoped(retryable: @retryable) do |connection|
+        replies = client.ensure_connected_cluster_scoped(retryable: @retryable) do |connection|
           commands = @pipeline._commands
           client.middlewares.call_pipelined(commands, client.config) do
             connection.call_pipelined(commands, nil)
@@ -128,8 +128,26 @@ class RedisClient
           end
         end
 
-        @pipeline._coerce!(results)
-        results[watch? ? -2 : -1]
+        offset = watch? ? 2 : 1
+        coerce_results!(replies[-offset], offset)
+      end
+
+      def coerce_results!(results, offset)
+        results.each_with_index do |result, index|
+          if result.is_a?(::RedisClient::CommandError)
+            result._set_command(@pipeline._commands[index + offset])
+            raise result
+          end
+
+          next if @pipeline._blocks.nil?
+
+          block = @pipeline._blocks[index + offset]
+          next if block.nil?
+
+          results[index] = block.call(result)
+        end
+
+        results
       end
 
       def handle_command_error!(commands, err)

@@ -62,7 +62,10 @@ class TestAgainstClusterState < TestingWrapper
     def test_the_state_of_cluster_resharding_with_transaction
       do_resharding_test do |keys|
         @client.multi do |tx|
-          keys.each { |key| tx.call('INCR', key) }
+          keys.each do |key|
+            tx.call('SET', key, '0')
+            tx.call('INCR', key)
+          end
         end
 
         keys.each do |key|
