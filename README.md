@@ -175,7 +175,7 @@ and conditional execution with `WATCH`. Redis does not support cross-node transa
 transaction must live in the same key slot. To use transactions, you can use `#multi` method same as the [redis-client](https://github.com/redis-rb/redis-client#usage):
 
 ```ruby
-conn.multi do |tx|
+cli.multi do |tx|
   tx.call('INCR', 'my_key')
   tx.call('INCR', 'my_key')
 end
@@ -192,7 +192,7 @@ it _is_ possible to perform a transaction on the keys `{tag}foo` and `{tag}bar`.
 To perform such transactions on this gem, use `hashtag:
 
 ```ruby
-conn.multi do |tx|
+cli.multi do |tx|
   tx.call('INCR', '{user123}coins_spent')
   tx.call('DECR', '{user123}coins_available')
 end
@@ -201,11 +201,11 @@ end
 ```ruby
 # Conditional execution with WATCH can be used to e.g. atomically swap two keys
 cli.call('MSET', '{myslot}1', 'v1', '{myslot}2', 'v2')
-conn.multi(watch: %w[{myslot}1 {myslot}2]) do |txn|
+cli.multi(watch: %w[{myslot}1 {myslot}2]) do |tx|
   old_key1 = cli.call('GET', '{myslot}1')
   old_key2 = cli.call('GET', '{myslot}2')
-  txn.call('SET', '{myslot}1', old_key2)
-  txn.call('SET', '{myslot}2', old_key1)
+  tx.call('SET', '{myslot}1', old_key2)
+  tx.call('SET', '{myslot}2', old_key1)
 end
 # This transaction will swap the values of {myslot}1 and {myslot}2 only if no concurrent connection modified
 # either of the values

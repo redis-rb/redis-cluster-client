@@ -104,7 +104,6 @@ class RedisClient
     # @see https://github.com/redis-rb/redis-cluster-client/issues/299
     def with(key: nil, hashtag: nil, write: true, _retry_count: 0, &_)
       key = process_with_arguments(key, hashtag)
-
       node_key = @router.find_node_key_by_key(key, primary: write)
       node = @router.find_node(node_key)
       yield ::RedisClient::Cluster::PinningNode.new(node)
