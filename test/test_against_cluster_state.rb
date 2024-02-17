@@ -62,11 +62,14 @@ class TestAgainstClusterState < TestingWrapper
     def test_the_state_of_cluster_resharding_with_transaction
       do_resharding_test do |keys|
         @client.multi do |tx|
-          keys.each { |key| tx.call('SET', key, key) }
+          keys.each do |key|
+            tx.call('SET', key, '0')
+            tx.call('INCR', key)
+          end
         end
 
         keys.each do |key|
-          want = key
+          want = '1'
           got = @client.call('GET', key)
           assert_equal(want, got, "Case: GET: #{key}")
         end
