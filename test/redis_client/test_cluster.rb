@@ -248,6 +248,8 @@ class RedisClient
       end
 
       def test_transaction_with_watch
+        @client.call('MSET', '{key}1', '0', '{key}2', '0')
+
         got = @client.multi(watch: %w[{key}1 {key}2]) do |tx|
           tx.call('ECHO', 'START')
           tx.call('SET', '{key}1', '1')
@@ -259,10 +261,10 @@ class RedisClient
         assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
       end
 
-      def test_transaction_with_bad_watch
+      def test_transaction_with_unsafe_watch
         @client.call('MSET', '{key}1', '0', '{key}2', '0')
 
-        assert_raises(::RedisClient::CommandError) do
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
           @client.multi(watch: %w[key1 key2]) do |tx|
             tx.call('ECHO', 'START')
             tx.call('SET', '{key}1', '1')
@@ -274,8 +276,18 @@ class RedisClient
         assert_equal(%w[0 0], @client.call('MGET', '{key}1', '{key}2'))
       end
 
-      def test_transaction_against_optimistic_locking
-        skip("TODO: It's hard to hook in the middle of the transaction.")
+      def test_transaction_with_meaningless_watch
+        @client.call('MSET', '{key}1', '0', '{key}2', '0')
+
+        got = @client.multi(watch: %w[{key}3 {key}4]) do |tx|
+          tx.call('ECHO', 'START')
+          tx.call('SET', '{key}1', '1')
+          tx.call('SET', '{key}2', '2')
+          tx.call('ECHO', 'FINISH')
+        end
+
+        assert_equal(%w[START OK OK FINISH], got)
+        assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
       end
 
       def test_pubsub_without_subscription

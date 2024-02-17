@@ -2,6 +2,7 @@
 
 require 'redis_client'
 require 'redis_client/cluster/pipeline'
+require 'redis_client/cluster/key_slot_converter'
 
 class RedisClient
   class Cluster
@@ -56,11 +57,12 @@ class RedisClient
         end
       end
 
-      def execute
+      def execute # rubocop:disable Metrics/AbcSize
         @buffer.each(&:call)
 
         raise ArgumentError, 'empty transaction' if @pipeline._empty?
         raise ConsistencyError, "couldn't determine the node: #{@pipeline._commands}" if @node.nil?
+        raise ConsistencyError, "unsafe watch: #{@watch.join(' ')}" unless safe_watch?
 
         case @node
         when ::RedisClient then settle(@node)
@@ -71,6 +73,25 @@ class RedisClient
 
       private
 
+      def watch?
+        !@watch.nil? && !@watch.empty?
+      end
+
+      def safe_watch?
+        return true unless watch?
+        return false if @node.nil?
+
+        slots = @watch.map do |k|
+          return false if k.nil? || k.empty?
+
+          ::RedisClient::Cluster::KeySlotConverter.convert(k)
+        end
+
+        return false if slots.uniq.size != 1
+
+        @router.find_primary_node_by_slot(slots.first) == @node
+      end
+
       def prepare(command)
         return true unless @node.nil?
 
@@ -78,7 +99,7 @@ class RedisClient
         return false if node_key.nil?
 
         @node = @router.find_node(node_key)
-        @node.call('WATCH', *@watch) if watch?
+        @pipeline.call('WATCH', *@watch) if watch?
         @pipeline.call('MULTI')
         @buffer.each(&:call)
         @buffer.clear
@@ -87,7 +108,7 @@ class RedisClient
 
       def settle(client)
         @pipeline.call('EXEC')
-        @node.call('UNWATCH') if watch?
+        @pipeline.call('UNWATCH') if watch?
         send_pipeline(client)
       end
 
@@ -104,7 +125,7 @@ class RedisClient
         end
 
         @pipeline._coerce!(results)
-        results[-1]
+        results[watch? ? -2 : -1]
       end
 
       def handle_command_error!(commands, err)
@@ -146,10 +167,6 @@ class RedisClient
         node.call('ASKING') == 'OK'
       rescue StandardError
         false
-      end
-
-      def watch?
-        !@watch.nil? && !@watch.empty?
       end
     end
   end
