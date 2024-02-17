@@ -308,6 +308,19 @@ class RedisClient
         assert_equal('x', @client.call('GET', 'key1'))
       end
 
+      def test_transaction_without_error_during_queueing
+        @client.call('SET', 'key1', 'x')
+
+        assert_raises(::RedisClient::CommandError) do
+          @client.multi do |tx|
+            tx.call('SET', 'key1', 'aaa')
+            tx.call('INCR', 'key1')
+          end
+        end
+
+        assert_equal('aaa', @client.call('GET', 'key1'))
+      end
+
       def test_transaction_with_block
         @client.call('MSET', '{key}1', 'a', '{key}2', 'b', '{key}3', 'c')
 
@@ -318,6 +331,14 @@ class RedisClient
         end
 
         assert_equal(%w[aaa bbb ccc], got)
+
+        got = @client.multi(watch: %w[{key}1 {key}2 {key}3]) do |tx|
+          tx.call('GET', '{key}1') { |x| "#{x}11" }
+          tx.call('GET', '{key}2') { |x| "#{x}22" }
+          tx.call('GET', '{key}3') { |x| "#{x}33" }
+        end
+
+        assert_equal(%w[a11 b22 c33], got)
       end
 
       def test_pubsub_without_subscription
