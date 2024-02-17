@@ -2,8 +2,10 @@
 
 require 'rake/testtask'
 require 'rubocop/rake_task'
+require 'bundler/gem_helper'
 
 RuboCop::RakeTask.new
+Bundler::GemHelper.install_tasks
 
 SLUGGISH_TEST_TYPES = %w[broken scale state].freeze
 
