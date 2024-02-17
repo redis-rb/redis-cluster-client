@@ -296,12 +296,16 @@ class RedisClient
       end
 
       def test_transaction_with_error
+        @client.call('SET', 'key1', 'x')
+
         assert_raises(::RedisClient::CommandError) do
           @client.multi do |tx|
             tx.call('SET', 'key1', 'a')
             tx.call('INCR', 'key1')
           end
         end
+
+        assert_equal('x', @client.call('GET', 'key1'))
       end
 
       def test_transaction_with_block
