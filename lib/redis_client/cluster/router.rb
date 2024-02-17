@@ -162,6 +162,11 @@ class RedisClient
         end
       end
 
+      def find_primary_node_by_slot(slot)
+        node_key = @node.find_node_key_of_primary(slot)
+        find_node(node_key)
+      end
+
       def find_node_key(command, seed: nil)
         key = @command.extract_first_key(command)
         find_node_key_by_key(key, seed: seed, primary: @command.should_send_to_primary?(command))

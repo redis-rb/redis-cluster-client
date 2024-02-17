@@ -207,7 +207,7 @@ class RedisClient
         assert_raises(LocalJumpError) { @client.multi }
       end
 
-      def test_transaction_with_keyless_commands
+      def test_transaction_with_only_keyless_commands
         assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
           @client.multi do |t|
             t.call('ECHO', 'foo')
@@ -234,7 +234,7 @@ class RedisClient
           end
         end
 
-        assert_raises(::RedisClient::CommandError, 'CROSSSLOT keys') do
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
           @client.multi do |t|
             t.call('MSET', 'key1', '1', 'key2', '2')
             t.call('MSET', 'key1', '1', 'key3', '3')
@@ -245,6 +245,54 @@ class RedisClient
         (1..4).each do |i|
           assert_nil(@client.call('GET', "key#{i}"))
         end
+      end
+
+      def test_transaction_with_watch
+        @client.call('MSET', '{key}1', '0', '{key}2', '0')
+
+        got = @client.multi(watch: %w[{key}1 {key}2]) do |tx|
+          tx.call('ECHO', 'START')
+          tx.call('SET', '{key}1', '1')
+          tx.call('SET', '{key}2', '2')
+          tx.call('ECHO', 'FINISH')
+        end
+
+        assert_equal(%w[START OK OK FINISH], got)
+        assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
+      end
+
+      def test_transaction_with_unsafe_watch
+        @client.call('MSET', '{key}1', '0', '{key}2', '0')
+
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
+          @client.multi(watch: %w[key1 key2]) do |tx|
+            tx.call('SET', '{key}1', '1')
+            tx.call('SET', '{key}2', '2')
+          end
+        end
+
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
+          @client.multi(watch: %w[{hey}1 {hey}2]) do |tx|
+            tx.call('SET', '{key}1', '1')
+            tx.call('SET', '{key}2', '2')
+          end
+        end
+
+        assert_equal(%w[0 0], @client.call('MGET', '{key}1', '{key}2'))
+      end
+
+      def test_transaction_with_meaningless_watch
+        @client.call('MSET', '{key}1', '0', '{key}2', '0')
+
+        got = @client.multi(watch: %w[{key}3 {key}4]) do |tx|
+          tx.call('ECHO', 'START')
+          tx.call('SET', '{key}1', '1')
+          tx.call('SET', '{key}2', '2')
+          tx.call('ECHO', 'FINISH')
+        end
+
+        assert_equal(%w[START OK OK FINISH], got)
+        assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
       end
 
       def test_pubsub_without_subscription
