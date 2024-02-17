@@ -300,8 +300,8 @@ class RedisClient
 
         assert_raises(::RedisClient::CommandError) do
           @client.multi do |tx|
-            tx.call('SET', 'key1', 'a')
-            tx.call('INCR', 'key1')
+            tx.call('SET', 'key1', 'aaa')
+            tx.call('MYBAD', 'key1', 'bbb')
           end
         end
 
