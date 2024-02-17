@@ -57,18 +57,14 @@ class RedisClient
         end
       end
 
-      def execute # rubocop:disable Metrics/AbcSize
+      def execute
         @buffer.each(&:call)
 
         raise ArgumentError, 'empty transaction' if @pipeline._empty?
         raise ConsistencyError, "couldn't determine the node: #{@pipeline._commands}" if @node.nil?
         raise ConsistencyError, "unsafe watch: #{@watch.join(' ')}" unless safe_watch?
 
-        case @node
-        when ::RedisClient then settle(@node)
-        when ::RedisClient::Pooled then @node.with { |nd| settle(nd) }
-        else raise NotImplementedError, "#{client.class.name}#multi for cluster client"
-        end
+        settle
       end
 
       private
@@ -106,13 +102,21 @@ class RedisClient
         true
       end
 
-      def settle(client)
+      def settle
         @pipeline.call('EXEC')
         @pipeline.call('UNWATCH') if watch?
-        send_pipeline(client)
+        send_transaction(@node, redirect: true)
       end
 
-      def send_pipeline(client, redirect: true)
+      def send_transaction(client, redirect:)
+        case client
+        when ::RedisClient then send_pipeline(client, redirect: redirect)
+        when ::RedisClient::Pooled then client.with { |c| send_pipeline(c, redirect: redirect) }
+        else raise NotImplementedError, "#{client.class.name}#multi for cluster client"
+        end
+      end
+
+      def send_pipeline(client, redirect:)
         results = client.ensure_connected_cluster_scoped(retryable: @retryable) do |connection|
           commands = @pipeline._commands
           client.middlewares.call_pipelined(commands, client.config) do
@@ -154,10 +158,10 @@ class RedisClient
       def handle_redirection(err)
         if err.message.start_with?('MOVED')
           node = @router.assign_redirection_node(err.message)
-          send_pipeline(node, redirect: false)
+          send_transaction(node, redirect: false)
         elsif err.message.start_with?('ASK')
           node = @router.assign_asking_node(err.message)
-          try_asking(node) ? send_pipeline(node, redirect: false) : err
+          try_asking(node) ? send_transaction(node, redirect: false) : err
         else
           raise err
         end

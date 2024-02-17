@@ -266,10 +266,15 @@ class RedisClient
 
         assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
           @client.multi(watch: %w[key1 key2]) do |tx|
-            tx.call('ECHO', 'START')
             tx.call('SET', '{key}1', '1')
             tx.call('SET', '{key}2', '2')
-            tx.call('ECHO', 'FINISH')
+          end
+        end
+
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
+          @client.multi(watch: %w[{hey}1 {hey}2]) do |tx|
+            tx.call('SET', '{key}1', '1')
+            tx.call('SET', '{key}2', '2')
           end
         end
 
