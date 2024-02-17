@@ -5,6 +5,7 @@ require 'redis_client/cluster/pipeline'
 require 'redis_client/cluster/pub_sub'
 require 'redis_client/cluster/router'
 require 'redis_client/cluster/transaction'
+require 'redis_client/cluster/pinning_node'
 
 class RedisClient
   class Cluster
@@ -95,19 +96,18 @@ class RedisClient
       transaction.execute
     end
 
-    def with(key: nil, hashtag: nil, write: true, retry_count: 0, &block)
+    def pubsub
+      ::RedisClient::Cluster::PubSub.new(@router, @command_builder)
+    end
+
+    # TODO: This isn't an official public interface yet. Don't use in your production environment.
+    # @see https://github.com/redis-rb/redis-cluster-client/issues/299
+    def with(key: nil, hashtag: nil, write: true, _retry_count: 0, &_)
       key = process_with_arguments(key, hashtag)
 
       node_key = @router.find_node_key_by_key(key, primary: write)
       node = @router.find_node(node_key)
-      # Calling #with checks out the underlying connection if this is a pooled connection
-      # Calling it through #try_delegate ensures we handle any redirections and retry the entire
-      # transaction if so.
-      @router.try_delegate(node, :with, retry_count: retry_count, &block)
-    end
-
-    def pubsub
-      ::RedisClient::Cluster::PubSub.new(@router, @command_builder)
+      yield ::RedisClient::Cluster::PinningNode.new(node)
     end
 
     def close
