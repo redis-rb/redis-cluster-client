@@ -142,17 +142,27 @@ class TestAgainstClusterState < TestingWrapper
   class ScaleReadRandom < TestingWrapper
     include Mixin
 
+    # FIXME: https://github.com/redis/redis/issues/11312
     def test_the_state_of_cluster_resharding
       keys = nil
       do_resharding_test { |ks| keys = ks }
       keys.each { |key| assert_equal(key, @client.call('GET', key), "Case: GET: #{key}") }
     end
 
+    # FIXME: https://github.com/redis/redis/issues/11312
     def test_the_state_of_cluster_resharding_with_pipelining
       keys = nil
       do_resharding_test { |ks| keys = ks }
       values = @client.pipelined { |pipeline| keys.each { |key| pipeline.call('GET', key) } }
       keys.each_with_index { |key, i| assert_equal(key, values[i], "Case: GET: #{key}") }
+    end
+
+    # FIXME: https://github.com/redis/redis/issues/11312
+    def test_the_state_of_cluster_resharding_with_transaction
+      keys = nil
+      do_resharding_test { |ks| keys = ks }
+      @client.multi { |tx| keys.each { |key| tx.call('SET', key, key) } }
+      keys.each { |key| assert_equal(key, @client.call('GET', key), "Case: GET: #{key}") }
     end
 
     private
@@ -171,17 +181,27 @@ class TestAgainstClusterState < TestingWrapper
   class ScaleReadRandomWithPrimary < TestingWrapper
     include Mixin
 
+    # FIXME: https://github.com/redis/redis/issues/11312
     def test_the_state_of_cluster_resharding
       keys = nil
       do_resharding_test { |ks| keys = ks }
       keys.each { |key| assert_equal(key, @client.call('GET', key), "Case: GET: #{key}") }
     end
 
+    # FIXME: https://github.com/redis/redis/issues/11312
     def test_the_state_of_cluster_resharding_with_pipelining
       keys = nil
       do_resharding_test { |ks| keys = ks }
       values = @client.pipelined { |pipeline| keys.each { |key| pipeline.call('GET', key) } }
       keys.each_with_index { |key, i| assert_equal(key, values[i], "Case: GET: #{key}") }
+    end
+
+    # FIXME: https://github.com/redis/redis/issues/11312
+    def test_the_state_of_cluster_resharding_with_transaction
+      keys = nil
+      do_resharding_test { |ks| keys = ks }
+      @client.multi { |tx| keys.each { |key| tx.call('SET', key, key) } }
+      keys.each { |key| assert_equal(key, @client.call('GET', key), "Case: GET: #{key}") }
     end
 
     private
@@ -200,17 +220,27 @@ class TestAgainstClusterState < TestingWrapper
   class ScaleReadLatency < TestingWrapper
     include Mixin
 
+    # FIXME: https://github.com/redis/redis/issues/11312
     def test_the_state_of_cluster_resharding
       keys = nil
       do_resharding_test { |ks| keys = ks }
       keys.each { |key| assert_equal(key, @client.call('GET', key), "Case: GET: #{key}") }
     end
 
+    # FIXME: https://github.com/redis/redis/issues/11312
     def test_the_state_of_cluster_resharding_with_pipelining
       keys = nil
       do_resharding_test { |ks| keys = ks }
       values = @client.pipelined { |pipeline| keys.each { |key| pipeline.call('GET', key) } }
       keys.each_with_index { |key, i| assert_equal(key, values[i], "Case: GET: #{key}") }
+    end
+
+    # FIXME: https://github.com/redis/redis/issues/11312
+    def test_the_state_of_cluster_resharding_with_transaction
+      keys = nil
+      do_resharding_test { |ks| keys = ks }
+      @client.multi { |tx| keys.each { |key| tx.call('SET', key, key) } }
+      keys.each { |key| assert_equal(key, @client.call('GET', key), "Case: GET: #{key}") }
     end
 
     private
