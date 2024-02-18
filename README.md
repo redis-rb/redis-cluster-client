@@ -189,7 +189,7 @@ then it is guaranted to hash to the same slot (and thus always live on the same 
 
 So, whilst it's not possible in Redis cluster to perform a transction on the keys `foo` and `bar`,
 it _is_ possible to perform a transaction on the keys `{tag}foo` and `{tag}bar`.
-To perform such transactions on this gem, use `hashtag:
+To perform such transactions on this gem, use the hashtag:
 
 ```ruby
 cli.multi do |tx|
