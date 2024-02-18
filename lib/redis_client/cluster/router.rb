@@ -179,6 +179,16 @@ class RedisClient
         find_node_key_by_key(key, primary: true)
       end
 
+      def find_slot(command)
+        find_slot_by_key(@command.extract_first_key(command))
+      end
+
+      def find_slot_by_key(key)
+        return if key.empty?
+
+        ::RedisClient::Cluster::KeySlotConverter.convert(key)
+      end
+
       def find_node(node_key, retry_count: 3)
         @node.find_by(node_key)
       rescue ::RedisClient::Cluster::Node::ReloadNeeded

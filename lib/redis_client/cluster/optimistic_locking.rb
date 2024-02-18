@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'redis_client'
-require 'redis_client/cluster/key_slot_converter'
 require 'redis_client/cluster/transaction'
 
 class RedisClient
@@ -12,15 +11,14 @@ class RedisClient
       end
 
       def watch(keys)
-        ensure_safe_keys(keys)
-        node = find_node(keys)
-        cnt = 0 # We assume redirects occurred when incrementing it.
+        slot = find_slot(keys)
+        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "unsafe watch: #{keys.join(' ')}" if slot.nil?
 
+        node = @router.find_primary_node_by_slot(slot)
         @router.handle_redirection(node, retry_count: 1) do |nd|
-          cnt += 1
           nd.with do |c|
             c.call('WATCH', *keys)
-            reply = yield(c, cnt > 1)
+            reply = yield(c, slot)
             c.call('UNWATCH')
             reply
           end
@@ -29,29 +27,14 @@ class RedisClient
 
       private
 
-      def ensure_safe_keys(keys)
-        return if safe?(keys)
+      def find_slot(keys)
+        return if keys.empty?
+        return if keys.any? { |k| k.nil? || k.empty? }
 
-        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "unsafe watch: #{keys.join(' ')}"
-      end
+        slots = keys.map { |k| @router.find_slot_by_key(k) }
+        return if slots.uniq.size != 1
 
-      def safe?(keys)
-        return false if keys.empty?
-
-        slots = keys.map do |k|
-          return false if k.nil? || k.empty?
-
-          ::RedisClient::Cluster::KeySlotConverter.convert(k)
-        end
-
-        slots.uniq.size == 1
-      end
-
-      def find_node(keys)
-        node_key = @router.find_primary_node_key(['WATCH', *keys])
-        return @router.find_node(node_key) unless node_key.nil?
-
-        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "couldn't determine the node"
+        slots.first
       end
     end
   end
