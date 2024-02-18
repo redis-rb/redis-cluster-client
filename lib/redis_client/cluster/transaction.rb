@@ -2,21 +2,21 @@
 
 require 'redis_client'
 require 'redis_client/cluster/pipeline'
-require 'redis_client/cluster/key_slot_converter'
+require 'redis_client/cluster/node_key'
 
 class RedisClient
   class Cluster
     class Transaction
       ConsistencyError = Class.new(::RedisClient::Error)
 
-      def initialize(router, command_builder, watch)
+      def initialize(router, command_builder, node = nil)
         @router = router
         @command_builder = command_builder
-        @watch = watch
         @retryable = true
         @pipeline = ::RedisClient::Pipeline.new(@command_builder)
         @pending_commands = []
-        @node = nil
+        @node = node
+        prepare_tx unless @node.nil?
       end
 
       def call(*command, **kwargs, &block)
@@ -62,7 +62,6 @@ class RedisClient
 
         raise ArgumentError, 'empty transaction' if @pipeline._empty?
         raise ConsistencyError, "couldn't determine the node: #{@pipeline._commands}" if @node.nil?
-        raise ConsistencyError, "unsafe watch: #{@watch.join(' ')}" unless safe_watch?
 
         settle
       end
@@ -74,25 +73,6 @@ class RedisClient
         nil
       end
 
-      def watch?
-        !@watch.nil? && !@watch.empty?
-      end
-
-      def safe_watch?
-        return true unless watch?
-        return false if @node.nil?
-
-        slots = @watch.map do |k|
-          return false if k.nil? || k.empty?
-
-          ::RedisClient::Cluster::KeySlotConverter.convert(k)
-        end
-
-        return false if slots.uniq.size != 1
-
-        @router.find_primary_node_by_slot(slots.first) == @node
-      end
-
       def prepare(command)
         return true unless @node.nil?
 
@@ -100,16 +80,18 @@ class RedisClient
         return false if node_key.nil?
 
         @node = @router.find_node(node_key)
-        @pipeline.call('WATCH', *@watch) if watch?
+        prepare_tx
+        true
+      end
+
+      def prepare_tx
         @pipeline.call('MULTI')
         @pending_commands.each(&:call)
         @pending_commands.clear
-        true
       end
 
       def settle
         @pipeline.call('EXEC')
-        @pipeline.call('UNWATCH') if watch?
         send_transaction(@node, redirect: true)
       end
 
@@ -133,11 +115,12 @@ class RedisClient
           end
         end
 
-        offset = watch? ? 2 : 1
-        coerce_results!(replies[-offset], offset)
+        return if replies.last.nil?
+
+        coerce_results!(replies.last)
       end
 
-      def coerce_results!(results, offset)
+      def coerce_results!(results, offset: 1)
         results.each_with_index do |result, index|
           if result.is_a?(::RedisClient::CommandError)
             result._set_command(@pipeline._commands[index + offset])
@@ -167,12 +150,12 @@ class RedisClient
       end
 
       def ensure_the_same_node!(commands)
+        expected_node_key = NodeKey.build_from_client(@node)
+
         commands.each do |command|
           node_key = @router.find_primary_node_key(command)
           next if node_key.nil?
-
-          node = @router.find_node(node_key)
-          next if @node == node
+          next if node_key == expected_node_key
 
           raise ConsistencyError, "the transaction should be executed to a slot in a node: #{commands}"
         end

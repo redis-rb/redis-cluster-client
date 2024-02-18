@@ -51,6 +51,20 @@ class RedisClient
           assert_equal(c[:want], got, "Case: #{idx}")
         end
       end
+
+      def test_build_from_client
+        dummy_client = Struct.new(:config, keyword_init: true)
+        dummy_config = Struct.new(:host, :port, keyword_init: true)
+        dummy = dummy_client.new(config: dummy_config.new(host: '127.0.0.1', port: '6379'))
+
+        [
+          { client: dummy, want: '127.0.0.1:6379' },
+          { client: ::RedisClient.new(host: '127.0.0.1', port: '6379'), want: '127.0.0.1:6379' }
+        ].each_with_index do |c, idx|
+          got = ::RedisClient::Cluster::NodeKey.build_from_client(c[:client])
+          assert_equal(c[:want], got, "Case: #{idx}")
+        end
+      end
     end
   end
 end
