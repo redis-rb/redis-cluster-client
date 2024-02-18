@@ -2,7 +2,6 @@
 
 require 'redis_client'
 require 'redis_client/cluster/pipeline'
-require 'redis_client/cluster/node_key'
 
 class RedisClient
   class Cluster
@@ -10,7 +9,7 @@ class RedisClient
       ConsistencyError = Class.new(::RedisClient::Error)
       MAX_REDIRECTION = 2
 
-      def initialize(router, command_builder, node: nil, resharding: false)
+      def initialize(router, command_builder, node: nil, slot: nil)
         @router = router
         @command_builder = command_builder
         @retryable = true
@@ -18,7 +17,7 @@ class RedisClient
         @pending_commands = []
         @node = node
         prepare_tx unless @node.nil?
-        @resharding_state = resharding
+        @watching_slot = slot
       end
 
       def call(*command, **kwargs, &block)
@@ -111,7 +110,7 @@ class RedisClient
           client.middlewares.call_pipelined(commands, client.config) do
             connection.call_pipelined(commands, nil)
           rescue ::RedisClient::CommandError => e
-            return handle_command_error!(client, commands, e, redirect: redirect) unless redirect.zero?
+            return handle_command_error!(commands, e, redirect: redirect) unless redirect.zero?
 
             raise
           end
@@ -140,15 +139,15 @@ class RedisClient
         results
       end
 
-      def handle_command_error!(client, commands, err, redirect:) # rubocop:disable Metrics/AbcSize
+      def handle_command_error!(commands, err, redirect:) # rubocop:disable Metrics/AbcSize
         if err.message.start_with?('CROSSSLOT')
           raise ConsistencyError, "#{err.message}: #{err.command}"
         elsif err.message.start_with?('MOVED')
-          ensure_the_same_node!(client, commands)
+          ensure_the_same_slot!(commands)
           node = @router.assign_redirection_node(err.message)
           send_transaction(node, redirect: redirect - 1)
         elsif err.message.start_with?('ASK')
-          ensure_the_same_node!(client, commands)
+          ensure_the_same_slot!(commands)
           node = @router.assign_asking_node(err.message)
           try_asking(node) ? send_transaction(node, redirect: redirect - 1) : err
         else
@@ -156,12 +155,10 @@ class RedisClient
         end
       end
 
-      def ensure_the_same_node!(client, commands)
-        node_keys = commands.map { |command| @router.find_primary_node_key(command) }.compact.uniq
-        expected_node_key = ::RedisClient::Cluster::NodeKey.build_from_client(client)
-
-        return if !@resharding_state && node_keys.size == 1 && node_keys.first == expected_node_key
-        return if @resharding_state && node_keys.size == 1
+      def ensure_the_same_slot!(commands)
+        slots = commands.map { |command| @router.find_slot(command) }.compact.uniq
+        return if slots.size == 1 && @watching_slot.nil?
+        return if slots.size == 1 && @watching_slot == slots.first
 
         raise(ConsistencyError, "the transaction should be executed to a slot in a node: #{commands}")
       end
