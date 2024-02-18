@@ -115,6 +115,8 @@ class RedisClient
           end
         end
 
+        return if replies.last.nil?
+
         coerce_results!(replies.last)
       end
 

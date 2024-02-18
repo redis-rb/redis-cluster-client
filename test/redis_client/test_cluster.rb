@@ -341,6 +341,27 @@ class RedisClient
         assert_equal(%w[a11 b22 c33], got)
       end
 
+      def test_transaction_in_race_condition
+        @client.call('MSET', '{key}1', '1', '{key}2', '2')
+
+        another = Fiber.new do
+          cli = new_test_client
+          cli.call('MSET', '{key}1', '3', '{key}2', '4')
+          cli.close
+          Fiber.yield
+        end
+
+        @client.multi(watch: %w[{key}1 {key}2]) do |tx|
+          another.resume
+          v1 = @client.call('GET', '{key}1')
+          v2 = @client.call('GET', '{key}1')
+          tx.call('SET', '{key}1', v2)
+          tx.call('SET', '{key}2', v1)
+        end
+
+        assert_equal(%w[3 4], @client.call('MGET', '{key}1', '{key}2'))
+      end
+
       def test_pubsub_without_subscription
         pubsub = @client.pubsub
         assert_nil(pubsub.next_event(0.01))
