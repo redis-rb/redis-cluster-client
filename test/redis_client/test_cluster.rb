@@ -351,14 +351,15 @@ class RedisClient
           Fiber.yield
         end
 
-        @client.multi(watch: %w[{key}1 {key}2]) do |tx|
+        got = @client.multi(watch: %w[{key}1 {key}2]) do |tx|
           another.resume
           v1 = @client.call('GET', '{key}1')
-          v2 = @client.call('GET', '{key}1')
+          v2 = @client.call('GET', '{key}2')
           tx.call('SET', '{key}1', v2)
           tx.call('SET', '{key}2', v1)
         end
 
+        assert_nil(got)
         assert_equal(%w[3 4], @client.call('MGET', '{key}1', '{key}2'))
       end
 
