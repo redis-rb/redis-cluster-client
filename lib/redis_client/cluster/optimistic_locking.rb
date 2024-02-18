@@ -8,29 +8,26 @@ class RedisClient
   class Cluster
     class OptimisticLocking
       def initialize(keys, router)
-        @node = find_node!(keys, router)
+        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "unsafe watch: #{keys.join(' ')}" unless safe?(keys)
+
         @keys = keys
+        @router = router
       end
 
       def watch
-        @node.with do |c|
-          c.call('WATCH', *@keys)
-          reply = yield(c)
-          c.call('UNWATCH')
-          reply
+        node = find_node!
+
+        @router.handle_redirection(node, retry_count: 1) do |nd|
+          nd.with do |c|
+            c.call('WATCH', *@keys)
+            reply = yield(c)
+            c.call('UNWATCH')
+            reply
+          end
         end
       end
 
       private
-
-      def find_node!(keys, router)
-        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "unsafe watch: #{keys.join(' ')}" unless safe?(keys)
-
-        node_key = router.find_primary_node_key(['WATCH', *keys])
-        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "couldn't determine the node" if node_key.nil?
-
-        router.find_node(node_key)
-      end
 
       def safe?(keys)
         return false if keys.empty?
@@ -42,6 +39,13 @@ class RedisClient
         end
 
         slots.uniq.size == 1
+      end
+
+      def find_node!
+        node_key = @router.find_primary_node_key(['WATCH', *@keys])
+        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "couldn't determine the node" if node_key.nil?
+
+        @router.find_node(node_key)
       end
     end
   end

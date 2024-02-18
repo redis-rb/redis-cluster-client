@@ -8,6 +8,7 @@ class RedisClient
   class Cluster
     class Transaction
       ConsistencyError = Class.new(::RedisClient::Error)
+      MAX_REDIRECTION = 2
 
       def initialize(router, command_builder, node = nil)
         @router = router
@@ -17,6 +18,7 @@ class RedisClient
         @pending_commands = []
         @node = node
         prepare_tx unless @node.nil?
+        @resharding_state = false
       end
 
       def call(*command, **kwargs, &block)
@@ -92,7 +94,7 @@ class RedisClient
 
       def settle
         @pipeline.call('EXEC')
-        send_transaction(@node, redirect: true)
+        send_transaction(@node, redirect: MAX_REDIRECTION)
       end
 
       def send_transaction(client, redirect:)
@@ -109,7 +111,7 @@ class RedisClient
           client.middlewares.call_pipelined(commands, client.config) do
             connection.call_pipelined(commands, nil)
           rescue ::RedisClient::CommandError => e
-            return handle_command_error!(commands, e) if redirect
+            return handle_command_error!(client, commands, e, redirect: redirect) unless redirect.zero?
 
             raise
           end
@@ -138,36 +140,35 @@ class RedisClient
         results
       end
 
-      def handle_command_error!(commands, err)
+      def handle_command_error!(client, commands, err, redirect:)
         if err.message.start_with?('CROSSSLOT')
           raise ConsistencyError, "#{err.message}: #{err.command}"
         elsif err.message.start_with?('MOVED', 'ASK')
-          ensure_the_same_node!(commands)
-          handle_redirection(err)
+          ensure_the_same_node!(client, commands)
+          handle_redirection(err, redirect: redirect)
         else
           raise err
         end
       end
 
-      def ensure_the_same_node!(commands)
-        expected_node_key = NodeKey.build_from_client(@node)
+      def ensure_the_same_node!(client, commands)
+        node_keys = commands.map { |command| @router.find_primary_node_key(command) }.compact.uniq
+        expected_node_key = ::RedisClient::Cluster::NodeKey.build_from_client(client)
 
-        commands.each do |command|
-          node_key = @router.find_primary_node_key(command)
-          next if node_key.nil?
-          next if node_key == expected_node_key
+        return if !@resharding_state && node_keys.size == 1 && node_keys.first == expected_node_key
+        return if @resharding_state && node_keys.size == 1
 
-          raise ConsistencyError, "the transaction should be executed to a slot in a node: #{commands}"
-        end
+        raise(ConsistencyError, "the transaction should be executed to a slot in a node: #{commands}")
       end
 
-      def handle_redirection(err)
+      def handle_redirection(err, redirect:)
         if err.message.start_with?('MOVED')
           node = @router.assign_redirection_node(err.message)
-          send_transaction(node, redirect: false)
+          send_transaction(node, redirect: redirect - 1)
         elsif err.message.start_with?('ASK')
+          @resharding_state = true
           node = @router.assign_asking_node(err.message)
-          try_asking(node) ? send_transaction(node, redirect: false) : err
+          try_asking(node) ? send_transaction(node, redirect: redirect - 1) : err
         else
           raise err
         end
