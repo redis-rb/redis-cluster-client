@@ -7,20 +7,20 @@ require 'redis_client/cluster/transaction'
 class RedisClient
   class Cluster
     class OptimisticLocking
-      def initialize(keys, router)
-        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "unsafe watch: #{keys.join(' ')}" unless safe?(keys)
-
-        @keys = keys
+      def initialize(router)
         @router = router
       end
 
-      def watch
-        node = find_node!
+      def watch(keys)
+        ensure_safe_keys(keys)
+        node = find_node(keys)
+        cnt = 0 # We assume redirects occurred when incrementing it.
 
         @router.handle_redirection(node, retry_count: 1) do |nd|
+          cnt += 1
           nd.with do |c|
-            c.call('WATCH', *@keys)
-            reply = yield(c)
+            c.call('WATCH', *keys)
+            reply = yield(c, cnt > 1)
             c.call('UNWATCH')
             reply
           end
@@ -28,6 +28,12 @@ class RedisClient
       end
 
       private
+
+      def ensure_safe_keys(keys)
+        return if safe?(keys)
+
+        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "unsafe watch: #{keys.join(' ')}"
+      end
 
       def safe?(keys)
         return false if keys.empty?
@@ -41,11 +47,11 @@ class RedisClient
         slots.uniq.size == 1
       end
 
-      def find_node!
-        node_key = @router.find_primary_node_key(['WATCH', *@keys])
-        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "couldn't determine the node" if node_key.nil?
+      def find_node(keys)
+        node_key = @router.find_primary_node_key(['WATCH', *keys])
+        return @router.find_node(node_key) unless node_key.nil?
 
-        @router.find_node(node_key)
+        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "couldn't determine the node"
       end
     end
   end

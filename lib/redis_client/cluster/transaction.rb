@@ -10,7 +10,7 @@ class RedisClient
       ConsistencyError = Class.new(::RedisClient::Error)
       MAX_REDIRECTION = 2
 
-      def initialize(router, command_builder, node = nil)
+      def initialize(router, command_builder, node: nil, resharding: false)
         @router = router
         @command_builder = command_builder
         @retryable = true
@@ -18,7 +18,7 @@ class RedisClient
         @pending_commands = []
         @node = node
         prepare_tx unless @node.nil?
-        @resharding_state = false
+        @resharding_state = resharding
       end
 
       def call(*command, **kwargs, &block)
@@ -140,12 +140,17 @@ class RedisClient
         results
       end
 
-      def handle_command_error!(client, commands, err, redirect:)
+      def handle_command_error!(client, commands, err, redirect:) # rubocop:disable Metrics/AbcSize
         if err.message.start_with?('CROSSSLOT')
           raise ConsistencyError, "#{err.message}: #{err.command}"
-        elsif err.message.start_with?('MOVED', 'ASK')
+        elsif err.message.start_with?('MOVED')
           ensure_the_same_node!(client, commands)
-          handle_redirection(err, redirect: redirect)
+          node = @router.assign_redirection_node(err.message)
+          send_transaction(node, redirect: redirect - 1)
+        elsif err.message.start_with?('ASK')
+          ensure_the_same_node!(client, commands)
+          node = @router.assign_asking_node(err.message)
+          try_asking(node) ? send_transaction(node, redirect: redirect - 1) : err
         else
           raise err
         end
@@ -159,19 +164,6 @@ class RedisClient
         return if @resharding_state && node_keys.size == 1
 
         raise(ConsistencyError, "the transaction should be executed to a slot in a node: #{commands}")
-      end
-
-      def handle_redirection(err, redirect:)
-        if err.message.start_with?('MOVED')
-          node = @router.assign_redirection_node(err.message)
-          send_transaction(node, redirect: redirect - 1)
-        elsif err.message.start_with?('ASK')
-          @resharding_state = true
-          node = @router.assign_asking_node(err.message)
-          try_asking(node) ? send_transaction(node, redirect: redirect - 1) : err
-        else
-          raise err
-        end
       end
 
       def try_asking(node)

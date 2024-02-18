@@ -98,8 +98,10 @@ class RedisClient
         return transaction.execute
       end
 
-      ::RedisClient::Cluster::OptimisticLocking.new(watch, @router).watch do |c|
-        transaction = ::RedisClient::Cluster::Transaction.new(@router, @command_builder, c)
+      ::RedisClient::Cluster::OptimisticLocking.new(@router).watch(watch) do |c, resharding|
+        transaction = ::RedisClient::Cluster::Transaction.new(
+          @router, @command_builder, node: c, resharding: resharding
+        )
         yield transaction
         transaction.execute
       end
