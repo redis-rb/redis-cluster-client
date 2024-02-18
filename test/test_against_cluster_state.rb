@@ -169,6 +169,20 @@ class TestAgainstClusterState < TestingWrapper
     end
   end
 
+  class Pooled < TestingWrapper
+    include Mixin
+
+    private
+
+    def new_test_client
+      ::RedisClient.cluster(
+        nodes: TEST_NODE_URIS,
+        fixed_hostname: TEST_FIXED_HOSTNAME,
+        **TEST_GENERIC_OPTIONS
+      ).new_pool(timeout: TEST_TIMEOUT_SEC, size: 2)
+    end
+  end
+
   class ScaleReadRandom < TestingWrapper
     include Mixin
 
@@ -181,6 +195,10 @@ class TestAgainstClusterState < TestingWrapper
     end
 
     def test_the_state_of_cluster_resharding_with_transaction
+      skip('https://github.com/redis/redis/issues/11312')
+    end
+
+    def test_the_state_of_cluster_resharding_with_transaction_and_watch
       skip('https://github.com/redis/redis/issues/11312')
     end
 
@@ -212,6 +230,10 @@ class TestAgainstClusterState < TestingWrapper
       skip('https://github.com/redis/redis/issues/11312')
     end
 
+    def test_the_state_of_cluster_resharding_with_transaction_and_watch
+      skip('https://github.com/redis/redis/issues/11312')
+    end
+
     private
 
     def new_test_client
@@ -240,6 +262,10 @@ class TestAgainstClusterState < TestingWrapper
       skip('https://github.com/redis/redis/issues/11312')
     end
 
+    def test_the_state_of_cluster_resharding_with_transaction_and_watch
+      skip('https://github.com/redis/redis/issues/11312')
+    end
+
     private
 
     def new_test_client
@@ -250,20 +276,6 @@ class TestAgainstClusterState < TestingWrapper
         fixed_hostname: TEST_FIXED_HOSTNAME,
         **TEST_GENERIC_OPTIONS
       ).new_client
-    end
-  end
-
-  class Pooled < TestingWrapper
-    include Mixin
-
-    private
-
-    def new_test_client
-      ::RedisClient.cluster(
-        nodes: TEST_NODE_URIS,
-        fixed_hostname: TEST_FIXED_HOSTNAME,
-        **TEST_GENERIC_OPTIONS
-      ).new_pool(timeout: TEST_TIMEOUT_SEC, size: 2)
     end
   end
 end
