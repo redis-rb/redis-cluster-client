@@ -150,11 +150,12 @@ class RedisClient
       end
 
       def ensure_the_same_node!(commands)
+        expected_node_key = NodeKey.build_from_client(@node)
+
         commands.each do |command|
           node_key = @router.find_primary_node_key(command)
           next if node_key.nil?
-
-          next if NodeKey.build_from_client(@node) == node_key
+          next if node_key == expected_node_key
 
           raise ConsistencyError, "the transaction should be executed to a slot in a node: #{commands}"
         end
