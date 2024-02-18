@@ -6,6 +6,7 @@ require 'redis_client/cluster/pub_sub'
 require 'redis_client/cluster/router'
 require 'redis_client/cluster/transaction'
 require 'redis_client/cluster/pinning_node'
+require 'redis_client/cluster/optimistic_locking'
 
 class RedisClient
   class Cluster
@@ -91,9 +92,18 @@ class RedisClient
     end
 
     def multi(watch: nil)
-      transaction = ::RedisClient::Cluster::Transaction.new(@router, @command_builder, watch)
-      yield transaction
-      transaction.execute
+      if watch.nil? || watch.empty?
+        transaction = ::RedisClient::Cluster::Transaction.new(@router, @command_builder)
+        yield transaction
+        transaction.execute
+      else
+        locking = ::RedisClient::Cluster::OptimisticLocking.new(watch, @router)
+        locking.watch do |c|
+          transaction = ::RedisClient::Cluster::Transaction.new(@router, @command_builder, c)
+          yield transaction
+          transaction.execute
+        end
+      end
     end
 
     def pubsub
@@ -102,11 +112,11 @@ class RedisClient
 
     # TODO: This isn't an official public interface yet. Don't use in your production environment.
     # @see https://github.com/redis-rb/redis-cluster-client/issues/299
-    def with(key: nil, hashtag: nil, write: true, _retry_count: 0, &_)
+    def with(key: nil, hashtag: nil, write: true)
       key = process_with_arguments(key, hashtag)
       node_key = @router.find_node_key_by_key(key, primary: write)
       node = @router.find_node(node_key)
-      yield ::RedisClient::Cluster::PinningNode.new(node)
+      node.with { |c| yield ::RedisClient::Cluster::PinningNode.new(c) }
     end
 
     def close

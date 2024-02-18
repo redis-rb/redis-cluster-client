@@ -31,6 +31,10 @@ class RedisClient
       def build_from_host_port(host, port)
         "#{host}#{DELIMITER}#{port}"
       end
+
+      def build_from_client(client)
+        "#{client.config.host}#{DELIMITER}#{client.config.port}"
+      end
     end
   end
 end
