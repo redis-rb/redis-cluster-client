@@ -8,6 +8,7 @@ class RedisClient
     class OptimisticLocking
       def initialize(router)
         @router = router
+        @asking = false
       end
 
       def watch(keys)
@@ -17,12 +18,13 @@ class RedisClient
         # We have not yet selected a node for this transaction, initially, which means we can handle
         # redirections freely initially (i.e. for the first WATCH call)
         node = @router.find_primary_node_by_slot(slot)
-        @router.handle_redirection(node, retry_count: 1) do |nd|
+        handle_redirection(node, retry_count: 1) do |nd|
           nd.with do |c|
             c.ensure_connected_cluster_scoped(retryable: false) do
+              c.call('ASKING') if @asking
               c.call('WATCH', *keys)
               begin
-                yield(c, slot)
+                yield(c, slot, @asking)
               rescue ::RedisClient::ConnectionError
                 # No need to unwatch on a connection error.
                 raise
@@ -36,6 +38,25 @@ class RedisClient
       end
 
       private
+
+      def handle_redirection(node, retry_count: 1, &blk)
+        @router.handle_redirection(node, retry_count: retry_count) do |nd|
+          handle_asking_once(nd, &blk)
+        end
+      end
+
+      def handle_asking_once(node)
+        yield node
+      rescue ::RedisClient::CommandError => e
+        raise unless ErrorIdentification.client_owns_error?(e, node)
+        raise unless e.message.start_with?('ASK')
+
+        node = @router.assign_asking_node(e.message)
+        @asking = true
+        yield node
+      ensure
+        @asking = false
+      end
 
       def find_slot(keys)
         return if keys.empty?

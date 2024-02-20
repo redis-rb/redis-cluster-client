@@ -9,7 +9,7 @@ class RedisClient
       ConsistencyError = Class.new(::RedisClient::Error)
       MAX_REDIRECTION = 2
 
-      def initialize(router, command_builder, node: nil, slot: nil)
+      def initialize(router, command_builder, node: nil, slot: nil, asking: false)
         @router = router
         @command_builder = command_builder
         @retryable = true
@@ -18,6 +18,7 @@ class RedisClient
         @node = node
         prepare_tx unless @node.nil?
         @watching_slot = slot
+        @asking = asking
       end
 
       def call(*command, **kwargs, &block)
@@ -93,7 +94,11 @@ class RedisClient
 
       def settle
         @pipeline.call('EXEC')
-        send_transaction(@node, redirect: MAX_REDIRECTION)
+        # If we needed ASKING on the watch, we need ASKING on the multi as well.
+        @node.call('ASKING') if @asking
+        # Don't handle redirections at this level if we're in a watch (the watcher handles redirections
+        # at the whole-transaction level.)
+        send_transaction(@node, redirect: !!@watching_slot ? 0 : MAX_REDIRECTION)
       end
 
       def send_transaction(client, redirect:)
@@ -110,7 +115,8 @@ class RedisClient
           client.middlewares.call_pipelined(commands, client.config) do
             connection.call_pipelined(commands, nil)
           rescue ::RedisClient::CommandError => e
-            return handle_command_error!(commands, e, redirect: redirect) unless redirect.zero?
+            ensure_the_same_slot!(commands)
+            return handle_command_error!(e, redirect: redirect) unless redirect.zero?
 
             raise
           end
@@ -139,15 +145,13 @@ class RedisClient
         results
       end
 
-      def handle_command_error!(commands, err, redirect:) # rubocop:disable Metrics/AbcSize
+      def handle_command_error!(err, redirect:) # rubocop:disable Metrics/AbcSize
         if err.message.start_with?('CROSSSLOT')
           raise ConsistencyError, "#{err.message}: #{err.command}"
         elsif err.message.start_with?('MOVED')
-          ensure_the_same_slot!(commands)
           node = @router.assign_redirection_node(err.message)
           send_transaction(node, redirect: redirect - 1)
         elsif err.message.start_with?('ASK')
-          ensure_the_same_slot!(commands)
           node = @router.assign_asking_node(err.message)
           try_asking(node) ? send_transaction(node, redirect: redirect - 1) : err
         else
