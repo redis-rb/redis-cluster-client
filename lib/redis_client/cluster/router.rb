@@ -46,7 +46,7 @@ class RedisClient
         when 'memory'   then send_memory_command(method, command, args, &block)
         when 'script'   then send_script_command(method, command, args, &block)
         when 'pubsub'   then send_pubsub_command(method, command, args, &block)
-        when 'watch'    then send_watch_command(args, &block)
+        when 'watch'    then send_watch_command(command, &block)
         when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save'
           @node.call_all(method, command, args).first.then(&TSF.call(block))
         when 'flushall', 'flushdb'
@@ -312,8 +312,8 @@ class RedisClient
       end
 
       # for redis-rb
-      def send_watch_command(args)
-        ::RedisClient::Cluster::OptimisticLocking.new(self).watch(args) do |c, slot|
+      def send_watch_command(command)
+        ::RedisClient::Cluster::OptimisticLocking.new(self).watch(command[1..]) do |c, slot|
           transaction = ::RedisClient::Cluster::Transaction.new(
             self, @command_builder, node: c, slot: slot
           )
