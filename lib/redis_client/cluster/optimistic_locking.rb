@@ -18,9 +18,10 @@ class RedisClient
         @router.handle_redirection(node, retry_count: 1) do |nd|
           nd.with do |c|
             c.call('WATCH', *keys)
-            reply = yield(c, slot)
+            yield(c, slot)
+          rescue StandardError
             c.call('UNWATCH')
-            reply
+            raise
           end
         end
       end
