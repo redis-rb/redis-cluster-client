@@ -313,6 +313,8 @@ class RedisClient
 
       # for redis-rb
       def send_watch_command(command)
+        raise ::RedisClient::Cluster::Transaction::ConsistencyError, 'A block required. And you need to use the block argument as a client for the transaction.' unless block_given?
+
         ::RedisClient::Cluster::OptimisticLocking.new(self).watch(command[1..]) do |c, slot|
           transaction = ::RedisClient::Cluster::Transaction.new(
             self, @command_builder, node: c, slot: slot
