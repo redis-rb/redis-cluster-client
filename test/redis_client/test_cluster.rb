@@ -363,6 +363,21 @@ class RedisClient
         assert_equal(%w[3 4], @client.call('MGET', '{key}1', '{key}2'))
       end
 
+      # for redis-rb
+      def test_transaction_with_standalone_watch_command
+        @client.call('MSET', '{key}1', '0', '{key}2', '0')
+
+        got = @client.call('WATCH', '{key}1', '{key}2') do |tx|
+          tx.call('ECHO', 'START')
+          tx.call('SET', '{key}1', '1')
+          tx.call('SET', '{key}2', '2')
+          tx.call('ECHO', 'FINISH')
+        end
+
+        assert_equal(%w[START OK OK FINISH], got)
+        assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
+      end
+
       def test_pubsub_without_subscription
         pubsub = @client.pubsub
         assert_nil(pubsub.next_event(0.01))
