@@ -14,14 +14,23 @@ class RedisClient
         slot = find_slot(keys)
         raise ::RedisClient::Cluster::Transaction::ConsistencyError, "unsafe watch: #{keys.join(' ')}" if slot.nil?
 
+        # We have not yet selected a node for this transaction, initially, which means we can handle
+        # redirections freely initially (i.e. for the first WATCH call)
         node = @router.find_primary_node_by_slot(slot)
         @router.handle_redirection(node, retry_count: 1) do |nd|
           nd.with do |c|
-            c.call('WATCH', *keys)
-            yield(c, slot)
-          rescue StandardError
-            c.call('UNWATCH')
-            raise
+            c.ensure_connected_cluster_scoped(retryable: false) do
+              c.call('WATCH', *keys)
+              begin
+                yield(c, slot)
+              rescue ::RedisClient::ConnectionError
+                # No need to unwatch on a connection error.
+                raise
+              rescue StandardError
+                c.call('UNWATCH')
+                raise
+              end
+            end
           end
         end
       end

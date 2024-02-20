@@ -295,6 +295,100 @@ class RedisClient
         assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
       end
 
+      def test_transaction_does_not_pointlessly_unwatch_on_success
+        @client.call('MSET', '{key}1', '0', '{key}2', '0')
+
+        @captured_commands.clear
+        @client.multi(watch: %w[{key}1 {key}2]) do |tx|
+          tx.call('SET', '{key}1', '1')
+          tx.call('SET', '{key}2', '2')
+        end
+        assert_equal(%w[WATCH MULTI SET SET EXEC], @captured_commands.to_a.map(&:command).map(&:first))
+        assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
+      end
+
+      def test_transaction_unwatches_on_error
+        test_error = Class.new(StandardError)
+
+        @captured_commands.clear
+        assert_raises(test_error) do
+          @client.multi(watch: %w[{key}1 {key}2]) do
+            raise test_error, 'error!'
+          end
+        end
+
+        assert_equal(%w[WATCH UNWATCH], @captured_commands.to_a.map(&:command).map(&:first))
+      end
+
+      def test_transaction_does_not_unwatch_on_connection_error
+        @captured_commands.clear
+        assert_raises(RedisClient::ConnectionError) do
+          @client.multi(watch: %w[{key}1 {key}2]) do |tx|
+            tx.call('SET', '{key}1', 'x')
+            tx.call('QUIT')
+          end
+        end
+        command_list = @captured_commands.to_a.map(&:command).map(&:first)
+        assert_includes(command_list, 'WATCH')
+        refute_includes(command_list, 'UNWATCH')
+      end
+
+      def test_transaction_does_not_retry_without_rewatching
+        client2 = new_test_client
+
+        @client.call('SET', 'key', 'original_value')
+
+        assert_raises(RedisClient::ConnectionError) do
+          @client.multi(watch: %w[key]) do |tx|
+            # Simulate all the connections closing behind the router's back
+            # Sending QUIT to redis makes the server side close the connection (and the client
+            # side thus get a RedisClient::ConnectionError)
+            node = @client.instance_variable_get(:@router).instance_variable_get(:@node)
+            node.clients.each do |conn|
+              conn.with(&:close)
+            end
+
+            # Now the second client sets the value, which should make this watch invalid
+            client2.call('SET', 'key', 'client2_value')
+
+            tx.call('SET', 'key', '@client_value')
+            # Committing this transaction will fail, not silently reconnect (without the watch!)
+          end
+        end
+
+        # The transaction did not commit.
+        assert_equal('client2_value', @client.call('GET', 'key'))
+      end
+
+      def test_transaction_with_watch_retries_block
+        client2 = new_test_client
+        call_count = 0
+
+        @client.call('SET', 'key', 'original_value')
+
+        @client.multi(watch: %w[key]) do |tx|
+          if call_count == 0
+            # Simulate all the connections closing behind the router's back
+            # Sending QUIT to redis makes the server side close the connection (and the client
+            # side thus get a RedisClient::ConnectionError)
+            node = @client.instance_variable_get(:@router).instance_variable_get(:@node)
+            node.clients.each do |conn|
+              conn.with(&:close)
+            end
+
+            # Now the second client sets the value, which should make this watch invalid
+            client2.call('SET', 'key', 'client2_value')
+          end
+          call_count += 1
+
+          tx.call('SET', 'key', "@client_value_#{call_count}")
+        end
+
+        # The transaction did commit (but it was the second time)
+        assert_equal('@client_value_2', @client.call('GET', 'key'))
+        assert_equal(2, call_count)
+      end
+
       def test_transaction_with_error
         @client.call('SET', 'key1', 'x')
 
