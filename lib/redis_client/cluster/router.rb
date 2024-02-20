@@ -8,6 +8,8 @@ require 'redis_client/cluster/key_slot_converter'
 require 'redis_client/cluster/node'
 require 'redis_client/cluster/node_key'
 require 'redis_client/cluster/normalized_cmd_name'
+require 'redis_client/cluster/transaction'
+require 'redis_client/cluster/optimistic_locking'
 
 class RedisClient
   class Cluster
@@ -44,6 +46,7 @@ class RedisClient
         when 'memory'   then send_memory_command(method, command, args, &block)
         when 'script'   then send_script_command(method, command, args, &block)
         when 'pubsub'   then send_pubsub_command(method, command, args, &block)
+        when 'watch'    then send_watch_command(command, &block)
         when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save'
           @node.call_all(method, command, args).first.then(&TSF.call(block))
         when 'flushall', 'flushdb'
@@ -305,6 +308,17 @@ class RedisClient
           @node.call_replicas(method, command, args).reject(&:empty?).map { |e| Hash[*e] }
                .reduce({}) { |a, e| a.merge(e) { |_, v1, v2| v1 + v2 } }.then(&TSF.call(block))
         else assign_node(command).public_send(method, *args, command, &block)
+        end
+      end
+
+      # for redis-rb
+      def send_watch_command(command)
+        ::RedisClient::Cluster::OptimisticLocking.new(self).watch(command[1..]) do |c, slot|
+          transaction = ::RedisClient::Cluster::Transaction.new(
+            self, @command_builder, node: c, slot: slot
+          )
+          yield transaction
+          transaction.execute
         end
       end
 
