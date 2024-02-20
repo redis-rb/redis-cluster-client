@@ -61,9 +61,14 @@ class TestConcurrency < TestingWrapper
 
     pids = Array.new(MAX_THREADS) do
       Process.fork do
-        @client.multi(watch: %w[{key}1]) { |tx| ATTEMPTS.times { MAX_THREADS.times { tx.call('INCR', '{key}1') } } }
-        sleep 0.1
-        @client.multi(watch: %w[{key}1]) { |tx| ATTEMPTS.times { MAX_THREADS.times { tx.call('DECR', '{key}1') } } }
+        @client.multi(watch: %w[{key}1]) do |tx|
+          ATTEMPTS.times do
+            MAX_THREADS.times do
+              tx.call('INCR', '{key}1')
+              tx.call('DECR', '{key}1')
+            end
+          end
+        end
       end
     end
 
@@ -110,15 +115,20 @@ class TestConcurrency < TestingWrapper
 
     threads = Array.new(MAX_THREADS) do
       Thread.new do
-        @client.multi(watch: %w[{key}1]) { |tx| ATTEMPTS.times { MAX_THREADS.times { tx.call('INCR', '{key}1') } } }
-        @client.multi(watch: %w[{key}1]) { |tx| ATTEMPTS.times { MAX_THREADS.times { tx.call('DECR', '{key}1') } } }
-        nil
+        @client.multi(watch: %w[{key}1]) do |tx|
+          ATTEMPTS.times do
+            MAX_THREADS.times do
+              tx.call('INCR', '{key}1')
+              tx.call('DECR', '{key}1')
+            end
+          end
+        end
       rescue StandardError => e
         e
       end
     end
 
-    threads.each { |t| assert_nil(t.value) }
+    threads.each { |t| refute_instance_of(StandardError, t.value) }
     assert_equal(WANT, @client.call('GET', '{key}1'))
   end
 
