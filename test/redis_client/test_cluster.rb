@@ -364,7 +364,7 @@ class RedisClient
       end
 
       # for redis-rb
-      def test_transaction_with_standalone_watch_command
+      def test_transaction_with_dedicated_watch_command
         @client.call('MSET', '{key}1', '0', '{key}2', '0')
 
         got = @client.call('WATCH', '{key}1', '{key}2') do |tx|
@@ -376,6 +376,12 @@ class RedisClient
 
         assert_equal(%w[START OK OK FINISH], got)
         assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
+      end
+
+      def test_transaction_with_dedicated_watch_command_without_block
+        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
+          @client.call('WATCH', '{key}1', '{key}2')
+        end
       end
 
       def test_pubsub_without_subscription
