@@ -6,30 +6,58 @@ require 'redis_client/cluster/transaction'
 class RedisClient
   class Cluster
     class OptimisticLocking
-      def initialize(router)
+      def initialize(router, command_builder)
         @router = router
+        @command_builder = command_builder
+        @slot = nil
+        @conn = nil
         @asking = false
       end
 
-      def watch(keys)
-        slot = find_slot(keys)
-        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "unsafe watch: #{keys.join(' ')}" if slot.nil?
+      def watch(keys, &block)
+        if @conn
+          # We're already watching, and the caller wants to watch additional keys
+          add_to_watch(keys)
+        else
+          # First call to #watch
+          start_watch(keys, &block)
+        end
+      end
+
+      def unwatch
+        @conn.call('UNWATCH')
+      end
+
+      def multi
+        transaction = ::RedisClient::Cluster::Transaction.new(
+          @router, @command_builder, node: @conn, slot: @slot, asking: @asking
+        )
+        yield transaction
+        transaction.execute
+      end
+
+      private
+
+      def start_watch(keys)
+        @slot = find_slot(keys)
+        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "unsafe watch: #{keys.join(' ')}" if @slot.nil?
 
         # We have not yet selected a node for this transaction, initially, which means we can handle
         # redirections freely initially (i.e. for the first WATCH call)
-        node = @router.find_primary_node_by_slot(slot)
+        node = @router.find_primary_node_by_slot(@slot)
         handle_redirection(node, retry_count: 1) do |nd|
           nd.with do |c|
             c.ensure_connected_cluster_scoped(retryable: false) do
-              c.call('ASKING') if @asking
-              c.call('WATCH', *keys)
+              @conn = c
+              @conn.call('ASKING') if @asking
+              @conn.call('WATCH', *keys)
               begin
-                yield(c, slot, @asking)
+                yield(c, @slot, @asking)
               rescue ::RedisClient::ConnectionError
                 # No need to unwatch on a connection error.
                 raise
               rescue StandardError
-                c.call('UNWATCH')
+                unwatch
                 raise
               end
             end
@@ -37,7 +65,12 @@ class RedisClient
         end
       end
 
-      private
+      def add_to_watch(keys)
+        slot = find_slot(keys)
+        raise ::RedisClient::Cluster::Transaction::ConsistencyError, "inconsistent watch: #{keys.join(' ')}" if slot != @slot
+
+        @conn.call('WATCH', *keys)
+      end
 
       def handle_redirection(node, retry_count: 1, &blk)
         @router.handle_redirection(node, retry_count: retry_count) do |nd|
