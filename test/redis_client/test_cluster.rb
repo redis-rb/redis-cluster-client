@@ -367,11 +367,13 @@ class RedisClient
       def test_transaction_with_dedicated_watch_command
         @client.call('MSET', '{key}1', '0', '{key}2', '0')
 
-        got = @client.call('WATCH', '{key}1', '{key}2') do |tx|
-          tx.call('ECHO', 'START')
-          tx.call('SET', '{key}1', '1')
-          tx.call('SET', '{key}2', '2')
-          tx.call('ECHO', 'FINISH')
+        got = @client.send(:watch, ['{key}1', '{key}2']) do |watcher|
+          watcher.multi do |tx|
+            tx.call('ECHO', 'START')
+            tx.call('SET', '{key}1', '1')
+            tx.call('SET', '{key}2', '2')
+            tx.call('ECHO', 'FINISH')
+          end
         end
 
         assert_equal(%w[START OK OK FINISH], got)
@@ -379,8 +381,8 @@ class RedisClient
       end
 
       def test_transaction_with_dedicated_watch_command_without_block
-        assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
-          @client.call('WATCH', '{key}1', '{key}2')
+        assert_raises(ArgumentError) do
+          @client.send(:watch, ['{key}1', '{key}2'])
         end
       end
 
