@@ -103,6 +103,35 @@ class TestAgainstClusterState < TestingWrapper
       assert_equal(1, call_cnt)
     end
 
+    def test_the_state_of_cluster_resharding_with_reexecuted_watch
+      client2 = new_test_client
+      call_cnt = 0
+
+      @client.call('SET', 'watch_key', 'original_value')
+      @client.multi(watch: %w[watch_key]) do |tx|
+        # Use client2 to change the value of watch_key, which would cause this transaction to fail
+        if call_cnt == 0
+          client2.call('SET', 'watch_key', 'client2_value')
+
+          # Now perform (and _finish_) a reshard, which should make this transaction receive a MOVED
+          # redirection when it goes to commit. That should result in the entire block being retried
+          slot = ::RedisClient::Cluster::KeySlotConverter.convert('watch_key')
+          src, dest = @controller.select_resharding_target(slot)
+          @controller.start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+          @controller.finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
+        end
+        call_cnt += 1
+
+        tx.call('SET', 'watch_key', "@client_value_#{call_cnt}")
+      end
+      # It should have retried the entire transaction block.
+      assert_equal(2, call_cnt)
+      # The second call succeeded
+      assert_equal('@client_value_2', @client.call('GET', 'watch_key'))
+    ensure
+      client2&.close
+    end
+
     def test_the_state_of_cluster_resharding_with_pipelining_on_new_connection
       # This test is excercising a very delicate race condition; i think the use of @client to set
       # the keys in do_resharding_test is actually causing the race condition not to happen, so this
