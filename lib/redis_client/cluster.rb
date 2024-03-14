@@ -91,19 +91,16 @@ class RedisClient
       pipeline.execute
     end
 
-    def multi(watch: nil)
+    def multi(watch: nil, &block)
       if watch.nil? || watch.empty?
         transaction = ::RedisClient::Cluster::Transaction.new(@router, @command_builder)
         yield transaction
         return transaction.execute
       end
 
-      ::RedisClient::Cluster::OptimisticLocking.new(@router).watch(watch) do |c, slot, asking|
-        transaction = ::RedisClient::Cluster::Transaction.new(
-          @router, @command_builder, node: c, slot: slot, asking: asking
-        )
-        yield transaction
-        transaction.execute
+      watcher = ::RedisClient::Cluster::OptimisticLocking.new(@router, @command_builder)
+      watcher.watch(watch) do
+        watcher.multi(&block)
       end
     end
 
@@ -127,6 +124,17 @@ class RedisClient
     end
 
     private
+
+    # This API is called by redis-clustering/redis-rb, but requries further refinement before we commit
+    # to making it part of redis-cluster-client's official public API.
+    def watch(keys)
+      raise ArgumentError, "#{self.class.name}#watch requires a block for the initial watch" unless block_given?
+
+      watcher = ::RedisClient::Cluster::OptimisticLocking.new(@router, @command_builder)
+      watcher.watch(keys) do
+        yield watcher
+      end
+    end
 
     def process_with_arguments(key, hashtag) # rubocop:disable Metrics/CyclomaticComplexity
       raise ArgumentError, 'Only one of key or hashtag may be provided' if key && hashtag

@@ -46,7 +46,6 @@ class RedisClient
         when 'memory'   then send_memory_command(method, command, args, &block)
         when 'script'   then send_script_command(method, command, args, &block)
         when 'pubsub'   then send_pubsub_command(method, command, args, &block)
-        when 'watch'    then send_watch_command(command, &block)
         when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save'
           @node.call_all(method, command, args).first.then(&TSF.call(block))
         when 'flushall', 'flushdb'
@@ -308,19 +307,6 @@ class RedisClient
           @node.call_replicas(method, command, args).reject(&:empty?).map { |e| Hash[*e] }
                .reduce({}) { |a, e| a.merge(e) { |_, v1, v2| v1 + v2 } }.then(&TSF.call(block))
         else assign_node(command).public_send(method, *args, command, &block)
-        end
-      end
-
-      # for redis-rb
-      def send_watch_command(command)
-        raise ::RedisClient::Cluster::Transaction::ConsistencyError, 'A block required. And you need to use the block argument as a client for the transaction.' unless block_given?
-
-        ::RedisClient::Cluster::OptimisticLocking.new(self).watch(command[1..]) do |c, slot, asking|
-          transaction = ::RedisClient::Cluster::Transaction.new(
-            self, @command_builder, node: c, slot: slot, asking: asking
-          )
-          yield transaction
-          transaction.execute
         end
       end
 
