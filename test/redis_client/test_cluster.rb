@@ -170,6 +170,28 @@ class RedisClient
         10.times { |i| assert_equal((i + 10).to_s, @client.call('GET', "string#{i}")) }
       end
 
+      def test_pipelined_with_errors_as_is
+        got = @client.pipelined(exception: false) do |pipeline|
+          10.times do |i|
+            pipeline.call('SET', "string#{i}", i)
+            pipeline.call('SET', "string#{i}", i, 'too many args')
+            pipeline.call('SET', "string#{i}", i + 10)
+          end
+        end
+
+        assert_equal(30, got.size)
+
+        10.times do |i|
+          assert_equal('OK', got[(3 * i) + 0])
+          assert_instance_of(::RedisClient::CommandError, got[(3 * i) + 1])
+          assert_equal('OK', got[(3 * i) + 2])
+        end
+
+        wait_for_replication
+
+        10.times { |i| assert_equal((i + 10).to_s, @client.call('GET', "string#{i}")) }
+      end
+
       def test_pipelined_with_many_commands
         @client.pipelined { |pi| 1000.times { |i| pi.call('SET', i, i) } }
         wait_for_replication
