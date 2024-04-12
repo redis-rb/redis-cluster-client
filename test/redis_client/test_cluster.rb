@@ -726,11 +726,20 @@ class RedisClient
           middlewares: [::RedisClient::Cluster::ErrorIdentification::Middleware]
         )
 
+        middlewares = [
+          ::RedisClient::Cluster::ErrorIdentification::Middleware,
+          RedirectionEmulationMiddleware
+        ]
+
+        if RUBY_ENGINE == 'ruby'
+          major, minor, = RUBY_VERSION.split('.')
+          major = Integer(major)
+          minor = Integer(minor)
+          middlewares.reverse! if major < 3 || (major >= 3 && minor < 1)
+        end
+
         client2 = new_test_client(
-          middlewares: [
-            ::RedisClient::Cluster::ErrorIdentification::Middleware,
-            RedirectionEmulationMiddleware
-          ],
+          middlewares: middlewares,
           custom: { redirect: { slot: slot, to: broken_primary_key, command: %w[GET testkey] } }
         )
 
