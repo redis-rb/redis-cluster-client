@@ -3,7 +3,7 @@
 Gem::Specification.new do |s|
   s.name                              = 'redis-cluster-client'
   s.summary                           = 'A Redis cluster client for Ruby'
-  s.version                           = '0.7.11'
+  s.version                           = '0.8.0'
   s.license                           = 'MIT'
   s.homepage                          = 'https://github.com/redis-rb/redis-cluster-client'
   s.authors                           = ['Taishi Kasuga']
@@ -13,5 +13,5 @@ Gem::Specification.new do |s|
   s.metadata['allowed_push_host']     = 'https://rubygems.org'
   s.files                             = Dir['lib/**/*.rb']
 
-  s.add_runtime_dependency 'redis-client', '~> 0.12'
+  s.add_runtime_dependency 'redis-client', '~> 0.22'
 end
