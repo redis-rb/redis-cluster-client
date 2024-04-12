@@ -727,18 +727,24 @@ class RedisClient
         )
 
         client2 = new_test_client(
-          middlewares: [RedirectionEmulationMiddleware],
+          middlewares: [
+            ::RedisClient::Cluster::ErrorIdentification::Middleware,
+            RedirectionEmulationMiddleware
+          ],
           custom: { redirect: { slot: slot, to: broken_primary_key, command: %w[GET testkey] } }
         )
 
+        @client.call('SET', 'testkey', 'testvalue')
+
         assert_raises(RedisClient::CommandError) do
-          client1.call('GET', 'safekey') do
+          client1.call('GET', 'testkey') do |got|
+            assert_equal('testvalue', got)
             client2.call('GET', 'testkey')
           end
         end
 
-        # The exception should not have causes client to update its shard mappings, because it didn't
-        # come from a RedisClient instance that client knows about.
+        # The exception should not have causes client1 to update its shard mappings, because it didn't
+        # come from a RedisClient instance that client1 knows about.
         assert_equal(
           correct_primary_key,
           client1.instance_variable_get(:@router).find_node_key_by_key('testkey', primary: true)
