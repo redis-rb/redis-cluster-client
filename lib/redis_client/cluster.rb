@@ -82,9 +82,16 @@ class RedisClient
       @router.try_delegate(node, :zscan, key, *args, **kwargs, &block)
     end
 
-    def pipelined
+    def pipelined(exception: true)
       seed = @config.use_replica? && @config.replica_affinity == :random ? nil : Random.new_seed
-      pipeline = ::RedisClient::Cluster::Pipeline.new(@router, @command_builder, @concurrent_worker, seed: seed)
+      pipeline = ::RedisClient::Cluster::Pipeline.new(
+        @router,
+        @command_builder,
+        @concurrent_worker,
+        exception: exception,
+        seed: seed
+      )
+
       yield pipeline
       return [] if pipeline.empty?
 

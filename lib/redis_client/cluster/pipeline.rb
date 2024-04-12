@@ -12,7 +12,7 @@ class RedisClient
       class Extended < ::RedisClient::Pipeline
         attr_reader :outer_indices
 
-        def initialize(command_builder)
+        def initialize(...)
           super
           @outer_indices = nil
         end
@@ -50,14 +50,14 @@ class RedisClient
       end
 
       ::RedisClient::ConnectionMixin.module_eval do
-        def call_pipelined_aware_of_redirection(commands, timeouts) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        def call_pipelined_aware_of_redirection(commands, timeouts, exception:) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
           size = commands.size
           results = Array.new(commands.size)
           @pending_reads += size
           write_multi(commands)
 
           redirection_indices = nil
-          exception = nil
+          first_exception = nil
           size.times do |index|
             timeout = timeouts && timeouts[index]
             result = read(timeout)
@@ -67,14 +67,14 @@ class RedisClient
               if result.is_a?(::RedisClient::CommandError) && result.message.start_with?('MOVED', 'ASK')
                 redirection_indices ||= []
                 redirection_indices << index
-              else
-                exception ||= result
+              elsif exception
+                first_exception ||= result
               end
             end
             results[index] = result
           end
 
-          raise exception if exception
+          raise first_exception if exception && first_exception
           return results if redirection_indices.nil?
 
           err = ::RedisClient::Cluster::Pipeline::RedirectionNeeded.new
@@ -98,10 +98,11 @@ class RedisClient
         attr_accessor :replies, :indices
       end
 
-      def initialize(router, command_builder, concurrent_worker, seed: Random.new_seed)
+      def initialize(router, command_builder, concurrent_worker, exception:, seed: Random.new_seed)
         @router = router
         @command_builder = command_builder
         @concurrent_worker = concurrent_worker
+        @exception = exception
         @seed = seed
         @pipelines = nil
         @size = 0
@@ -212,7 +213,7 @@ class RedisClient
         results = client.ensure_connected_cluster_scoped(retryable: pipeline._retryable?) do |connection|
           commands = pipeline._commands
           client.middlewares.call_pipelined(commands, client.config) do
-            connection.call_pipelined_aware_of_redirection(commands, pipeline._timeouts)
+            connection.call_pipelined_aware_of_redirection(commands, pipeline._timeouts, exception: @exception)
           end
         end
 
@@ -224,13 +225,19 @@ class RedisClient
 
         if err.message.start_with?('MOVED')
           node = @router.assign_redirection_node(err.message)
-          redirect_command(node, pipeline, inner_index)
+          try_redirection(node, pipeline, inner_index)
         elsif err.message.start_with?('ASK')
           node = @router.assign_asking_node(err.message)
-          try_asking(node) ? redirect_command(node, pipeline, inner_index) : err
+          try_asking(node) ? try_redirection(node, pipeline, inner_index) : err
         else
           err
         end
+      end
+
+      def try_redirection(node, pipeline, inner_index)
+        redirect_command(node, pipeline, inner_index)
+      rescue StandardError => e
+        @exception ? raise : e
       end
 
       def redirect_command(node, pipeline, inner_index)
