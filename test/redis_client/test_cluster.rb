@@ -717,21 +717,35 @@ class RedisClient
       end
 
       def test_only_reshards_own_errors
-        @client.call_v(%w[SADD testkey testvalue1])
-        @client.call_v(%w[SADD testkey testvalue2])
         slot = ::RedisClient::Cluster::KeySlotConverter.convert('testkey')
         router = @client.instance_variable_get(:@router)
         correct_primary_key = router.find_node_key_by_key('testkey', primary: true)
         broken_primary_key = (router.node_keys - [correct_primary_key]).first
+
+        client1 = new_test_client(
+          middlewares: [::RedisClient::Cluster::ErrorIdentification::Middleware]
+        )
+
+        client2 = new_test_client(
+          middlewares: [RedirectionEmulationMiddleware],
+          custom: { redirect: { slot: slot, to: broken_primary_key, command: %w[GET testkey] } }
+        )
+
         assert_raises(RedisClient::CommandError) do
-          @client.sscan('testkey', retry_count: 0) do
-            raise RedisClient::CommandError, "MOVED #{slot} #{broken_primary_key}"
+          client1.call('GET', 'safekey') do
+            client2.call('GET', 'testkey')
           end
         end
 
-        # The exception should not have causes @client to update its shard mappings, because it didn't
-        # come from a RedisClient instance that @client knows about.
-        assert_equal correct_primary_key, router.find_node_key_by_key('testkey', primary: true)
+        # The exception should not have causes client to update its shard mappings, because it didn't
+        # come from a RedisClient instance that client knows about.
+        assert_equal(
+          correct_primary_key,
+          client1.instance_variable_get(:@router).find_node_key_by_key('testkey', primary: true)
+        )
+
+        client1.close
+        client2.close
       end
 
       def test_pinning_single_key
@@ -810,12 +824,12 @@ class RedisClient
     class PrimaryOnly < TestingWrapper
       include Mixin
 
-      def new_test_client(capture_buffer: @captured_commands, **opts)
+      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          middlewares: [CommandCaptureMiddleware, ::RedisClient::Cluster::ErrorIdentification::Middleware],
-          custom: { captured_commands: capture_buffer },
+          middlewares: middlewares,
+          custom: custom,
           **TEST_GENERIC_OPTIONS,
           **opts
         )
@@ -826,14 +840,14 @@ class RedisClient
     class ScaleReadRandom < TestingWrapper
       include Mixin
 
-      def new_test_client(capture_buffer: @captured_commands, **opts)
+      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
           replica_affinity: :random,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          middlewares: [CommandCaptureMiddleware, ::RedisClient::Cluster::ErrorIdentification::Middleware],
-          custom: { captured_commands: capture_buffer },
+          middlewares: middlewares,
+          custom: custom,
           **TEST_GENERIC_OPTIONS,
           **opts
         )
@@ -844,14 +858,14 @@ class RedisClient
     class ScaleReadRandomWithPrimary < TestingWrapper
       include Mixin
 
-      def new_test_client(capture_buffer: @captured_commands, **opts)
+      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
           replica_affinity: :random_with_primary,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          middlewares: [CommandCaptureMiddleware, ::RedisClient::Cluster::ErrorIdentification::Middleware],
-          custom: { captured_commands: capture_buffer },
+          middlewares: middlewares,
+          custom: custom,
           **TEST_GENERIC_OPTIONS,
           **opts
         )
@@ -862,14 +876,14 @@ class RedisClient
     class ScaleReadLatency < TestingWrapper
       include Mixin
 
-      def new_test_client(capture_buffer: @captured_commands, **opts)
+      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
           replica_affinity: :latency,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          middlewares: [CommandCaptureMiddleware, ::RedisClient::Cluster::ErrorIdentification::Middleware],
-          custom: { captured_commands: capture_buffer },
+          middlewares: middlewares,
+          custom: custom,
           **TEST_GENERIC_OPTIONS,
           **opts
         )
@@ -880,12 +894,12 @@ class RedisClient
     class Pooled < TestingWrapper
       include Mixin
 
-      def new_test_client(capture_buffer: @captured_commands, **opts)
+      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          middlewares: [CommandCaptureMiddleware, ::RedisClient::Cluster::ErrorIdentification::Middleware],
-          custom: { captured_commands: capture_buffer },
+          middlewares: middlewares,
+          custom: custom,
           **TEST_GENERIC_OPTIONS,
           **opts
         )
