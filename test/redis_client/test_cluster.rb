@@ -814,7 +814,7 @@ class RedisClient
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          middlewares: [CommandCaptureMiddleware],
+          middlewares: [CommandCaptureMiddleware, ::RedisClient::Cluster::ErrorIdentification::Middleware],
           custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS,
           **opts
@@ -832,7 +832,7 @@ class RedisClient
           replica: true,
           replica_affinity: :random,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          middlewares: [CommandCaptureMiddleware],
+          middlewares: [CommandCaptureMiddleware, ::RedisClient::Cluster::ErrorIdentification::Middleware],
           custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS,
           **opts
@@ -850,7 +850,7 @@ class RedisClient
           replica: true,
           replica_affinity: :random_with_primary,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          middlewares: [CommandCaptureMiddleware],
+          middlewares: [CommandCaptureMiddleware, ::RedisClient::Cluster::ErrorIdentification::Middleware],
           custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS,
           **opts
@@ -868,7 +868,7 @@ class RedisClient
           replica: true,
           replica_affinity: :latency,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          middlewares: [CommandCaptureMiddleware],
+          middlewares: [CommandCaptureMiddleware, ::RedisClient::Cluster::ErrorIdentification::Middleware],
           custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS,
           **opts
@@ -884,7 +884,7 @@ class RedisClient
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          middlewares: [CommandCaptureMiddleware],
+          middlewares: [CommandCaptureMiddleware, ::RedisClient::Cluster::ErrorIdentification::Middleware],
           custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS,
           **opts

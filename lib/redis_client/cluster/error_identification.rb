@@ -4,7 +4,13 @@ class RedisClient
   class Cluster
     module ErrorIdentification
       def self.client_owns_error?(err, client)
-        err.is_a?(TaggedError) && err.from?(client)
+        return true unless identifiable?(err)
+
+        err.from?(client)
+      end
+
+      def self.identifiable?(err)
+        err.is_a?(TaggedError)
       end
 
       module TaggedError
