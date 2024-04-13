@@ -753,12 +753,12 @@ class RedisClient
           RedirectionEmulationMiddleware
         ]
 
-        if RUBY_ENGINE == 'ruby'
-          major, minor, = RUBY_VERSION.split('.')
-          major = Integer(major)
-          minor = Integer(minor)
-          middlewares.reverse! if major < 3 || (major >= 3 && minor < 1)
-        end
+        # if RUBY_ENGINE == 'ruby'
+        #   major, minor, = RUBY_VERSION.split('.')
+        #   major = Integer(major)
+        #   minor = Integer(minor)
+        #   middlewares.reverse! if major < 3 || (major >= 3 && minor < 1)
+        # end
 
         client2 = new_test_client(
           middlewares: middlewares,
