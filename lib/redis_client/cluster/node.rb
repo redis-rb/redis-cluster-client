@@ -106,6 +106,7 @@ class RedisClient
         @topology = klass.new(pool, @concurrent_worker, **kwargs)
         @config = config
         @mutex = Mutex.new
+        @last_reloaded_at = nil
       end
 
       def inspect
