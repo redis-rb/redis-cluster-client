@@ -745,32 +745,27 @@ class RedisClient
         broken_primary_key = (router.node_keys - [correct_primary_key]).first
 
         client1 = new_test_client(
-          middlewares: [::RedisClient::Cluster::ErrorIdentification::Middleware]
+          middlewares: [
+            ::RedisClient::Cluster::ErrorIdentification::Middleware
+          ]
         )
-
-        middlewares = [
-          ::RedisClient::Cluster::ErrorIdentification::Middleware,
-          RedirectionEmulationMiddleware
-        ]
-
-        # if RUBY_ENGINE == 'ruby'
-        #   major, minor, = RUBY_VERSION.split('.')
-        #   major = Integer(major)
-        #   minor = Integer(minor)
-        #   middlewares.reverse! if major < 3 || (major >= 3 && minor < 1)
-        # end
 
         client2 = new_test_client(
-          middlewares: middlewares,
-          custom: { redirect: { slot: slot, to: broken_primary_key, command: %w[GET testkey] } }
+          middlewares: [
+            ::RedisClient::Cluster::ErrorIdentification::Middleware,
+            RedirectionEmulationMiddleware
+          ],
+          custom: {
+            redirect: RedirectionEmulationMiddleware::Setting.new(
+              slot: slot, to: broken_primary_key, command: %w[SET testkey client2]
+            )
+          }
         )
 
-        @client.call('SET', 'testkey', 'testvalue')
-
         assert_raises(RedisClient::CommandError) do
-          client1.call('GET', 'testkey') do |got|
-            assert_equal('testvalue', got)
-            client2.call('GET', 'testkey')
+          client1.call('SET', 'testkey', 'client1') do |got|
+            assert_equal('OK', got)
+            client2.call('SET', 'testkey', 'client2')
           end
         end
 
