@@ -69,6 +69,8 @@ jobs:
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Run minitest
         run: bundle exec rake ${{ matrix.task || 'test' }}
+        env:
+          RUBYOPT: "-W:deprecated -W:experimental -W:performance"
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down || true
   nat-ted-env:
