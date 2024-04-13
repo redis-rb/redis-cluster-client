@@ -2,7 +2,6 @@
 
 require 'redis_client'
 require 'redis_client/config'
-require 'redis_client/cluster/error_identification'
 require 'redis_client/cluster/errors'
 require 'redis_client/cluster/node/primary_only'
 require 'redis_client/cluster/node/random_replica'
@@ -79,11 +78,9 @@ class RedisClient
       end
 
       class Config < ::RedisClient::Config
-        def initialize(scale_read: false, middlewares: nil, **kwargs)
+        def initialize(scale_read: false, **kwargs)
           @scale_read = scale_read
-          middlewares ||= []
-          middlewares.unshift ErrorIdentification::Middleware
-          super(middlewares: middlewares, **kwargs)
+          super(**kwargs)
         end
 
         private
@@ -215,10 +212,6 @@ class RedisClient
             @topology.process_topology_update!(@replications, @node_configs)
           end
         end
-      end
-
-      def owns_error?(err)
-        any? { |c| ErrorIdentification.client_owns_error?(err, c) }
       end
 
       private

@@ -10,6 +10,7 @@ require 'redis_client/cluster/node_key'
 require 'redis_client/cluster/normalized_cmd_name'
 require 'redis_client/cluster/transaction'
 require 'redis_client/cluster/optimistic_locking'
+require 'redis_client/cluster/error_identification'
 
 class RedisClient
   class Cluster
@@ -68,7 +69,9 @@ class RedisClient
         raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
 
         update_cluster_info! if e.errors.values.any? do |err|
-          @node.owns_error?(err) && err.message.start_with?('CLUSTERDOWN Hash slot not served')
+          next false if ::RedisClient::Cluster::ErrorIdentification.identifiable?(err) && @node.none? { |c| ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(err, c) }
+
+          err.message.start_with?('CLUSTERDOWN Hash slot not served')
         end
 
         raise
@@ -97,7 +100,7 @@ class RedisClient
       rescue ::RedisClient::CircuitBreaker::OpenCircuitError
         raise
       rescue ::RedisClient::CommandError => e
-        raise unless ErrorIdentification.client_owns_error?(e, node)
+        raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
 
         if e.message.start_with?('MOVED')
           node = assign_redirection_node(e.message)
@@ -117,7 +120,7 @@ class RedisClient
         end
         raise
       rescue ::RedisClient::ConnectionError => e
-        raise unless ErrorIdentification.client_owns_error?(e, node)
+        raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
 
         update_cluster_info!
 
