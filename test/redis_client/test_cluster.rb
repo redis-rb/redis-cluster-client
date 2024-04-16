@@ -224,9 +224,20 @@ class RedisClient
         end
       end
 
-      def test_transaction_with_empty_block
-        assert_raises(ArgumentError) { @client.multi {} }
+      def test_transaction_without_block
         assert_raises(LocalJumpError) { @client.multi }
+      end
+
+      def test_transaction_with_empty_block
+        @captured_commands.clear
+        assert_empty(@client.multi {})
+        assert_empty(@captured_commands.to_a.map(&:command).map(&:first))
+      end
+
+      def test_transaction_with_empty_block_and_watch
+        @captured_commands.clear
+        assert_empty(@client.multi(watch: %w[key]) {})
+        assert_equal(%w[WATCH MULTI EXEC], @captured_commands.to_a.map(&:command).map(&:first))
       end
 
       def test_transaction_with_only_keyless_commands

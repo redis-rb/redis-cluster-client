@@ -8,6 +8,7 @@ class RedisClient
     class Transaction
       ConsistencyError = Class.new(::RedisClient::Error)
       MAX_REDIRECTION = 2
+      EMPTY_ARRAY = [].freeze
 
       def initialize(router, command_builder, node: nil, slot: nil, asking: false)
         @router = router
@@ -62,10 +63,10 @@ class RedisClient
       def execute
         @pending_commands.each(&:call)
 
-        raise ArgumentError, 'empty transaction' if @pipeline._empty?
+        return EMPTY_ARRAY if @pipeline._empty?
         raise ConsistencyError, "couldn't determine the node: #{@pipeline._commands}" if @node.nil?
 
-        settle
+        commit
       end
 
       private
@@ -92,8 +93,17 @@ class RedisClient
         @pending_commands.clear
       end
 
-      def settle
+      def commit
         @pipeline.call('EXEC')
+        settle
+      end
+
+      def cancel
+        @pipeline.call('DISCARD')
+        settle
+      end
+
+      def settle
         # If we needed ASKING on the watch, we need ASKING on the multi as well.
         @node.call('ASKING') if @asking
         # Don't handle redirections at this level if we're in a watch (the watcher handles redirections
