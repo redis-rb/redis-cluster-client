@@ -211,6 +211,29 @@ end
 # either of the values
 ```
 
+You can early return out of your block with a `next` statement if you want to cancel your transaction.
+In this context, don't use `break` and `return` statements.
+
+```ruby
+# The transaction isn't executed.
+cli.multi do |tx|
+  next if some_conditions?
+
+  tx.call('SET', '{key}1', '1')
+  tx.call('SET', '{key}2', '2')
+end
+```
+
+```ruby
+# The watching state is automatically cleared with an execution of an empty transaction.
+cli.multi(watch: %w[{key}1 {key}2]) do |tx|
+  next if some_conditions?
+
+  tx.call('SET', '{key}1', '1')
+  tx.call('SET', '{key}2', '2')
+end
+```
+
 `RedisClient::Cluster#multi` is aware of redirections and node failures like ordinary calls to `RedisClient::Cluster`,
 but because you may have written non-idempotent code inside your block, the block is called once if e.g. the slot
 it is operating on moves to a different node.

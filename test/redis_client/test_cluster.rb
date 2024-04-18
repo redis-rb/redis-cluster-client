@@ -240,6 +240,34 @@ class RedisClient
         assert_equal(%w[WATCH MULTI EXEC], @captured_commands.to_a.map(&:command).map(&:first))
       end
 
+      def test_transaction_with_early_return_block
+        @captured_commands.clear
+        condition = true
+        got = @client.multi do |tx|
+          next if condition
+
+          tx.call('SET', 'key', 'value')
+        end
+
+        assert_empty(got)
+        assert_empty(@captured_commands.to_a.map(&:command).map(&:first))
+        assert_nil(@client.call('GET', 'key'))
+      end
+
+      def test_transaction_with_early_return_block_in_watching
+        @captured_commands.clear
+        condition = true
+        got = @client.multi(watch: %w[key]) do |tx|
+          next if condition
+
+          tx.call('SET', 'key', 'value')
+        end
+
+        assert_empty(got)
+        assert_equal(%w[WATCH MULTI EXEC], @captured_commands.to_a.map(&:command).map(&:first))
+        assert_nil(@client.call('GET', 'key'))
+      end
+
       def test_transaction_with_only_keyless_commands
         assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
           @client.multi do |t|
