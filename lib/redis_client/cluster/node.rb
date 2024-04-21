@@ -92,13 +92,7 @@ class RedisClient
         end
       end
 
-      def initialize(
-        concurrent_worker,
-        config:,
-        pool: nil,
-        **kwargs
-      )
-
+      def initialize(concurrent_worker, config:, pool: nil, **kwargs)
         @concurrent_worker = concurrent_worker
         @slots = build_slot_node_mappings(EMPTY_ARRAY)
         @replications = build_replication_mappings(EMPTY_ARRAY)

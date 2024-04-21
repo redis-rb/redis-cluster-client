@@ -130,8 +130,11 @@ The following methods are able to be used like `redis-client`.
 * `#pubsub`
 * `#close`
 
-The other methods are not implemented because the client cannot operate with cluster mode.
-`#pipelined` method splits and sends commands to each node and aggregates replies.
+The `#scan` method iterates all the nodes seamlessly.
+The `#pipelined` method splits and sends commands to each node and aggregates replies.
+The `#multi` method supports the transaction feature but you should use the hashtag for keys.
+The `#pubsub` method supports the sharded Pub/Sub feature.
+Every interfaces are handled with redirections and resharding states.
 
 ## Multiple keys and CROSSSLOT error
 A subset of commands can be passed multiple keys. But it has a constraint the keys are in the same hash slot.

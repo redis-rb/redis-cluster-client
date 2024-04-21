@@ -5,7 +5,6 @@ require 'redis_client/cluster/pipeline'
 require 'redis_client/cluster/pub_sub'
 require 'redis_client/cluster/router'
 require 'redis_client/cluster/transaction'
-require 'redis_client/cluster/pinning_node'
 require 'redis_client/cluster/optimistic_locking'
 
 class RedisClient
@@ -118,13 +117,8 @@ class RedisClient
       ::RedisClient::Cluster::PubSub.new(@router, @command_builder)
     end
 
-    # TODO: This isn't an official public interface yet. Don't use in your production environment.
-    # @see https://github.com/redis-rb/redis-cluster-client/issues/299
-    def with(key: nil, hashtag: nil, write: true)
-      key = process_with_arguments(key, hashtag)
-      node_key = @router.find_node_key_by_key(key, primary: write)
-      node = @router.find_node(node_key)
-      node.with { |c| yield ::RedisClient::Cluster::PinningNode.new(c) }
+    def with(...)
+      raise NotImplementedError, 'No way to use'
     end
 
     def close
@@ -134,19 +128,6 @@ class RedisClient
     end
 
     private
-
-    def process_with_arguments(key, hashtag) # rubocop:disable Metrics/CyclomaticComplexity
-      raise ArgumentError, 'Only one of key or hashtag may be provided' if key && hashtag
-
-      if hashtag
-        # The documentation says not to wrap your hashtag in {}, but people will probably
-        # do it anyway and it's easy for us to fix here.
-        key = hashtag&.match?(/^{.*}$/) ? hashtag : "{#{hashtag}}"
-      end
-      raise ArgumentError, 'One of key or hashtag must be provided' if key.nil? || key.empty?
-
-      key
-    end
 
     def method_missing(name, *args, **kwargs, &block)
       if @router.command_exists?(name)
