@@ -314,7 +314,6 @@ class RedisClient
         end
       end
 
-      # for redis-rb
       def send_watch_command(command)
         raise ::RedisClient::Cluster::Transaction::ConsistencyError, 'A block required. And you need to use the block argument as a client for the transaction.' unless block_given?
 

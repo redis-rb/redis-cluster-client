@@ -5,6 +5,9 @@ class RedisClient
     class Node
       class BaseTopology
         IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
+        EMPTY_HASH = {}.freeze
+        EMPTY_ARRAY = [].freeze
+
         attr_reader :clients, :primary_clients, :replica_clients
 
         def initialize(pool, concurrent_worker, **kwargs)

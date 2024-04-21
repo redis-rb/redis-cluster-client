@@ -518,7 +518,6 @@ class RedisClient
         assert_equal(%w[3 4], @client.call('MGET', '{key}1', '{key}2'))
       end
 
-      # for redis-rb
       def test_transaction_with_dedicated_watch_command
         @client.call('MSET', '{key}1', '0', '{key}2', '0')
 
@@ -683,6 +682,10 @@ class RedisClient
         ps.close
       end
 
+      def test_with_method
+        assert_raises(NotImplementedError) { @client.with }
+      end
+
       def test_dedicated_commands # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         10.times { |i| @client.call('SET', "key#{i}", i) }
         wait_for_replication
@@ -817,44 +820,6 @@ class RedisClient
 
         client1.close
         client2.close
-      end
-
-      def test_pinning_single_key
-        got = @client.with(key: 'key1') do |conn|
-          conn.call('SET', 'key1', 'hello')
-          conn.call('GET', 'key1')
-        end
-        assert_equal('hello', got)
-      end
-
-      def test_pinning_no_key
-        assert_raises(ArgumentError) do
-          @client.with {}
-        end
-      end
-
-      def test_pinning_empty_key
-        assert_raises(ArgumentError) do
-          @client.with(key: '') {}
-        end
-      end
-
-      def test_pinning_two_keys
-        got = @client.with(hashtag: 'slot') do |conn|
-          conn.call('SET', '{slot}key1', 'v1')
-          conn.call('SET', '{slot}key2', 'v2')
-          conn.call('MGET', '{slot}key1', '{slot}key2')
-        end
-        assert_equal(%w[v1 v2], got)
-      end
-
-      def test_pinning_hashtag_with_braces
-        got = @client.with(hashtag: '{slot}') do |conn|
-          conn.call('SET', '{slot}key1', 'v1')
-          conn.call('SET', '{slot}key2', 'v2')
-          conn.call('MGET', '{slot}key1', '{slot}key2')
-        end
-        assert_equal(%w[v1 v2], got)
       end
 
       private
