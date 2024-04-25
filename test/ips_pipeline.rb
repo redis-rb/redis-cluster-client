@@ -13,14 +13,16 @@ module IpsPipeline
     on_demand = make_client(:on_demand)
     pooled = make_client(:pooled)
     none = make_client(:none)
+    actor = make_client(:actor)
     envoy = make_client_for_envoy
     cluster_proxy = make_client_for_cluster_proxy
-    prepare(on_demand, pooled, none, envoy, cluster_proxy)
+    prepare(on_demand, pooled, none, actor, envoy, cluster_proxy)
     print_letter('pipelined')
     bench(
       ondemand: on_demand,
       pooled: pooled,
       none: none,
+      actor: actor,
       envoy: envoy,
       cproxy: cluster_proxy
     )
