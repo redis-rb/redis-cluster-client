@@ -67,6 +67,8 @@ TEST_REDIS_VERSION = _tmp_cli.call('INFO', 'SERVER').split("\r\n").grep(/redis_v
 TEST_REDIS_MAJOR_VERSION = Integer(TEST_REDIS_VERSION.split('.').first)
 _tmp_cli.close
 
+TEST_RUBY_MAJOR_VERSION = Integer(RUBY_VERSION.split('.').first)
+
 BENCH_ENVOY_OPTIONS = { port: 7000, protocol: 2 }.freeze
 BENCH_REDIS_CLUSTER_PROXY_OPTIONS = { port: 7001, protocol: 2 }.freeze
 

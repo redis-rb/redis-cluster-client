@@ -7,7 +7,7 @@ class RedisClient
   class Cluster
     module ConcurrentWorker
       class TestActor < TestingWrapper
-        include Mixin
+        include Mixin if RUBY_ENGINE == 'ruby' && TEST_RUBY_MAJOR_VERSION >= 3
 
         private
 
