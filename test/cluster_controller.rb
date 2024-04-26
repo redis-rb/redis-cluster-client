@@ -58,6 +58,8 @@ class ClusterController
     @debug = ENV.fetch('DEBUG', '0')
   end
 
+  attr_reader :clients
+
   def wait_for_cluster_to_be_ready(skip_clients: [])
     print_debug('wait for nodes to be recognized...')
     wait_meeting(@clients, max_attempts: @max_attempts)

@@ -15,10 +15,7 @@ class RedisClient
         slot = find_slot(keys)
         raise ::RedisClient::Cluster::Transaction::ConsistencyError, "unsafe watch: #{keys.join(' ')}" if slot.nil?
 
-        # We have not yet selected a node for this transaction, initially, which means we can handle
-        # redirections freely initially (i.e. for the first WATCH call)
-        node = @router.find_primary_node_by_slot(slot)
-        handle_redirection(node, retry_count: 1) do |nd|
+        handle_redirection(slot, retry_count: 1) do |nd|
           nd.with do |c|
             c.ensure_connected_cluster_scoped(retryable: false) do
               c.call('ASKING') if @asking
@@ -45,10 +42,22 @@ class RedisClient
 
       private
 
-      def handle_redirection(node, retry_count: 1, &blk)
-        @router.handle_redirection(node, retry_count: retry_count) do |nd|
+      def handle_redirection(slot, retry_count: 1, &blk)
+        # We have not yet selected a node for this transaction, initially, which means we can handle
+        # redirections freely initially (i.e. for the first WATCH call)
+        node = @router.find_primary_node_by_slot(slot)
+        times_block_executed = 0
+        @router.handle_redirection(node, nil, retry_count: retry_count) do |nd|
+          times_block_executed += 1
           handle_asking_once(nd, &blk)
         end
+      rescue ::RedisClient::ConnectionError
+        # Deduct the number of retries that happened _inside_ router#handle_redirection from our remaining
+        # _external_ retries. Always deduct at least one in case handle_redirection raises without trying the block.
+        retry_count -= [times_block_executed, 1].min
+        raise if retry_count < 0
+
+        retry
       end
 
       def handle_asking_once(node)
