@@ -10,6 +10,7 @@ require 'redis_client/cluster/node_key'
 require 'redis_client/cluster/normalized_cmd_name'
 require 'redis_client/cluster/transaction'
 require 'redis_client/cluster/optimistic_locking'
+require 'redis_client/cluster/pipeline'
 require 'redis_client/cluster/error_identification'
 
 class RedisClient
@@ -17,6 +18,11 @@ class RedisClient
     class Router
       ZERO_CURSOR_FOR_SCAN = '0'
       TSF = ->(f, x) { f.nil? ? x : f.call(x) }.curry
+      MULTIPLE_KEYS_COMMAND_TO_PIPELINE = {
+        'mset' => 'set',
+        'mget' => 'get',
+        'del' => 'del'
+      }.freeze
 
       def initialize(config, concurrent_worker, pool: nil, **kwargs)
         @config = config.dup
@@ -48,6 +54,8 @@ class RedisClient
         when 'script'   then send_script_command(method, command, args, &block)
         when 'pubsub'   then send_pubsub_command(method, command, args, &block)
         when 'watch'    then send_watch_command(command, &block)
+        when 'mset', 'mget', 'del'
+          send_multiple_keys_command(cmd, method, command, args, &block)
         when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save'
           @node.call_all(method, command, args).first.then(&TSF.call(block))
         when 'flushall', 'flushdb'
@@ -324,6 +332,25 @@ class RedisClient
           yield transaction
           transaction.execute
         end
+      end
+
+      def send_multiple_keys_command(cmd, method, command, args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+        if command.size < 3 || !::RedisClient::Cluster::KeySlotConverter.extract_hash_tag(command[1]).empty? # rubocop:disable Style/IfUnlessModifier
+          return try_send(assign_node(command), method, command, args, &block)
+        end
+
+        single_key_cmd = MULTIPLE_KEYS_COMMAND_TO_PIPELINE[cmd]
+        key_step = @command.determine_key_step(cmd)
+        seed = @config.use_replica? && @config.replica_affinity == :random ? nil : Random.new_seed
+        pipeline = ::RedisClient::Cluster::Pipeline.new(self, @command_builder, @concurrent_worker, exception: true, seed: seed)
+        command[1..].each_slice(key_step) { |*v| pipeline.call(single_key_cmd, *v) }
+        replies = pipeline.execute
+        result = case cmd
+                 when 'mset' then replies.first
+                 when 'del' then replies.sum
+                 else replies
+                 end
+        block_given? ? yield(result) : result
       end
 
       def update_cluster_info!

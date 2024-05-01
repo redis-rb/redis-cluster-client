@@ -97,6 +97,12 @@ class RedisClient
         @commands.key?(::RedisClient::Cluster::NormalizedCmdName.instance.get_by_name(name))
       end
 
+      def determine_key_step(command)
+        name = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
+        # Some commands like EVALSHA have zero as the step in COMMANDS somehow.
+        @commands[name].key_step == 0 ? 1 : @commands[name].key_step
+      end
+
       private
 
       def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity
@@ -141,12 +147,6 @@ class RedisClient
             command.length + @commands[name].last_key_position
           end
         end
-      end
-
-      def determine_key_step(command)
-        name = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
-        # Some commands like EVALSHA have zero as the step in COMMANDS somehow.
-        @commands[name].key_step == 0 ? 1 : @commands[name].key_step
       end
 
       def determine_optional_key_position(command, option_name) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
