@@ -147,6 +147,20 @@ class RedisClient
         end
       end
 
+      def test_determine_key_step
+        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
+        [
+          { name: 'MSET', want: 2 },
+          { name: 'MGET', want: 1 },
+          { name: 'DEL', want: 1 },
+          { name: 'EVALSHA', want: 1 }
+        ].each_with_index do |c, idx|
+          msg = "Case: #{idx}"
+          got = cmd.determine_key_step(c[:name])
+          assert_equal(c[:want], got, msg)
+        end
+      end
+
       def test_determine_first_key_position
         cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
         [
