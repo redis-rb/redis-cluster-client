@@ -9,6 +9,8 @@ require 'testing_constants'
 module ProfStack
   SIZE = 40
   ATTEMPTS = 1000
+  ORIGINAL_MGET = (%w[MGET] + Array.new(SIZE) { |i| "{key}#{i}" }).freeze
+  EMULATED_MGET = (%w[MGET] + Array.new(SIZE) { |i| "key#{i}" }).freeze
 
   module_function
 
@@ -36,6 +38,7 @@ module ProfStack
         SIZE.times do |j|
           n = SIZE * i + j
           pi.call('SET', "key#{n}", "val#{n}")
+          pi.call('SET', "{key}#{n}", "val#{n}")
         end
       end
     end
@@ -58,6 +61,10 @@ module ProfStack
           end
         end
       end
+    when :original_mget
+      ATTEMPTS.times { client.call_v(ORIGINAL_MGET) }
+    when :emulated_mget
+      ATTEMPTS.times { client.call_v(EMULATED_MGET) }
     else raise ArgumentError, mode
     end
   end
