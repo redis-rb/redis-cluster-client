@@ -334,16 +334,31 @@ class RedisClient
         end
       end
 
-      def send_multiple_keys_command(cmd, method, command, args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
-        if command.size < 3 || !::RedisClient::Cluster::KeySlotConverter.extract_hash_tag(command[1]).empty? # rubocop:disable Style/IfUnlessModifier
+      def send_multiple_keys_command(cmd, method, command, args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        key_step = @command.determine_key_step(cmd)
+        if command.size <= key_step + 1 || !::RedisClient::Cluster::KeySlotConverter.extract_hash_tag(command[1]).empty? # rubocop:disable Style/IfUnlessModifier
           return try_send(assign_node(command), method, command, args, &block)
         end
 
-        single_key_cmd = MULTIPLE_KEYS_COMMAND_TO_PIPELINE[cmd]
-        key_step = @command.determine_key_step(cmd)
         seed = @config.use_replica? && @config.replica_affinity == :random ? nil : Random.new_seed
         pipeline = ::RedisClient::Cluster::Pipeline.new(self, @command_builder, @concurrent_worker, exception: true, seed: seed)
-        command[1..].each_slice(key_step) { |*v| pipeline.call(single_key_cmd, *v) }
+
+        # This implementation is prioritized to lessen memory consumption rather than readability.
+        single_key_cmd = MULTIPLE_KEYS_COMMAND_TO_PIPELINE[cmd]
+        single_command = Array.new(key_step + 1)
+        single_command[0] = single_key_cmd
+        if key_step == 1
+          command[1..].each do |key|
+            single_command[1] = key
+            pipeline.call_v(single_command)
+          end
+        else
+          command[1..].each_slice(key_step) do |v|
+            key_step.times { |i| single_command[i + 1] = v[i] }
+            pipeline.call_v(single_command)
+          end
+        end
+
         replies = pipeline.execute
         result = case cmd
                  when 'mset' then replies.first
