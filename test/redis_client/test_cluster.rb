@@ -364,7 +364,10 @@ class RedisClient
           tx.call('SET', '{key}1', '1')
           tx.call('SET', '{key}2', '2')
         end
+
         assert_equal(%w[WATCH MULTI SET SET EXEC], @captured_commands.to_a.map(&:command).map(&:first))
+
+        wait_for_replication
         assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
       end
 
