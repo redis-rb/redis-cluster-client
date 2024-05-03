@@ -44,12 +44,21 @@ module IpsMget
   def bench(cmd, client)
     original = [cmd] + Array.new(ATTEMPTS) { |i| "{key}#{i}" }
     emulated = [cmd] + Array.new(ATTEMPTS) { |i| "key#{i}" }
+    single_get = [cmd]
 
     Benchmark.ips do |x|
       x.time = 5
       x.warmup = 1
       x.report("#{cmd}: original") { client.call_v(original) }
       x.report("#{cmd}: emulated") { client.call_v(emulated) }
+
+      x.report("#{cmd}: single_get") do
+        ATTEMPTS.times do |i|
+          single_get[1] = "key#{i}"
+          client.call_v(single_get)
+        end
+      end
+
       x.compare!
     end
   end
