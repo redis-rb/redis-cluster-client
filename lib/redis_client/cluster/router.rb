@@ -336,7 +336,7 @@ class RedisClient
 
       def send_multiple_keys_command(cmd, method, command, args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         key_step = @command.determine_key_step(cmd)
-        if command.size <= key_step + 1 || !::RedisClient::Cluster::KeySlotConverter.extract_hash_tag(command[1]).empty? # rubocop:disable Style/IfUnlessModifier
+        if command.size <= key_step + 1 || ::RedisClient::Cluster::KeySlotConverter.hash_tag_included?(command[1]) # rubocop:disable Style/IfUnlessModifier
           return try_send(assign_node(command), method, command, args, &block)
         end
 

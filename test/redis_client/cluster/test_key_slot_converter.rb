@@ -48,6 +48,27 @@ class RedisClient
           assert_equal(c[:want], got, msg)
         end
       end
+
+      def test_hash_tag_included?
+        [
+          { key: 'foo', want: false },
+          { key: 'foo{bar}baz', want: true },
+          { key: 'foo{bar}baz{qux}quuc', want: true },
+          { key: 'foo}bar{baz', want: false },
+          { key: 'foo{bar', want: false },
+          { key: 'foo}bar', want: false },
+          { key: 'foo{}bar', want: false },
+          { key: '{}foo', want: false },
+          { key: 'foo{}', want: false },
+          { key: '{}', want: false },
+          { key: '', want: false },
+          { key: nil, want: false }
+        ].each_with_index do |c, idx|
+          msg = "Case: #{idx}"
+          got = ::RedisClient::Cluster::KeySlotConverter.hash_tag_included?(c[:key])
+          assert_equal(c[:want], got, msg)
+        end
+      end
     end
   end
 end
