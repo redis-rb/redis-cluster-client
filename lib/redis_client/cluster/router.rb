@@ -18,11 +18,6 @@ class RedisClient
     class Router
       ZERO_CURSOR_FOR_SCAN = '0'
       TSF = ->(f, x) { f.nil? ? x : f.call(x) }.curry
-      MULTIPLE_KEYS_COMMAND_TO_PIPELINE = {
-        'mset' => 'set',
-        'mget' => 'get',
-        'del' => 'del'
-      }.freeze
 
       def initialize(config, concurrent_worker, pool: nil, **kwargs)
         @config = config.dup
@@ -334,27 +329,31 @@ class RedisClient
         end
       end
 
+      MULTIPLE_KEYS_COMMAND_TO_SINGLE = {
+        'mget' => ['get', 1].freeze,
+        'mset' => ['set', 2].freeze,
+        'del' => ['del', 1].freeze
+      }.freeze
+
       def send_multiple_keys_command(cmd, method, command, args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        key_step = @command.determine_key_step(cmd)
-        if command.size <= key_step + 1 || ::RedisClient::Cluster::KeySlotConverter.hash_tag_included?(command[1]) # rubocop:disable Style/IfUnlessModifier
-          return try_send(assign_node(command), method, command, args, &block)
-        end
+        # This implementation is prioritized performance rather than readability or so.
+        single_key_cmd, keys_step = MULTIPLE_KEYS_COMMAND_TO_SINGLE.fetch(cmd)
+
+        return try_send(assign_node(command), method, command, args, &block) if command.size <= keys_step + 1 || ::RedisClient::Cluster::KeySlotConverter.hash_tag_included?(command[1])
 
         seed = @config.use_replica? && @config.replica_affinity == :random ? nil : Random.new_seed
         pipeline = ::RedisClient::Cluster::Pipeline.new(self, @command_builder, @concurrent_worker, exception: true, seed: seed)
 
-        # This implementation is prioritized to lessen memory consumption rather than readability.
-        single_key_cmd = MULTIPLE_KEYS_COMMAND_TO_PIPELINE[cmd]
-        single_command = Array.new(key_step + 1)
+        single_command = Array.new(keys_step + 1)
         single_command[0] = single_key_cmd
-        if key_step == 1
+        if keys_step == 1
           command[1..].each do |key|
             single_command[1] = key
             pipeline.call_v(single_command)
           end
         else
-          command[1..].each_slice(key_step) do |v|
-            key_step.times { |i| single_command[i + 1] = v[i] }
+          command[1..].each_slice(keys_step) do |v|
+            keys_step.times { |i| single_command[i + 1] = v[i] }
             pipeline.call_v(single_command)
           end
         end

@@ -207,6 +207,8 @@ class RedisClient
         end
 
         assert_equal(['OK', 1, 2], got)
+
+        wait_for_replication
         assert_equal('2', @client.call('GET', 'counter'))
       end
 
@@ -284,6 +286,8 @@ class RedisClient
         end
 
         assert_equal(%w[OK OK], got)
+
+        wait_for_replication
         assert_equal(%w[1 2 3 4], @client.call('MGET', '{key}1', '{key}2', '{key}3', '{key}4'))
       end
 
@@ -319,6 +323,8 @@ class RedisClient
         end
 
         assert_equal(%w[START OK OK FINISH], got)
+
+        wait_for_replication
         assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
       end
 
@@ -339,6 +345,7 @@ class RedisClient
           end
         end
 
+        wait_for_replication
         assert_equal(%w[0 0], @client.call('MGET', '{key}1', '{key}2'))
       end
 
@@ -353,6 +360,8 @@ class RedisClient
         end
 
         assert_equal(%w[START OK OK FINISH], got)
+
+        wait_for_replication
         assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
       end
 
@@ -392,6 +401,7 @@ class RedisClient
             tx.call('QUIT')
           end
         end
+
         command_list = @captured_commands.to_a.map(&:command).map(&:first)
         assert_includes(command_list, 'WATCH')
         refute_includes(command_list, 'UNWATCH')
@@ -421,6 +431,7 @@ class RedisClient
         end
 
         # The transaction did not commit.
+        wait_for_replication
         assert_equal('client2_value', @client.call('GET', 'key'))
       end
 
@@ -449,6 +460,7 @@ class RedisClient
         end
 
         # The transaction did commit (but it was the second time)
+        wait_for_replication
         assert_equal('@client_value_2', @client.call('GET', 'key'))
         assert_equal(2, call_count)
       end
@@ -463,6 +475,7 @@ class RedisClient
           end
         end
 
+        wait_for_replication
         assert_equal('x', @client.call('GET', 'key1'))
       end
 
@@ -476,6 +489,7 @@ class RedisClient
           end
         end
 
+        wait_for_replication
         assert_equal('aaa', @client.call('GET', 'key1'))
       end
 
@@ -518,6 +532,8 @@ class RedisClient
         end
 
         assert_nil(got)
+
+        wait_for_replication
         assert_equal(%w[3 4], @client.call('MGET', '{key}1', '{key}2'))
       end
 
@@ -532,6 +548,8 @@ class RedisClient
         end
 
         assert_equal(%w[START OK OK FINISH], got)
+
+        wait_for_replication
         assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
       end
 
