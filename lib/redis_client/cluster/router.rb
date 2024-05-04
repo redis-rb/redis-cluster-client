@@ -329,20 +329,15 @@ class RedisClient
         end
       end
 
+      MULTIPLE_KEYS_COMMAND_TO_SINGLE = {
+        'mget' => ['get', 1].freeze,
+        'mset' => ['set', 2].freeze,
+        'del' => ['del', 1].freeze
+      }.freeze
+
       def send_multiple_keys_command(cmd, method, command, args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         # This implementation is prioritized performance rather than readability or so.
-        case cmd
-        when 'mget'
-          single_key_cmd = 'get'
-          keys_step = 1
-        when 'mset'
-          single_key_cmd = 'set'
-          keys_step = 2
-        when 'del'
-          single_key_cmd = 'del'
-          keys_step = 1
-        else raise NotImplementedError, cmd
-        end
+        single_key_cmd, keys_step = MULTIPLE_KEYS_COMMAND_TO_SINGLE.fetch(cmd)
 
         return try_send(assign_node(command), method, command, args, &block) if command.size <= keys_step + 1 || ::RedisClient::Cluster::KeySlotConverter.hash_tag_included?(command[1])
 
