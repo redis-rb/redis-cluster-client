@@ -4,7 +4,7 @@
 
 require 'redis_client'
 
-TEST_REDIS_HOST = '127.0.0.1'
+TEST_REDIS_HOST = ENV.fetch('REDIS_HOST', '127.0.0.1')
 TEST_REDIS_PORT = 6379
 TEST_TIMEOUT_SEC = 5.0
 TEST_RECONNECT_ATTEMPTS = 3
@@ -56,9 +56,25 @@ TEST_REPLICA_SIZE = ENV.fetch('REDIS_REPLICA_SIZE', '1').to_i
 TEST_NUMBER_OF_REPLICAS = TEST_REPLICA_SIZE * TEST_SHARD_SIZE
 TEST_NUMBER_OF_NODES = TEST_SHARD_SIZE + TEST_NUMBER_OF_REPLICAS
 
-TEST_REDIS_PORTS = TEST_REDIS_PORT.upto(TEST_REDIS_PORT + TEST_NUMBER_OF_NODES - 1).to_a.freeze
-TEST_NODE_URIS = TEST_REDIS_PORTS.map { |v| "#{TEST_REDIS_SCHEME}://#{TEST_REDIS_HOST}:#{v}" }.freeze
-TEST_NODE_OPTIONS = TEST_REDIS_PORTS.to_h { |v| ["#{TEST_REDIS_HOST}:#{v}", { host: TEST_REDIS_HOST, port: v }] }.freeze
+case TEST_REDIS_HOST
+when '127.0.0.1', 'localhost'
+  TEST_REDIS_PORTS = TEST_REDIS_PORT.upto(TEST_REDIS_PORT + TEST_NUMBER_OF_NODES - 1).to_a.freeze
+  TEST_NODE_URIS = TEST_REDIS_PORTS.map { |v| "#{TEST_REDIS_SCHEME}://#{TEST_REDIS_HOST}:#{v}" }.freeze
+  TEST_NODE_OPTIONS = TEST_REDIS_PORTS.to_h { |v| ["#{TEST_REDIS_HOST}:#{v}", { host: TEST_REDIS_HOST, port: v }] }.freeze
+when 'node1'
+  TEST_REDIS_PORTS = Array.new(TEST_NUMBER_OF_NODES) { TEST_REDIS_PORT }.freeze
+  TEST_NODE_URIS = Array.new(TEST_NUMBER_OF_NODES) do |i|
+    host = "node#{i + 1}"
+    "#{TEST_REDIS_SCHEME}://#{host}:#{TEST_REDIS_PORT}"
+  end.freeze
+
+  TEST_NODE_OPTIONS = Array.new(TEST_NUMBER_OF_NODES) do |i|
+    host = "node#{format("%#{TEST_NUMBER_OF_NODES}d", i + 1)}"
+    ["#{host}:#{TEST_REDIS_PORT}", { host: host, port: TEST_REDIS_PORT }]
+  end.to_h.freeze
+else
+  raise NotImplementedError, TEST_REDIS_HOST
+end
 
 TEST_GENERIC_OPTIONS = (TEST_REDIS_SSL ? _base_opts.merge(_ssl_opts) : _base_opts).freeze
 
