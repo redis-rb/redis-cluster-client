@@ -16,42 +16,43 @@ class RedisClient
     def initialize(config, pool: nil, concurrency: nil, **kwargs)
       @config = config
       @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create(**(concurrency || {}))
-      @router = ::RedisClient::Cluster::Router.new(config, @concurrent_worker, pool: pool, **kwargs)
       @command_builder = config.command_builder
+      @pool = pool
+      @kwargs = kwargs
     end
 
     def inspect
-      "#<#{self.class.name} #{@router.node_keys.join(', ')}>"
+      "#<#{self.class.name} #{router.node_keys.join(', ')}>"
     end
 
     def call(*args, **kwargs, &block)
       command = @command_builder.generate(args, kwargs)
-      @router.send_command(:call_v, command, &block)
+      router.send_command(:call_v, command, &block)
     end
 
     def call_v(command, &block)
       command = @command_builder.generate(command)
-      @router.send_command(:call_v, command, &block)
+      router.send_command(:call_v, command, &block)
     end
 
     def call_once(*args, **kwargs, &block)
       command = @command_builder.generate(args, kwargs)
-      @router.send_command(:call_once_v, command, &block)
+      router.send_command(:call_once_v, command, &block)
     end
 
     def call_once_v(command, &block)
       command = @command_builder.generate(command)
-      @router.send_command(:call_once_v, command, &block)
+      router.send_command(:call_once_v, command, &block)
     end
 
     def blocking_call(timeout, *args, **kwargs, &block)
       command = @command_builder.generate(args, kwargs)
-      @router.send_command(:blocking_call_v, command, timeout, &block)
+      router.send_command(:blocking_call_v, command, timeout, &block)
     end
 
     def blocking_call_v(timeout, command, &block)
       command = @command_builder.generate(command)
-      @router.send_command(:blocking_call_v, command, timeout, &block)
+      router.send_command(:blocking_call_v, command, timeout, &block)
     end
 
     def scan(*args, **kwargs, &block)
@@ -60,31 +61,31 @@ class RedisClient
       seed = Random.new_seed
       cursor = ZERO_CURSOR_FOR_SCAN
       loop do
-        cursor, keys = @router.scan('SCAN', cursor, *args, seed: seed, **kwargs)
+        cursor, keys = router.scan('SCAN', cursor, *args, seed: seed, **kwargs)
         keys.each(&block)
         break if cursor == ZERO_CURSOR_FOR_SCAN
       end
     end
 
     def sscan(key, *args, **kwargs, &block)
-      node = @router.assign_node(['SSCAN', key])
-      @router.try_delegate(node, :sscan, key, *args, **kwargs, &block)
+      node = router.assign_node(['SSCAN', key])
+      router.try_delegate(node, :sscan, key, *args, **kwargs, &block)
     end
 
     def hscan(key, *args, **kwargs, &block)
-      node = @router.assign_node(['HSCAN', key])
-      @router.try_delegate(node, :hscan, key, *args, **kwargs, &block)
+      node = router.assign_node(['HSCAN', key])
+      router.try_delegate(node, :hscan, key, *args, **kwargs, &block)
     end
 
     def zscan(key, *args, **kwargs, &block)
-      node = @router.assign_node(['ZSCAN', key])
-      @router.try_delegate(node, :zscan, key, *args, **kwargs, &block)
+      node = router.assign_node(['ZSCAN', key])
+      router.try_delegate(node, :zscan, key, *args, **kwargs, &block)
     end
 
     def pipelined(exception: true)
       seed = @config.use_replica? && @config.replica_affinity == :random ? nil : Random.new_seed
       pipeline = ::RedisClient::Cluster::Pipeline.new(
-        @router,
+        router,
         @command_builder,
         @concurrent_worker,
         exception: exception,
@@ -99,14 +100,14 @@ class RedisClient
 
     def multi(watch: nil)
       if watch.nil? || watch.empty?
-        transaction = ::RedisClient::Cluster::Transaction.new(@router, @command_builder)
+        transaction = ::RedisClient::Cluster::Transaction.new(router, @command_builder)
         yield transaction
         return transaction.execute
       end
 
-      ::RedisClient::Cluster::OptimisticLocking.new(@router).watch(watch) do |c, slot, asking|
+      ::RedisClient::Cluster::OptimisticLocking.new(router).watch(watch) do |c, slot, asking|
         transaction = ::RedisClient::Cluster::Transaction.new(
-          @router, @command_builder, node: c, slot: slot, asking: asking
+          router, @command_builder, node: c, slot: slot, asking: asking
         )
         yield transaction
         transaction.execute
@@ -114,7 +115,7 @@ class RedisClient
     end
 
     def pubsub
-      ::RedisClient::Cluster::PubSub.new(@router, @command_builder)
+      ::RedisClient::Cluster::PubSub.new(router, @command_builder)
     end
 
     def with(...)
@@ -123,24 +124,28 @@ class RedisClient
 
     def close
       @concurrent_worker.close
-      @router.close
+      router.close
       nil
     end
 
     private
 
+    def router
+      @router ||= ::RedisClient::Cluster::Router.new(@config, @concurrent_worker, pool: @pool, **@kwargs)
+    end
+
     def method_missing(name, *args, **kwargs, &block)
-      if @router.command_exists?(name)
+      if router.command_exists?(name)
         args.unshift(name)
         command = @command_builder.generate(args, kwargs)
-        return @router.send_command(:call_v, command, &block)
+        return router.send_command(:call_v, command, &block)
       end
 
       super
     end
 
     def respond_to_missing?(name, include_private = false)
-      return true if @router.command_exists?(name)
+      return true if router.command_exists?(name)
 
       super
     end
