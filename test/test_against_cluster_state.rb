@@ -14,6 +14,7 @@ class TestAgainstClusterState < TestingWrapper
       )
       @controller.rebuild
       @client = new_test_client
+      @client.call('echo', 'init')
     end
 
     def teardown

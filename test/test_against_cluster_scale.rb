@@ -16,6 +16,7 @@ class TestAgainstClusterScale < TestingWrapper
       fixed_hostname: TEST_FIXED_HOSTNAME,
       **TEST_GENERIC_OPTIONS
     ).new_client
+    @client.call('echo', 'init')
   end
 
   def teardown

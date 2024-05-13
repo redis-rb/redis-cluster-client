@@ -863,6 +863,13 @@ class RedisClient
         client2.close
       end
 
+      def test_initialization_delayed
+        config = ::RedisClient::ClusterConfig.new(nodes: 'redis://127.0.0.1:11211')
+        client = ::RedisClient::Cluster.new(config)
+        assert_instance_of(::RedisClient::Cluster, client)
+        assert_raises(RedisClient::Cluster::InitialSetupError) { client.call('PING') }
+      end
+
       private
 
       def wait_for_replication
