@@ -123,8 +123,8 @@ class RedisClient
     end
 
     def close
+      @router&.close
       @concurrent_worker.close
-      router.close
       nil
     end
 
