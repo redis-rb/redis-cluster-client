@@ -19,6 +19,7 @@ class RedisClient
       @command_builder = config.command_builder
       @pool = pool
       @kwargs = kwargs
+      @mutex = Mutex.new
     end
 
     def inspect
@@ -131,7 +132,11 @@ class RedisClient
     private
 
     def router
-      @router ||= ::RedisClient::Cluster::Router.new(@config, @concurrent_worker, pool: @pool, **@kwargs)
+      return @router unless @router.nil?
+
+      @mutex.synchronize do
+        @router ||= ::RedisClient::Cluster::Router.new(@config, @concurrent_worker, pool: @pool, **@kwargs)
+      end
     end
 
     def method_missing(name, *args, **kwargs, &block)
