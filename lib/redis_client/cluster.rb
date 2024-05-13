@@ -17,13 +17,16 @@ class RedisClient
       @config = config
       @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create(**(concurrency || {}))
       @command_builder = config.command_builder
+
       @pool = pool
       @kwargs = kwargs
+      @router = nil
       @mutex = Mutex.new
     end
 
     def inspect
-      "#<#{self.class.name} #{router.node_keys.join(', ')}>"
+      node_keys = @router.nil? ? @config.startup_nodes.keys : router.node_keys
+      "#<#{self.class.name} #{node_keys.join(', ')}>"
     end
 
     def call(*args, **kwargs, &block)

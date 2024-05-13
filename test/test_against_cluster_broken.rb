@@ -12,7 +12,7 @@ class TestAgainstClusterBroken < TestingWrapper
       fixed_hostname: TEST_FIXED_HOSTNAME,
       **TEST_GENERIC_OPTIONS
     ).new_client
-    @client.inspect # for init
+    @client.call('echo', 'init')
     @controller = ClusterController.new(
       TEST_NODE_URIS,
       replica_size: TEST_REPLICA_SIZE,
