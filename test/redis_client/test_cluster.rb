@@ -715,21 +715,22 @@ class RedisClient
 
       def test_dedicated_multiple_keys_command
         [
-          { command: %w[MSET key1 val1], want: 'OK' },
+          { command: %w[MSET key1 val1], want: 'OK', wait: true },
           { command: %w[MGET key1], want: %w[val1] },
-          { command: %w[DEL key1], want: 1 },
-          { command: %w[MSET {key}1 val1 {key}2 val2], want: 'OK' },
+          { command: %w[DEL key1], want: 1, wait: true },
+          { command: %w[MSET {key}1 val1 {key}2 val2], want: 'OK', wait: true },
           { command: %w[MGET {key}1 {key}2], want: %w[val1 val2] },
-          { command: %w[DEL {key}1 {key}2], want: 2 },
-          { command: %w[MSET key1 val1 key2 val2], want: 'OK' },
+          { command: %w[DEL {key}1 {key}2], want: 2, wait: true },
+          { command: %w[MSET key1 val1 key2 val2], want: 'OK', wait: true },
           { command: %w[MGET key1 key2], want: %w[val1 val2] },
-          { command: %w[DEL key1 key2], want: 2 },
-          { command: %w[MSET key1 val1 key2 val2], block: ->(r) { "#{r}!" }, want: 'OK!' },
+          { command: %w[DEL key1 key2], want: 2, wait: true },
+          { command: %w[MSET key1 val1 key2 val2], block: ->(r) { "#{r}!" }, want: 'OK!', wait: true },
           { command: %w[MGET key1 key2], block: ->(r) { r.map { |e| "#{e}!" } }, want: %w[val1! val2!] },
-          { command: %w[DEL key1 key2], block: ->(r) { r == 2 }, want: true }
+          { command: %w[DEL key1 key2], block: ->(r) { r == 2 }, want: true, wait: true }
         ].each_with_index do |c, i|
           block = c.key?(:block) ? c.fetch(:block) : nil
           assert_equal(c.fetch(:want), @client.call_v(c.fetch(:command), &block), i + 1)
+          wait_for_replication if c.fetch(:wait, false)
         end
       end
 
