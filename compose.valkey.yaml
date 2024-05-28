@@ -1,0 +1,86 @@
+---
+services:
+  node1: &node
+    image: "valkey/valkey:${REDIS_VERSION:-7}"
+    command: >
+      valkey-server
+      --maxmemory            64mb
+      --maxmemory-policy     allkeys-lru
+      --appendonly           yes
+      --cluster-enabled      yes
+      --cluster-config-file  nodes.conf
+      --cluster-node-timeout 5000
+    restart: "${RESTART_POLICY:-always}"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: "7s"
+      timeout: "5s"
+      retries: 10
+    ports:
+      - "6379:6379"
+  node2:
+    <<: *node
+    ports:
+      - "6380:6379"
+  node3:
+    <<: *node
+    ports:
+      - "6381:6379"
+  node4:
+    <<: *node
+    ports:
+      - "6382:6379"
+  node5:
+    <<: *node
+    ports:
+      - "6383:6379"
+  node6:
+    <<: *node
+    ports:
+      - "6384:6379"
+  clustering:
+    image: "valkey/valkey:${REDIS_VERSION:-7}"
+    command: >
+      bash -c "apt-get update > /dev/null
+      && apt-get install --no-install-recommends --no-install-suggests -y dnsutils > /dev/null
+      && rm -rf /var/lib/apt/lists/*
+      && yes yes | valkey-cli --cluster create
+      $$(dig node1 +short):6379
+      $$(dig node2 +short):6379
+      $$(dig node3 +short):6379
+      $$(dig node4 +short):6379
+      $$(dig node5 +short):6379
+      $$(dig node6 +short):6379
+      --cluster-replicas 1"
+    depends_on:
+      node1:
+        condition: service_healthy
+      node2:
+        condition: service_healthy
+      node3:
+        condition: service_healthy
+      node4:
+        condition: service_healthy
+      node5:
+        condition: service_healthy
+      node6:
+        condition: service_healthy
+  ruby:
+    image: "ruby:${RUBY_VERSION:-3}"
+    restart: always
+    working_dir: /client
+    volumes:
+      - .:/client
+    command:
+      - ruby
+      - "-e"
+      - 'Signal.trap(:INT, "EXIT"); Signal.trap(:TERM, "EXIT"); loop { sleep 1 }'
+    environment:
+      REDIS_HOST: node1
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "ruby", "-e", "'puts 1'"]
+      interval: "5s"
+      timeout: "3s"
+      retries: 3

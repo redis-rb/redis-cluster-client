@@ -28,6 +28,7 @@ jobs:
       matrix:
         include:
           - {redis: '7.2', ruby: '3.3'}
+          - {redis: '7.2', ruby: '3.3', compose: compose.valkey.yaml}
           - {redis: '7.2', ruby: '3.3', compose: compose.ssl.yaml}
           - {redis: '7.2', ruby: '3.3', driver: 'hiredis'}
           - {redis: '7.2', ruby: '3.3', driver: 'hiredis', compose: compose.ssl.yaml}
@@ -60,7 +61,7 @@ jobs:
           ruby-version: ${{ matrix.ruby || '3.3' }}
           bundler-cache: true
       - name: Pull Docker images
-        run: docker pull redis:$REDIS_VERSION
+        run: docker compose -f $DOCKER_COMPOSE_FILE pull
       - name: Run containers
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
       - name: Wait for Redis cluster to be ready
@@ -91,7 +92,7 @@ jobs:
           host_ip_addr=$(ip a | grep eth0 | grep inet | awk '{print $2}' | cut -d'/' -f1)
           echo "HOST_IP_ADDR=$host_ip_addr" >> $GITHUB_ENV
       - name: Pull Docker images
-        run: docker pull redis:$REDIS_VERSION
+        run: docker compose -f $DOCKER_COMPOSE_FILE pull
       - name: Run containers
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
         env:
@@ -162,7 +163,7 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: true
       - name: Pull Docker images
-        run: docker pull redis:$REDIS_VERSION
+        run: docker compose -f $DOCKER_COMPOSE_FILE pull
       - name: Run containers
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
       - name: Wait for Redis cluster to be ready
@@ -222,7 +223,7 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: true
       - name: Pull Docker images
-        run: docker pull redis:$REDIS_VERSION
+        run: docker compose -f $DOCKER_COMPOSE_FILE pull
       - name: Run containers
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
       - name: Wait for Redis cluster to be ready
@@ -260,7 +261,7 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: true
       - name: Pull Docker images
-        run: docker pull redis:$REDIS_VERSION
+        run: docker compose -f $DOCKER_COMPOSE_FILE pull
       - name: Run containers
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
       - name: Wait for Redis cluster to be ready
@@ -316,7 +317,7 @@ jobs:
           sudo sysctl -w net.ipv4.tcp_max_syn_backlog=1024 # backlog setting
           sudo sysctl -w net.core.somaxconn=1024           # up the number of connections per port
       - name: Pull Docker images
-        run: docker pull redis:$REDIS_VERSION
+        run: docker compose -f $DOCKER_COMPOSE_FILE pull
       - name: Run containers
         run: docker compose -f $DOCKER_COMPOSE_FILE up -d
       - name: Print memory info

@@ -72,18 +72,20 @@ class RedisClient
         client_side_timeout = TEST_REDIS_MAJOR_VERSION < 6 ? 2.0 : 1.5
         server_side_timeout = TEST_REDIS_MAJOR_VERSION < 6 ? '1' : '0.5'
 
-        assert_equal(%w[foo world], @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 1st')
+        swap_timeout(@client, timeout: 0.1) do |client|
+          assert_equal(%w[foo world], client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 1st')
 
-        # FIXME: too flaky, just a workaround
-        got = @client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout)
-        if got.nil?
-          assert_nil(got, 'Case: 2nd')
-        else
-          assert_equal(%w[foo hello], got, 'Case: 2nd')
+          # FIXME: too flaky, just a workaround
+          got = client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout)
+          if got.nil?
+            assert_nil(got, 'Case: 2nd')
+          else
+            assert_equal(%w[foo hello], got, 'Case: 2nd')
+          end
+
+          assert_nil(client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 3rd')
+          assert_raises(::RedisClient::ReadTimeoutError, 'Case: 4th') { client.blocking_call(0.1, 'BRPOP', 'foo', 0) }
         end
-
-        assert_nil(@client.blocking_call(client_side_timeout, 'BRPOP', 'foo', server_side_timeout), 'Case: 3rd')
-        assert_raises(::RedisClient::ReadTimeoutError, 'Case: 4th') { @client.blocking_call(0.1, 'BRPOP', 'foo', 0) }
       end
 
       def test_scan
@@ -146,12 +148,16 @@ class RedisClient
         want = %w[PONG] + (0..9).map(&:to_s) + [%w[list 2]]
         client_side_timeout = TEST_REDIS_MAJOR_VERSION < 6 ? 1.5 : 1.0
         server_side_timeout = TEST_REDIS_MAJOR_VERSION < 6 ? '1' : '0.5'
-        got = @client.pipelined do |pipeline|
-          pipeline.call_once('PING')
-          10.times { |i| pipeline.call('GET', "string#{i}") }
-          pipeline.blocking_call(client_side_timeout, 'BRPOP', 'list', server_side_timeout)
+
+        swap_timeout(@client, timeout: 0.1) do |client|
+          got = client.pipelined do |pipeline|
+            pipeline.call_once('PING')
+            10.times { |i| pipeline.call('GET', "string#{i}") }
+            pipeline.blocking_call(client_side_timeout, 'BRPOP', 'list', server_side_timeout)
+          end
+
+          assert_equal(want, got)
         end
-        assert_equal(want, got)
       end
 
       def test_pipelined_with_errors
@@ -815,8 +821,12 @@ class RedisClient
           )
         ).new_client
 
-        assert_raises(::RedisClient::ReadTimeoutError) { cli.blocking_call(0.1, 'BRPOP', 'foo', 0) }
-        assert_raises(::RedisClient::CircuitBreaker::OpenCircuitError) { cli.blocking_call(0.1, 'BRPOP', 'foo', 0) }
+        cli.call('echo', 'init')
+
+        swap_timeout(cli, timeout: 0.1) do |c|
+          assert_raises(::RedisClient::ReadTimeoutError) { c.blocking_call(0.1, 'BRPOP', 'foo', 0) }
+          assert_raises(::RedisClient::CircuitBreaker::OpenCircuitError) { c.blocking_call(0.1, 'BRPOP', 'foo', 0) }
+        end
 
         cli&.close
       end
@@ -875,7 +885,9 @@ class RedisClient
       def wait_for_replication
         client_side_timeout = TEST_TIMEOUT_SEC + 1.0
         server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
-        @client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+        swap_timeout(@client, timeout: 0.1) do |client|
+          client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+        end
       end
 
       def collect_messages(pubsub, size:, max_attempts: 30, timeout: 1.0)
@@ -912,6 +924,7 @@ class RedisClient
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
+          slow_command_timeout: TEST_TIMEOUT_SEC,
           middlewares: middlewares,
           custom: custom,
           **TEST_GENERIC_OPTIONS,
@@ -930,6 +943,7 @@ class RedisClient
           replica: true,
           replica_affinity: :random,
           fixed_hostname: TEST_FIXED_HOSTNAME,
+          slow_command_timeout: TEST_TIMEOUT_SEC,
           middlewares: middlewares,
           custom: custom,
           **TEST_GENERIC_OPTIONS,
@@ -948,6 +962,7 @@ class RedisClient
           replica: true,
           replica_affinity: :random_with_primary,
           fixed_hostname: TEST_FIXED_HOSTNAME,
+          slow_command_timeout: TEST_TIMEOUT_SEC,
           middlewares: middlewares,
           custom: custom,
           **TEST_GENERIC_OPTIONS,
@@ -966,6 +981,7 @@ class RedisClient
           replica: true,
           replica_affinity: :latency,
           fixed_hostname: TEST_FIXED_HOSTNAME,
+          slow_command_timeout: TEST_TIMEOUT_SEC,
           middlewares: middlewares,
           custom: custom,
           **TEST_GENERIC_OPTIONS,
@@ -982,6 +998,7 @@ class RedisClient
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
+          slow_command_timeout: TEST_TIMEOUT_SEC,
           middlewares: middlewares,
           custom: custom,
           **TEST_GENERIC_OPTIONS,

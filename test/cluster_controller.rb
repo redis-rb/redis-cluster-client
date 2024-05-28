@@ -390,7 +390,9 @@ class ClusterController
   def wait_replication_delay(clients, replica_size:, timeout:)
     timeout_msec = timeout.to_i * 1000
     wait_for_state(clients, max_attempts: clients.size + 1) do |client|
-      client.blocking_call(timeout, 'WAIT', replica_size, timeout_msec - 100) if primary_client?(client)
+      swap_timeout(client, timeout: 0.1) do |cli|
+        cli.blocking_call(timeout, 'WAIT', replica_size, timeout_msec - 100) if primary_client?(cli)
+      end
       true
     rescue ::RedisClient::ConnectionError
       true
@@ -502,5 +504,18 @@ class ClusterController
     return unless @debug == '1'
 
     p msg
+  end
+
+  def swap_timeout(client, timeout:)
+    updater = lambda do |c, t|
+      c.read_timeout = t
+      c.config.instance_variable_set(:@read_timeout, t)
+    end
+
+    regular_timeout = client.read_timeout
+    updater.call(client, timeout)
+    result = yield client
+    updater.call(client, regular_timeout)
+    result
   end
 end

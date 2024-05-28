@@ -81,7 +81,9 @@ module BenchmarkMixin
   def wait_for_replication
     client_side_timeout = TEST_TIMEOUT_SEC + 1.0
     server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
-    @client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+    swap_timeout(@client, timeout: 0.1) do |client|
+      client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+    end
   end
 end
 
@@ -109,6 +111,8 @@ module BenchmarkMixinForProxy
   def wait_for_replication
     client_side_timeout = TEST_TIMEOUT_SEC + 1.0
     server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
-    @cluster_client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+    swap_timeout(@cluster_client, timeout: 0.1) do |cluster_client|
+      cluster_client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+    end
   end
 end

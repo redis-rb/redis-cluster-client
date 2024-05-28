@@ -40,7 +40,9 @@ class TestAgainstClusterBroken < TestingWrapper
   def wait_for_replication
     client_side_timeout = TEST_TIMEOUT_SEC + 1.0
     server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
-    @client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+    swap_timeout(@client, timeout: 0.1) do |client|
+      client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+    end
   end
 
   def do_test_a_node_is_down(sacrifice, number_of_keys:)
