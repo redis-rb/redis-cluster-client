@@ -13,4 +13,24 @@ case ENV.fetch('REDIS_CONNECTION_DRIVER', 'ruby')
 when 'hiredis' then require 'hiredis-client'
 end
 
-class TestingWrapper < Minitest::Test; end
+class TestingWrapper < Minitest::Test
+  private
+
+  def swap_timeout(client, timeout:)
+    return if client.nil?
+
+    node = client.instance_variable_get(:@router)&.instance_variable_get(:@node)
+    raise 'The client must be initialized.' if node.nil?
+
+    updater = lambda do |c, t|
+      c.read_timeout = t
+      c.config.instance_variable_set(:@read_timeout, t)
+    end
+
+    regular_timeout = node.first.read_timeout
+    node.each { |cli| updater.call(cli, timeout) }
+    result = yield client
+    node.each { |cli| updater.call(cli, regular_timeout) }
+    result
+  end
+end
