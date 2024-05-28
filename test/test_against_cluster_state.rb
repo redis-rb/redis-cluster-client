@@ -165,6 +165,8 @@ class TestAgainstClusterState < TestingWrapper
       server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
       swap_timeout(@client, timeout: 0.1) do |client|
         client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+      rescue RedisClient::Cluster::ErrorCollection => e
+        raise unless e.errors.values.all? { |err| err.message.start_with?('ERR WAIT cannot be used with replica instances') }
       end
     end
 
