@@ -82,7 +82,7 @@ class RedisClient
 
       # @see https://redis.io/docs/reference/cluster-spec/#redirection-and-resharding Redirection and resharding
       def try_send(node, method, command, args, retry_count: 3, &block)
-        handle_redirection(node, retry_count: retry_count) do |on_node|
+        handle_redirection(node, command, retry_count: retry_count) do |on_node|
           if args.empty?
             # prevent memory allocation for variable-length args
             on_node.public_send(method, command, &block)
@@ -93,12 +93,12 @@ class RedisClient
       end
 
       def try_delegate(node, method, *args, retry_count: 3, **kwargs, &block)
-        handle_redirection(node, retry_count: retry_count) do |on_node|
+        handle_redirection(node, nil, retry_count: retry_count) do |on_node|
           on_node.public_send(method, *args, **kwargs, &block)
         end
       end
 
-      def handle_redirection(node, retry_count:) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      def handle_redirection(node, command, retry_count:) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         yield node
       rescue ::RedisClient::CircuitBreaker::OpenCircuitError
         raise
@@ -127,7 +127,19 @@ class RedisClient
 
         update_cluster_info!
 
-        raise if retry_count <= 0
+        # if command.nil?, then we don't have a way to know what node this command should be done on
+        # under the new topology. It might be e.g. part of a transaction which needs to be retried at a
+        # higher level.
+        raise if retry_count <= 0 || command.nil?
+
+        # Find the node to use for this command - if this fails for some reason, though, re-raise
+        # the original connection error.
+        node = begin
+          find_node(find_node_key(command), retry_count: 0)
+        rescue StandardError
+          nil
+        end
+        raise unless node
 
         retry_count -= 1
         retry
