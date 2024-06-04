@@ -3,6 +3,7 @@
 require 'redis_client/cluster/concurrent_worker/on_demand'
 require 'redis_client/cluster/concurrent_worker/pooled'
 require 'redis_client/cluster/concurrent_worker/none'
+require 'redis_client/cluster/concurrent_worker/actor'
 
 class RedisClient
   class Cluster
@@ -78,6 +79,7 @@ class RedisClient
         when :on_demand, nil then ::RedisClient::Cluster::ConcurrentWorker::OnDemand.new(size: size)
         when :pooled then ::RedisClient::Cluster::ConcurrentWorker::Pooled.new(size: size)
         when :none then ::RedisClient::Cluster::ConcurrentWorker::None.new
+        when :actor then ::RedisClient::Cluster::ConcurrentWorker::Actor.new
         else raise ArgumentError, "Unknown model: #{model}"
         end
       end
