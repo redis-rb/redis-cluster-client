@@ -600,7 +600,7 @@ class RedisClient
 
         # It should have reloaded by calling CLUSTER NODES on three of the startup nodes
         cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
-        assert_equal RedisClient::Cluster::Node::MAX_STARTUP_SAMPLE, cluster_node_cmds.size
+        assert_equal RedisClient::ClusterConfig::MAX_STARTUP_SAMPLE, cluster_node_cmds.size
 
         # It should have connected to all of the clients.
         assert_equal TEST_NUMBER_OF_NODES, test_node.to_a.size
@@ -635,6 +635,27 @@ class RedisClient
         assert_equal bootstrap_node, cluster_node_cmds.first.server_url
       end
 
+      def test_reload_with_overriden_sample_size
+        capture_buffer = CommandCaptureMiddleware::CommandBuffer.new
+        test_node = make_node(replica: true, capture_buffer: capture_buffer, max_startup_sample: 1)
+
+        capture_buffer.clear
+        test_node.reload!
+
+        # It should have reloaded by calling CLUSTER NODES on one of the startup nodes
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
+        assert_equal 1, cluster_node_cmds.size
+
+        # It should have connected to all of the clients.
+        assert_equal TEST_NUMBER_OF_NODES, test_node.to_a.size
+
+        # If we reload again, it should NOT change the redis client instances we have.
+        original_client_ids = test_node.to_a.map(&:object_id).to_set
+        test_node.reload!
+        new_client_ids = test_node.to_a.map(&:object_id).to_set
+        assert_equal original_client_ids, new_client_ids
+      end
+
       def test_reload_concurrently
         capture_buffer = CommandCaptureMiddleware::CommandBuffer.new
         test_node = make_node(replica: true, pool: { size: 2 }, capture_buffer: capture_buffer)
@@ -656,7 +677,7 @@ class RedisClient
         # We should only have reloaded once, which is to say, we only called CLUSTER NODES command MAX_STARTUP_SAMPLE
         # times
         cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
-        assert_equal RedisClient::Cluster::Node::MAX_STARTUP_SAMPLE, cluster_node_cmds.size
+        assert_equal RedisClient::ClusterConfig::MAX_STARTUP_SAMPLE, cluster_node_cmds.size
       end
     end
     # rubocop:enable Metrics/ClassLength

@@ -20,11 +20,13 @@ class RedisClient
     MAX_WORKERS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
     # It's used with slow queries of fetching meta data like CLUSTER NODES, COMMAND and so on.
     SLOW_COMMAND_TIMEOUT = Float(ENV.fetch('REDIS_CLIENT_SLOW_COMMAND_TIMEOUT', -1))
+    # It affects to strike a balance between load and stability in initialization or changed states.
+    MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
 
     InvalidClientConfigError = Class.new(::RedisClient::Error)
 
     attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout,
-                :connect_with_original_config, :startup_nodes
+                :connect_with_original_config, :startup_nodes, :max_startup_sample
 
     def initialize(
       nodes: DEFAULT_NODES,
@@ -36,6 +38,7 @@ class RedisClient
       client_implementation: ::RedisClient::Cluster, # for redis gem
       slow_command_timeout: SLOW_COMMAND_TIMEOUT,
       command_builder: ::RedisClient::CommandBuilder,
+      max_startup_sample: MAX_STARTUP_SAMPLE,
       **client_config
     )
 
@@ -51,6 +54,7 @@ class RedisClient
       @connect_with_original_config = connect_with_original_config
       @client_implementation = client_implementation
       @slow_command_timeout = slow_command_timeout
+      @max_startup_sample = max_startup_sample
     end
 
     def inspect
