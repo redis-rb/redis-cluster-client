@@ -30,6 +30,7 @@ gem 'redis-cluster-client'
 | `:slow_command_timeout` | Integer | `-1` | timeout used for "slow" queries that fetch metdata e.g. CLUSTER NODES, COMMAND |
 | `:concurrency` | Hash | `{ model: :on_demand, size: 5}` | concurrency settings, `:on_demand`, `:pooled` and `:none` are valid models, size is a max number of workers, `:none` model is no concurrency, Please choose the one suited your environment if needed. |
 | `:connect_with_original_config` | Boolean | `false` | `true` if client should retry the connection using the original endpoint that was passed in |
+| `:max_startup_sample` | Integer | `3` | maximum number of nodes to fetch `CLUSTER NODES` information for startup |
 
 Also, [the other generic options](https://github.com/redis-rb/redis-client#configuration) can be passed.
 But `:url`, `:host`, `:port` and `:path` are ignored because they conflict with the `:nodes` option.

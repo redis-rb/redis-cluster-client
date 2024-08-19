@@ -13,9 +13,6 @@ class RedisClient
     class Node
       include Enumerable
 
-      # It affects to strike a balance between load and stability in initialization or changed states.
-      MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
-
       # less memory consumption, but slow
       USE_CHAR_ARRAY_SLOT = Integer(ENV.fetch('REDIS_CLIENT_USE_CHAR_ARRAY_SLOT', 1)) == 1
 
@@ -197,7 +194,7 @@ class RedisClient
 
       def reload!
         with_reload_lock do
-          with_startup_clients(MAX_STARTUP_SAMPLE) do |startup_clients|
+          with_startup_clients(@config.max_startup_sample) do |startup_clients|
             @node_info = refetch_node_info_list(startup_clients)
             @node_configs = @node_info.to_h do |node_info|
               [node_info.node_key, @config.client_config_for_node(node_info.node_key)]
