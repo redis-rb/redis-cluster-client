@@ -3,6 +3,7 @@
 source 'https://rubygems.org'
 gemspec name: 'redis-cluster-client'
 
+gem 'async-redis', platform: :mri
 gem 'benchmark-ips'
 gem 'hiredis-client', '~> 0.6'
 gem 'memory_profiler'
