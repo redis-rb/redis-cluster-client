@@ -8,6 +8,8 @@ class RedisClient
     module NodeKey
       DELIMITER = ':'
 
+      private_constant :DELIMITER
+
       module_function
 
       def hashify(node_key)

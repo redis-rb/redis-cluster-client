@@ -11,6 +11,8 @@ class RedisClient
   class Cluster
     ZERO_CURSOR_FOR_SCAN = '0'
 
+    private_constant :ZERO_CURSOR_FOR_SCAN
+
     attr_reader :config
 
     def initialize(config, pool: nil, concurrency: nil, **kwargs)

@@ -9,6 +9,9 @@ class ClusterController
   DEFAULT_MAX_ATTEMPTS = 600
   DEFAULT_TIMEOUT_SEC = 5.0
 
+  private_constant :SLOT_SIZE, :DEFAULT_SHARD_SIZE, :DEFAULT_REPLICA_SIZE,
+                   :DEFAULT_MAX_ATTEMPTS, :DEFAULT_TIMEOUT_SEC
+
   RedisNodeInfo = Struct.new(
     'RedisClusterNodeInfo',
     :id, :node_key, :flags, :role, :myself?, :primary_id, :ping_sent, :pong_recv,
