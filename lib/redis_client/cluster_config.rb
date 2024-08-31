@@ -23,6 +23,10 @@ class RedisClient
     # It affects to strike a balance between load and stability in initialization or changed states.
     MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
 
+    private_constant :DEFAULT_HOST, :DEFAULT_PORT, :DEFAULT_SCHEME, :SECURE_SCHEME, :DEFAULT_NODES,
+                     :VALID_SCHEMES, :VALID_NODES_KEYS, :MERGE_CONFIG_KEYS, :IGNORE_GENERIC_CONFIG_KEYS,
+                     :MAX_WORKERS, :SLOW_COMMAND_TIMEOUT, :MAX_STARTUP_SAMPLE
+
     InvalidClientConfigError = Class.new(::RedisClient::Error)
 
     attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout,

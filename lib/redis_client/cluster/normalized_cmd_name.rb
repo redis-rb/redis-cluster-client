@@ -9,6 +9,8 @@ class RedisClient
 
       EMPTY_STRING = ''
 
+      private_constant :EMPTY_STRING
+
       def initialize
         @cache = {}
         @mutex = Mutex.new

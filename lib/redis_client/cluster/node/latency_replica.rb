@@ -9,6 +9,8 @@ class RedisClient
         DUMMY_LATENCY_MSEC = 100 * 1000 * 1000
         MEASURE_ATTEMPT_COUNT = 10
 
+        private_constant :DUMMY_LATENCY_MSEC, :MEASURE_ATTEMPT_COUNT
+
         def clients_for_scanning(seed: nil) # rubocop:disable Lint/UnusedMethodArgument
           @clients_for_scanning
         end

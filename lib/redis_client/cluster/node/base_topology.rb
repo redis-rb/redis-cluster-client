@@ -8,6 +8,8 @@ class RedisClient
         EMPTY_HASH = {}.freeze
         EMPTY_ARRAY = [].freeze
 
+        private_constant :IGNORE_GENERIC_CONFIG_KEYS, :EMPTY_HASH, :EMPTY_ARRAY
+
         attr_reader :clients, :primary_clients, :replica_clients
 
         def initialize(pool, concurrent_worker, **kwargs)

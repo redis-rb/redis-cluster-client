@@ -44,6 +44,8 @@ class RedisClient
 
       BUF_SIZE = Integer(ENV.fetch('REDIS_CLIENT_PUBSUB_BUF_SIZE', 1024))
 
+      private_constant :BUF_SIZE
+
       def initialize(router, command_builder)
         @router = router
         @command_builder = command_builder

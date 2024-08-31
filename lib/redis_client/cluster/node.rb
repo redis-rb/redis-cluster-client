@@ -24,6 +24,9 @@ class RedisClient
       EMPTY_ARRAY = [].freeze
       EMPTY_HASH = {}.freeze
 
+      private_constant :USE_CHAR_ARRAY_SLOT, :SLOT_SIZE, :MIN_SLOT, :MAX_SLOT,
+                       :DEAD_FLAGS, :ROLE_FLAGS, :EMPTY_ARRAY, :EMPTY_HASH
+
       ReloadNeeded = Class.new(::RedisClient::Error)
 
       Info = Struct.new(
@@ -44,6 +47,8 @@ class RedisClient
       class CharArray
         BASE = ''
         PADDING = '0'
+
+        private_constant :BASE, :PADDING
 
         def initialize(size, elements)
           @elements = elements

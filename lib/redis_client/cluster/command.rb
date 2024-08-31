@@ -12,6 +12,8 @@ class RedisClient
       EMPTY_HASH = {}.freeze
       EMPTY_ARRAY = [].freeze
 
+      private_constant :EMPTY_STRING, :EMPTY_HASH, :EMPTY_ARRAY
+
       Detail = Struct.new(
         'RedisCommand',
         :first_key_position,

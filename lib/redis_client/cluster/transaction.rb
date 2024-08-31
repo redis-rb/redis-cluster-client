@@ -7,8 +7,11 @@ class RedisClient
   class Cluster
     class Transaction
       ConsistencyError = Class.new(::RedisClient::Error)
+
       MAX_REDIRECTION = 2
       EMPTY_ARRAY = [].freeze
+
+      private_constant :MAX_REDIRECTION, :EMPTY_ARRAY
 
       def initialize(router, command_builder, node: nil, slot: nil, asking: false)
         @router = router

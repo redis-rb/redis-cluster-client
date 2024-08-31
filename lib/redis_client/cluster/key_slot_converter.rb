@@ -43,6 +43,8 @@ class RedisClient
 
       HASH_SLOTS = 16_384
 
+      private_constant :EMPTY_STRING, :LEFT_BRACKET, :RIGHT_BRACKET, :XMODEM_CRC16_LOOKUP, :HASH_SLOTS
+
       module_function
 
       def convert(key)

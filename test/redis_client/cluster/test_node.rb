@@ -22,6 +22,10 @@ class RedisClient
 
     # rubocop:disable Metrics/ClassLength
     class TestNode < TestingWrapper
+      USE_CHAR_ARRAY_SLOT = Integer(ENV.fetch('REDIS_CLIENT_USE_CHAR_ARRAY_SLOT', 1)) == 1
+      SLOT_SIZE = 16_384
+      MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
+
       def setup
         @test_node = make_node.tap(&:reload!)
         @test_node_with_scale_read = make_node(replica: true).tap(&:reload!)
@@ -467,8 +471,8 @@ class RedisClient
 
         want = node_info_list.first.node_key
         got = @test_node.send(:make_array_for_slot_node_mappings, node_info_list)
-        assert_instance_of(::RedisClient::Cluster::Node::USE_CHAR_ARRAY_SLOT ? ::RedisClient::Cluster::Node::CharArray : Array, got)
-        ::RedisClient::Cluster::Node::SLOT_SIZE.times do |i|
+        assert_instance_of(USE_CHAR_ARRAY_SLOT ? ::RedisClient::Cluster::Node::CharArray : Array, got)
+        SLOT_SIZE.times do |i|
           got[i] = want
           assert_equal(want, got[i], "Case: #{i}")
         end
@@ -485,7 +489,7 @@ class RedisClient
         want = node_info_list.first.node_key
         got = @test_node.send(:make_array_for_slot_node_mappings, node_info_list)
         assert_instance_of(Array, got)
-        ::RedisClient::Cluster::Node::SLOT_SIZE.times do |i|
+        SLOT_SIZE.times do |i|
           got[i] = want
           assert_equal(want, got[i], "Case: #{i}")
         end
@@ -500,19 +504,19 @@ class RedisClient
         end
 
         got = @test_node.send(:make_array_for_slot_node_mappings, node_info_list)
-        assert_instance_of(::RedisClient::Cluster::Node::USE_CHAR_ARRAY_SLOT ? ::RedisClient::Cluster::Node::CharArray : Array, got)
+        assert_instance_of(USE_CHAR_ARRAY_SLOT ? ::RedisClient::Cluster::Node::CharArray : Array, got)
 
-        ::RedisClient::Cluster::Node::SLOT_SIZE.times { |i| got[i] = node_info_list.first.node_key }
+        SLOT_SIZE.times { |i| got[i] = node_info_list.first.node_key }
 
         got[0] = 'newbie:6379'
         assert_equal('newbie:6379', got[0])
-        assert_raises(RangeError) { got[0] = 'zombie:6379' } if ::RedisClient::Cluster::Node::USE_CHAR_ARRAY_SLOT
+        assert_raises(RangeError) { got[0] = 'zombie:6379' } if USE_CHAR_ARRAY_SLOT
 
-        assert_raises(IndexError) { got[-1] = 'newbie:6379' } if ::RedisClient::Cluster::Node::USE_CHAR_ARRAY_SLOT
-        assert_raises(IndexError) { got[-1] } if ::RedisClient::Cluster::Node::USE_CHAR_ARRAY_SLOT
+        assert_raises(IndexError) { got[-1] = 'newbie:6379' } if USE_CHAR_ARRAY_SLOT
+        assert_raises(IndexError) { got[-1] } if USE_CHAR_ARRAY_SLOT
 
         got[16_384] = 'newbie:6379'
-        assert_nil(got[16_384]) if ::RedisClient::Cluster::Node::USE_CHAR_ARRAY_SLOT
+        assert_nil(got[16_384]) if USE_CHAR_ARRAY_SLOT
       end
 
       def test_build_replication_mappings_regular
@@ -600,7 +604,7 @@ class RedisClient
 
         # It should have reloaded by calling CLUSTER NODES on three of the startup nodes
         cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
-        assert_equal RedisClient::ClusterConfig::MAX_STARTUP_SAMPLE, cluster_node_cmds.size
+        assert_equal MAX_STARTUP_SAMPLE, cluster_node_cmds.size
 
         # It should have connected to all of the clients.
         assert_equal TEST_NUMBER_OF_NODES, test_node.to_a.size
@@ -677,7 +681,7 @@ class RedisClient
         # We should only have reloaded once, which is to say, we only called CLUSTER NODES command MAX_STARTUP_SAMPLE
         # times
         cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
-        assert_equal RedisClient::ClusterConfig::MAX_STARTUP_SAMPLE, cluster_node_cmds.size
+        assert_equal MAX_STARTUP_SAMPLE, cluster_node_cmds.size
       end
     end
     # rubocop:enable Metrics/ClassLength

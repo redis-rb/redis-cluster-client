@@ -19,6 +19,8 @@ class RedisClient
       ZERO_CURSOR_FOR_SCAN = '0'
       TSF = ->(f, x) { f.nil? ? x : f.call(x) }.curry
 
+      private_constant :ZERO_CURSOR_FOR_SCAN, :TSF
+
       def initialize(config, concurrent_worker, pool: nil, **kwargs)
         @config = config.dup
         @original_config = config.dup if config.connect_with_original_config
@@ -334,6 +336,8 @@ class RedisClient
         'mset' => ['set', 2].freeze,
         'del' => ['del', 1].freeze
       }.freeze
+
+      private_constant :MULTIPLE_KEYS_COMMAND_TO_SINGLE
 
       def send_multiple_keys_command(cmd, method, command, args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         # This implementation is prioritized performance rather than readability or so.
