@@ -3,6 +3,7 @@
 class RedisClient
   class Cluster
     module KeySlotConverter
+      HASH_SLOTS = 16_384
       EMPTY_STRING = ''
       LEFT_BRACKET = '{'
       RIGHT_BRACKET = '}'
@@ -41,9 +42,8 @@ class RedisClient
         0x6e17, 0x7e36, 0x4e55, 0x5e74, 0x2e93, 0x3eb2, 0x0ed1, 0x1ef0
       ].freeze
 
-      HASH_SLOTS = 16_384
-
-      private_constant :EMPTY_STRING, :LEFT_BRACKET, :RIGHT_BRACKET, :XMODEM_CRC16_LOOKUP, :HASH_SLOTS
+      private_constant :HASH_SLOTS, :EMPTY_STRING,
+                       :LEFT_BRACKET, :RIGHT_BRACKET, :XMODEM_CRC16_LOOKUP
 
       module_function
 

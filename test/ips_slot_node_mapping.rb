@@ -5,7 +5,7 @@ require 'redis_cluster_client'
 
 module IpsSlotNodeMapping
   ELEMENTS = %w[foo bar baz].freeze
-  SIZE = ::RedisClient::Cluster::Node::SLOT_SIZE
+  SIZE = 16_384
 
   module_function
 
