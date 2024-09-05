@@ -195,7 +195,7 @@ r.call('mget', '{key}1', '{key}2', '{key}3')
 This behavior is for upper libraries to be able to keep a compatibility with a standalone client.
 You can exploit this behavior for migrating from a standalone server to a cluster.
 Although multiple times queries with single-key commands are slower than pipelining,
-that pipelining queries are slower than a single-slot query with multiple keys.
+that pipelined queries are slower than a single-slot query with multiple keys.
 Hence, we recommend to use a hash tag in this use case for the better performance.
 
 ## Transactions
