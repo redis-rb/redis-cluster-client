@@ -144,34 +144,34 @@ and not just the same node.
 Therefore, The following error occurs:
 
 ```
-$ redis-cli mget key1 key2 key3
+$ redis-cli -c mget key1 key2 key3
 (error) CROSSSLOT Keys in request don't hash to the same slot
 
-$ redis-cli cluster keyslot key1
+$ redis-cli -c cluster keyslot key1
 (integer) 9189
 
-$ redis-cli cluster keyslot key2
+$ redis-cli -c cluster keyslot key2
 (integer) 4998
 
-$ redis-cli cluster keyslot key3
+$ redis-cli -c cluster keyslot key3
 (integer) 935
 ```
 
 For the constraint, Redis cluster provides a feature to be able to bias keys to the same slot with a hash tag.
 
 ```
-$ redis-cli mget {key}1 {key}2 {key}3
+$ redis-cli -c mget {key}1 {key}2 {key}3
 1) (nil)
 2) (nil)
 3) (nil)
 
-$ redis-cli cluster keyslot {key}1
+$ redis-cli -c cluster keyslot {key}1
 (integer) 12539
 
-$ redis-cli cluster keyslot {key}2
+$ redis-cli -c cluster keyslot {key}2
 (integer) 12539
 
-$ redis-cli cluster keyslot {key}3
+$ redis-cli -c cluster keyslot {key}3
 (integer) 12539
 ```
 
