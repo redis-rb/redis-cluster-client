@@ -29,7 +29,7 @@ class RedisClient
         @pool = pool
         @client_kwargs = kwargs
         @node = ::RedisClient::Cluster::Node.new(concurrent_worker, config: config, pool: pool, **kwargs)
-        update_cluster_info!
+        @node.reload!
         @command = ::RedisClient::Cluster::Command.load(@node.replica_clients.shuffle, slow_command_timeout: config.slow_command_timeout)
         @command_builder = @config.command_builder
       end
@@ -68,12 +68,12 @@ class RedisClient
       rescue ::RedisClient::CircuitBreaker::OpenCircuitError
         raise
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
-        update_cluster_info!
+        @node.reload!
         raise ::RedisClient::Cluster::NodeMightBeDown
       rescue ::RedisClient::Cluster::ErrorCollection => e
         raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
 
-        update_cluster_info! if e.errors.values.any? do |err|
+        @node.reload! if e.errors.values.any? do |err|
           next false if ::RedisClient::Cluster::ErrorIdentification.identifiable?(err) && @node.none? { |c| ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(err, c) }
 
           err.message.start_with?('CLUSTERDOWN Hash slot not served')
@@ -119,7 +119,7 @@ class RedisClient
             retry
           end
         elsif e.message.start_with?('CLUSTERDOWN Hash slot not served')
-          update_cluster_info!
+          @node.reload!
           retry_count -= 1
           retry if retry_count >= 0
         end
@@ -127,7 +127,7 @@ class RedisClient
       rescue ::RedisClient::ConnectionError => e
         raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
 
-        update_cluster_info!
+        @node.reload!
 
         raise if retry_count <= 0
 
@@ -205,7 +205,7 @@ class RedisClient
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
         raise ::RedisClient::Cluster::NodeMightBeDown if retry_count <= 0
 
-        update_cluster_info!
+        @node.reload!
         retry_count -= 1
         retry
       end
@@ -245,7 +245,7 @@ class RedisClient
           err.message.include?('WAIT cannot be used with replica instances')
         end
 
-        update_cluster_info!
+        @node.reload!
         retry_count -= 1
         retry
       end
@@ -369,10 +369,6 @@ class RedisClient
                  else replies
                  end
         block_given? ? yield(result) : result
-      end
-
-      def update_cluster_info!
-        @node.reload!
       end
     end
   end
