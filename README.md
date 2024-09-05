@@ -178,7 +178,7 @@ $ redis-cli -c cluster keyslot {key}3
 In addition, this gem works multiple keys without a hash tag in MGET, MSET and DEL commands
 using pipelining internally automatically.
 If the first key includes a hash tag, this gem sends the command to the node as is.
-If the first key doesn't have a hash tag, this gem converts the command into a single-key command
+If the first key doesn't have a hash tag, this gem converts the command into single-key commands
 and sends them to nodes with pipelining, then gathering replies and returning them.
 
 ```ruby
@@ -194,9 +194,9 @@ r.call('mget', '{key}1', '{key}2', '{key}3')
 
 This behavior is for upper libraries to be able to keep a compatibility with a standalone client.
 You can exploit this behavior for migrating from a standalone server to a cluster.
-Although multiple calles with single-key comamnds are slower than pipelining,
-the performance of the pipelined commands are slower than a single-slot query with multiple keys.
-We recommend to use a hash tag in this use cases for the performance.
+Although multiple times queries with single-key commands are slower than pipelining,
+that pipelining queries are slower than a single-slot query with multiple keys.
+Hence, we recommend to use a hash tag in this use case for the better performance.
 
 ## Transactions
 This gem supports [Redis transactions](https://redis.io/topics/transactions), including atomicity with `MULTI`/`EXEC`,
