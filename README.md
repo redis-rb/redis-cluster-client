@@ -141,7 +141,7 @@ Every interface handles redirections and resharding states internally.
 A subset of commands can be passed multiple keys.
 In cluster mode, these commands have a constraint that passed keys should belong to the same slot
 and not just the same node.
-Therefore, The following error occurs:
+Therefore, the following error occurs:
 
 ```
 $ redis-cli -c mget key1 key2 key3
@@ -194,7 +194,7 @@ r.call('mget', '{key}1', '{key}2', '{key}3')
 
 This behavior is for upper libraries to be able to keep a compatibility with a standalone client.
 You can exploit this behavior for migrating from a standalone server to a cluster.
-Although multiple times queries with single-key commands are slower than pipelining,
+Although multiple-time queries with single-key commands are slower than pipelining,
 that pipelined queries are slower than a single-slot query with multiple keys.
 Hence, we recommend to use a hash tag in this use case for the better performance.
 
