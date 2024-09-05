@@ -138,40 +138,65 @@ The `#pubsub` method supports sharded subscriptions.
 Every interface handles redirections and resharding states internally.
 
 ## Multiple keys and CROSSSLOT error
-A subset of commands can be passed multiple keys. But it has a constraint the keys are in the same hash slot.
-The following error occurs because keys must be in the same hash slot and not just the same node.
+A subset of commands can be passed multiple keys.
+In cluster mode, these commands have a constraint that passed keys should belong to the same slot
+and not just the same node.
+Therefore, The following error occurs:
 
-```ruby
-cli = RedisClient.cluster.new_client
+```
+$ redis-cli -c mget key1 key2 key3
+(error) CROSSSLOT Keys in request don't hash to the same slot
 
-cli.call('MGET', 'key1', 'key2', 'key3')
-#=> CROSSSLOT Keys in request don't hash to the same slot (RedisClient::CommandError)
+$ redis-cli -c cluster keyslot key1
+(integer) 9189
 
-cli.call('CLUSTER', 'KEYSLOT', 'key1')
-#=> 9189
+$ redis-cli -c cluster keyslot key2
+(integer) 4998
 
-cli.call('CLUSTER', 'KEYSLOT', 'key2')
-#=> 4998
-
-cli.call('CLUSTER', 'KEYSLOT', 'key3')
-#=> 935
+$ redis-cli -c cluster keyslot key3
+(integer) 935
 ```
 
-Also, you can use the hash tag to bias keys to the same slot.
+For the constraint, Redis cluster provides a feature to be able to bias keys to the same slot with a hash tag.
+
+```
+$ redis-cli -c mget {key}1 {key}2 {key}3
+1) (nil)
+2) (nil)
+3) (nil)
+
+$ redis-cli -c cluster keyslot {key}1
+(integer) 12539
+
+$ redis-cli -c cluster keyslot {key}2
+(integer) 12539
+
+$ redis-cli -c cluster keyslot {key}3
+(integer) 12539
+```
+
+In addition, this gem works multiple keys without a hash tag in MGET, MSET and DEL commands
+using pipelining internally automatically.
+If the first key includes a hash tag, this gem sends the command to the node as is.
+If the first key doesn't have a hash tag, this gem converts the command into single-key commands
+and sends them to nodes with pipelining, then gathering replies and returning them.
 
 ```ruby
-cli.call('CLUSTER', 'KEYSLOT', '{key}1')
-#=> 12539
+r = RedisClient.cluster.new_client
+#=> #<RedisClient::Cluster 127.0.0.1:6379>
 
-cli.call('CLUSTER', 'KEYSLOT', '{key}2')
-#=> 12539
+r.call('mget', 'key1', 'key2', 'key3')
+#=> [nil, nil, nil]
 
-cli.call('CLUSTER', 'KEYSLOT', '{key}3')
-#=> 12539
-
-cli.call('MGET', '{key}1', '{key}2', '{key}3')
+r.call('mget', '{key}1', '{key}2', '{key}3')
 #=> [nil, nil, nil]
 ```
+
+This behavior is for upper libraries to be able to keep a compatibility with a standalone client.
+You can exploit this behavior for migrating from a standalone server to a cluster.
+Although multiple times queries with single-key commands are slower than pipelining,
+that pipelined queries are slower than a single-slot query with multiple keys.
+Hence, we recommend to use a hash tag in this use case for the better performance.
 
 ## Transactions
 This gem supports [Redis transactions](https://redis.io/topics/transactions), including atomicity with `MULTI`/`EXEC`,
