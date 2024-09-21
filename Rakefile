@@ -14,7 +14,7 @@ task default: :test
 Rake::TestTask.new(:test) do |t|
   t.libs << :lib
   t.libs << :test
-  t.options = '-v -c'
+  t.options = '-v'
   t.test_files = if ARGV.size > 1
                    ARGV[1..]
                  else
@@ -28,7 +28,7 @@ SLUGGISH_TEST_TYPES.each do |type|
     t.libs << :test
     pattern = ''
     pattern = "-n #{ARGV[1]}" if ARGV.size > 1
-    t.options = "-v -c #{pattern}"
+    t.options = "-v #{pattern}"
     t.test_files = ["test/test_against_cluster_#{type}.rb"]
   end
 end
