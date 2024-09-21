@@ -38,6 +38,18 @@ services:
     <<: *node
     ports:
       - "6384:6379"
+  node7:
+    <<: *node
+    ports:
+      - "6385:6379"
+  node8:
+    <<: *node
+    ports:
+      - "6386:6379"
+  node9:
+    <<: *node
+    ports:
+      - "6387:6379"
   clustering:
     image: "valkey/valkey:${REDIS_VERSION:-7}"
     command: >
@@ -51,7 +63,10 @@ services:
       $$(dig node4 +short):6379
       $$(dig node5 +short):6379
       $$(dig node6 +short):6379
-      --cluster-replicas 1"
+      $$(dig node7 +short):6379
+      $$(dig node8 +short):6379
+      $$(dig node9 +short):6379
+      --cluster-replicas 2"
     depends_on:
       node1:
         condition: service_healthy
@@ -64,6 +79,12 @@ services:
       node5:
         condition: service_healthy
       node6:
+        condition: service_healthy
+      node7:
+        condition: service_healthy
+      node8:
+        condition: service_healthy
+      node9:
         condition: service_healthy
   ruby:
     image: "ruby:${RUBY_VERSION:-3}"

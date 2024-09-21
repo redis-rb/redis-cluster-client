@@ -2,7 +2,7 @@
 
 require 'testing_helper'
 
-class TestAgainstClusterState < TestingWrapper
+module TestAgainstClusterState
   SLOT_SIZE = 16_384
 
   module Mixin
@@ -189,127 +189,91 @@ class TestAgainstClusterState < TestingWrapper
     end
   end
 
-  class PrimaryOnly < TestingWrapper
-    include Mixin
+  PATTERN = ENV.fetch('TEST_CLASS_PATTERN', '')
 
-    private
+  if PATTERN == 'PrimaryOnly' || PATTERN.empty?
+    class PrimaryOnly < TestingWrapper
+      include Mixin
 
-    def new_test_client
-      ::RedisClient.cluster(
-        nodes: TEST_NODE_URIS,
-        fixed_hostname: TEST_FIXED_HOSTNAME,
-        **TEST_GENERIC_OPTIONS
-      ).new_client
+      private
+
+      def new_test_client
+        ::RedisClient.cluster(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        ).new_client
+      end
     end
   end
 
-  class Pooled < TestingWrapper
-    include Mixin
+  if PATTERN == 'Pooled' || PATTERN.empty?
+    class Pooled < TestingWrapper
+      include Mixin
 
-    private
+      private
 
-    def new_test_client
-      ::RedisClient.cluster(
-        nodes: TEST_NODE_URIS,
-        fixed_hostname: TEST_FIXED_HOSTNAME,
-        **TEST_GENERIC_OPTIONS
-      ).new_pool(timeout: TEST_TIMEOUT_SEC, size: 2)
+      def new_test_client
+        ::RedisClient.cluster(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        ).new_pool(timeout: TEST_TIMEOUT_SEC, size: 2)
+      end
     end
   end
 
-  class ScaleReadRandom < TestingWrapper
-    include Mixin
+  if PATTERN == 'ScaleReadRandom' || PATTERN.empty?
+    class ScaleReadRandom < TestingWrapper
+      include Mixin
 
-    def test_the_state_of_cluster_resharding
-      skip('https://github.com/redis/redis/issues/11312')
-    end
+      private
 
-    def test_the_state_of_cluster_resharding_with_pipelining
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_transaction
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_transaction_and_watch
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    private
-
-    def new_test_client
-      ::RedisClient.cluster(
-        nodes: TEST_NODE_URIS,
-        replica: true,
-        replica_affinity: :random,
-        fixed_hostname: TEST_FIXED_HOSTNAME,
-        **TEST_GENERIC_OPTIONS
-      ).new_client
+      def new_test_client
+        ::RedisClient.cluster(
+          nodes: TEST_NODE_URIS,
+          replica: true,
+          replica_affinity: :random,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        ).new_client
+      end
     end
   end
 
-  class ScaleReadRandomWithPrimary < TestingWrapper
-    include Mixin
+  if PATTERN == 'ScaleReadRandomWithPrimary' || PATTERN.empty?
+    class ScaleReadRandomWithPrimary < TestingWrapper
+      include Mixin
 
-    def test_the_state_of_cluster_resharding
-      skip('https://github.com/redis/redis/issues/11312')
-    end
+      private
 
-    def test_the_state_of_cluster_resharding_with_pipelining
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_transaction
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_transaction_and_watch
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    private
-
-    def new_test_client
-      ::RedisClient.cluster(
-        nodes: TEST_NODE_URIS,
-        replica: true,
-        replica_affinity: :random_with_primary,
-        fixed_hostname: TEST_FIXED_HOSTNAME,
-        **TEST_GENERIC_OPTIONS
-      ).new_client
+      def new_test_client
+        ::RedisClient.cluster(
+          nodes: TEST_NODE_URIS,
+          replica: true,
+          replica_affinity: :random_with_primary,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        ).new_client
+      end
     end
   end
 
-  class ScaleReadLatency < TestingWrapper
-    include Mixin
+  if PATTERN == 'ScaleReadLatency' || PATTERN.empty?
+    class ScaleReadLatency < TestingWrapper
+      include Mixin
 
-    def test_the_state_of_cluster_resharding
-      skip('https://github.com/redis/redis/issues/11312')
-    end
+      private
 
-    def test_the_state_of_cluster_resharding_with_pipelining
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_transaction
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_transaction_and_watch
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    private
-
-    def new_test_client
-      ::RedisClient.cluster(
-        nodes: TEST_NODE_URIS,
-        replica: true,
-        replica_affinity: :latency,
-        fixed_hostname: TEST_FIXED_HOSTNAME,
-        **TEST_GENERIC_OPTIONS
-      ).new_client
+      def new_test_client
+        ::RedisClient.cluster(
+          nodes: TEST_NODE_URIS,
+          replica: true,
+          replica_affinity: :latency,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        ).new_client
+      end
     end
   end
 end
