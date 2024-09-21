@@ -27,7 +27,7 @@ SLUGGISH_TEST_TYPES.each do |type|
     t.libs << :lib
     t.libs << :test
     pattern = ''
-    pattern = "-n #{ARGV[1]}" if ARGV.size > 1
+    pattern = "-n /#{ARGV[1]}/" if ARGV.size > 1
     t.options = "-v #{pattern}"
     t.test_files = ["test/test_against_cluster_#{type}.rb"]
   end

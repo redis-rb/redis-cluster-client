@@ -31,8 +31,8 @@ jobs:
           - {redis: '7.2', ruby: '3.3', compose: compose.ssl.yaml}
           - {redis: '7.2', ruby: '3.3', driver: 'hiredis'}
           - {redis: '7.2', ruby: '3.3', driver: 'hiredis', compose: compose.ssl.yaml}
-          - {redis: '7.2', ruby: '3.3', replica: '2', compose: compose.replica.yaml}
-          - {redis: '8',   ruby: '3.3', replica: '2', compose: compose.valkey.yaml}
+          - {redis: '7.2', ruby: '3.3', compose: compose.replica.yaml, replica: '2'}
+          - {redis: '8',   ruby: '3.3', compose: compose.valkey.yaml, replica: '2'}
           - {redis: '7.2', ruby: '3.2', compose: compose.auth.yaml}
           - {redis: '7.0', ruby: '3.1'}
           - {redis: '6.2', ruby: '3.0'}
