@@ -55,6 +55,7 @@ jobs:
       REDIS_REPLICA_SIZE: ${{ matrix.replica || '1' }}
       RESTART_POLICY: ${{ matrix.restart || 'always' }}
       REDIS_CLIENT_MAX_STARTUP_SAMPLE: ${{ matrix.startup || '3' }}
+      TEST_CLASS_PATTERN: ${{ matrix.pattern || '' }}
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -72,7 +73,7 @@ jobs:
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Run minitest
-        run: bundle exec rake ${{ matrix.task || 'test' }} ${{ matrix.pattern || '' }}
+        run: bundle exec rake ${{ matrix.task || 'test' }}
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down || true
   nat-ted-env:

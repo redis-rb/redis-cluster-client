@@ -26,9 +26,7 @@ SLUGGISH_TEST_TYPES.each do |type|
   Rake::TestTask.new("test_cluster_#{type}".to_sym) do |t|
     t.libs << :lib
     t.libs << :test
-    pattern = ''
-    pattern = "-n /#{ARGV[1]}/" if ARGV.size > 1
-    t.options = "-v #{pattern}"
+    t.options = '-v'
     t.test_files = ["test/test_against_cluster_#{type}.rb"]
   end
 end
