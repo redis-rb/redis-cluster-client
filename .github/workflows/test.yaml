@@ -39,11 +39,15 @@ jobs:
           - {redis: '5.0', ruby: '2.7'}
           - {ruby: 'jruby'}
           - {ruby: 'truffleruby'}
-          - {task: test_cluster_state,  redis: '8', replica: '2', compose: compose.valkey.yaml, startup: '9'}
           - {task: test_cluster_broken, redis: '7.2', restart: 'no', startup: '6'}
           - {task: test_cluster_broken, redis: '6.2', restart: 'no', startup: '6'}
           - {task: test_cluster_scale,  redis: '7.2', compose: compose.scale.yaml, startup: '8'}
           - {task: test_cluster_scale,  redis: '6.2', compose: compose.scale.yaml, startup: '8'}
+          - {task: test_cluster_state,  redis: '8', pattern: 'PrimaryOnly', compose: compose.valkey.yaml, replica: '2', startup: '9'}
+          - {task: test_cluster_state,  redis: '8', pattern: 'Pooled', compose: compose.valkey.yaml, replica: '2', startup: '9'}
+          - {task: test_cluster_state,  redis: '8', pattern: 'ScaleReadRandom', compose: compose.valkey.yaml, replica: '2', startup: '9'}
+          - {task: test_cluster_state,  redis: '8', pattern: 'ScaleReadRandomWithPrimary', compose: compose.valkey.yaml, replica: '2', startup: '9'}
+          - {task: test_cluster_state,  redis: '8', pattern: 'ScaleReadLatency', compose: compose.valkey.yaml, replica: '2', startup: '9'}
     env:
       REDIS_VERSION: ${{ matrix.redis || '7.2' }}
       DOCKER_COMPOSE_FILE: ${{ matrix.compose || 'compose.yaml' }}
@@ -68,7 +72,7 @@ jobs:
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Run minitest
-        run: bundle exec rake ${{ matrix.task || 'test' }}
+        run: bundle exec rake ${{ matrix.task || 'test' }} ${{ matrix.pattern || '' }}
       - name: Stop containers
         run: docker compose -f $DOCKER_COMPOSE_FILE down || true
   nat-ted-env:
