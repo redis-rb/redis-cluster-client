@@ -28,7 +28,7 @@ jobs:
       matrix:
         include:
           - {redis: '7.2', ruby: '3.3'}
-          - {redis: '7.2', ruby: '3.3', compose: compose.valkey.yaml}
+          - {redis: '8',   ruby: '3.3', compose: compose.valkey.yaml}
           - {redis: '7.2', ruby: '3.3', compose: compose.ssl.yaml}
           - {redis: '7.2', ruby: '3.3', driver: 'hiredis'}
           - {redis: '7.2', ruby: '3.3', driver: 'hiredis', compose: compose.ssl.yaml}
@@ -39,8 +39,7 @@ jobs:
           - {redis: '5.0', ruby: '2.7'}
           - {ruby: 'jruby'}
           - {ruby: 'truffleruby'}
-          - {task: test_cluster_state,  redis: '7.2', replica: '2', compose: compose.replica.yaml, startup: '9'}
-          - {task: test_cluster_state,  redis: '6.2', replica: '2', compose: compose.replica.yaml, startup: '9'}
+          - {task: test_cluster_state,  redis: '8', replica: '2', compose: compose.valkey.yaml, startup: '9'}
           - {task: test_cluster_broken, redis: '7.2', restart: 'no', startup: '6'}
           - {task: test_cluster_broken, redis: '6.2', restart: 'no', startup: '6'}
           - {task: test_cluster_scale,  redis: '7.2', compose: compose.scale.yaml, startup: '8'}

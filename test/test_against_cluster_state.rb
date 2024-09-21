@@ -220,22 +220,6 @@ class TestAgainstClusterState < TestingWrapper
   class ScaleReadRandom < TestingWrapper
     include Mixin
 
-    def test_the_state_of_cluster_resharding
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_pipelining
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_transaction
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_transaction_and_watch
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
     private
 
     def new_test_client
@@ -252,22 +236,6 @@ class TestAgainstClusterState < TestingWrapper
   class ScaleReadRandomWithPrimary < TestingWrapper
     include Mixin
 
-    def test_the_state_of_cluster_resharding
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_pipelining
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_transaction
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_transaction_and_watch
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
     private
 
     def new_test_client
@@ -283,22 +251,6 @@ class TestAgainstClusterState < TestingWrapper
 
   class ScaleReadLatency < TestingWrapper
     include Mixin
-
-    def test_the_state_of_cluster_resharding
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_pipelining
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_transaction
-      skip('https://github.com/redis/redis/issues/11312')
-    end
-
-    def test_the_state_of_cluster_resharding_with_transaction_and_watch
-      skip('https://github.com/redis/redis/issues/11312')
-    end
 
     private
 
