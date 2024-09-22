@@ -6,17 +6,20 @@ class RedisClient
   class TestCluster
     module Mixin
       def setup
-        @captured_commands = CommandCaptureMiddleware::CommandBuffer.new
+        @captured_commands = ::Middlewares::CommandCapture::CommandBuffer.new
+        @redirection_count = ::Middlewares::RedirectionCount::Counter.new
         @client = new_test_client
         @client.call('FLUSHDB')
         wait_for_replication
         @captured_commands.clear
+        @redirection_count.clear
       end
 
       def teardown
         @client&.call('FLUSHDB')
         wait_for_replication
         @client&.close
+        flunk(@redirection_count.get) unless @redirection_count.zero?
       end
 
       def test_config
@@ -414,7 +417,7 @@ class RedisClient
       end
 
       def test_transaction_does_not_retry_without_rewatching
-        client2 = new_test_client
+        client2 = new_test_client(middlewares: nil)
 
         @client.call('SET', 'key', 'original_value')
 
@@ -442,7 +445,7 @@ class RedisClient
       end
 
       def test_transaction_with_watch_retries_block
-        client2 = new_test_client
+        client2 = new_test_client(middlewares: nil)
         call_count = 0
 
         @client.call('SET', 'key', 'original_value')
@@ -523,7 +526,7 @@ class RedisClient
         @client.call('MSET', '{key}1', '1', '{key}2', '2')
 
         another = Fiber.new do
-          cli = new_test_client
+          cli = new_test_client(middlewares: nil)
           cli.call('MSET', '{key}1', '3', '{key}2', '4')
           cli.close
           Fiber.yield
@@ -847,10 +850,10 @@ class RedisClient
         client2 = new_test_client(
           middlewares: [
             ::RedisClient::Cluster::ErrorIdentification::Middleware,
-            RedirectionEmulationMiddleware
+            ::Middlewares::RedirectionEmulation
           ],
           custom: {
-            redirect: RedirectionEmulationMiddleware::Setting.new(
+            redirect: ::Middlewares::RedirectionEmulation::Setting.new(
               slot: slot, to: broken_primary_key, command: %w[SET testkey client2]
             )
           }
@@ -907,7 +910,7 @@ class RedisClient
       end
 
       def publish_messages
-        client = new_test_client
+        client = new_test_client(middlewares: nil)
         yield client
         client.close
       end
@@ -921,7 +924,11 @@ class RedisClient
     class PrimaryOnly < TestingWrapper
       include Mixin
 
-      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
+      def new_test_client(
+        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        **opts
+      )
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
@@ -938,7 +945,11 @@ class RedisClient
     class ScaleReadRandom < TestingWrapper
       include Mixin
 
-      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
+      def new_test_client(
+        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        **opts
+      )
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
@@ -957,7 +968,11 @@ class RedisClient
     class ScaleReadRandomWithPrimary < TestingWrapper
       include Mixin
 
-      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
+      def new_test_client(
+        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        **opts
+      )
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
@@ -976,7 +991,11 @@ class RedisClient
     class ScaleReadLatency < TestingWrapper
       include Mixin
 
-      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
+      def new_test_client(
+        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        **opts
+      )
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
@@ -995,7 +1014,11 @@ class RedisClient
     class Pooled < TestingWrapper
       include Mixin
 
-      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
+      def new_test_client(
+        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        **opts
+      )
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,

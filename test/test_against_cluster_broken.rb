@@ -6,10 +6,13 @@ class TestAgainstClusterBroken < TestingWrapper
   WAIT_SEC = 3
 
   def setup
+    @captured_commands = ::Middlewares::CommandCapture::CommandBuffer.new
     @client = ::RedisClient.cluster(
       nodes: TEST_NODE_URIS,
       replica: true,
       fixed_hostname: TEST_FIXED_HOSTNAME,
+      custom: { captured_commands: @captured_commands },
+      middlewares: [::Middlewares::CommandCapture],
       **TEST_GENERIC_OPTIONS
     ).new_client
     @client.call('echo', 'init')
@@ -18,6 +21,7 @@ class TestAgainstClusterBroken < TestingWrapper
       replica_size: TEST_REPLICA_SIZE,
       **TEST_GENERIC_OPTIONS.merge(timeout: 30.0)
     )
+    @captured_commands.clear
   end
 
   def teardown
@@ -28,11 +32,13 @@ class TestAgainstClusterBroken < TestingWrapper
   def test_a_replica_is_down
     sacrifice = @controller.select_sacrifice_of_replica
     do_test_a_node_is_down(sacrifice, number_of_keys: 10)
+    refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
   end
 
   def test_a_primary_is_down
     sacrifice = @controller.select_sacrifice_of_primary
     do_test_a_node_is_down(sacrifice, number_of_keys: 10)
+    refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
   end
 
   private
