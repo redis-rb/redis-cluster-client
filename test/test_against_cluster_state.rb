@@ -4,6 +4,7 @@ require 'testing_helper'
 
 module TestAgainstClusterState
   SLOT_SIZE = 16_384
+  PATTERN = ENV.fetch('TEST_CLASS_PATTERN', '')
 
   module Mixin
     def setup
@@ -13,13 +14,16 @@ module TestAgainstClusterState
         **TEST_GENERIC_OPTIONS.merge(timeout: 30.0)
       )
       @controller.rebuild
+      @redirection_count = ::Middlewares::RedirectionCount::Counter.new
       @client = new_test_client
       @client.call('echo', 'init')
+      @redirection_count.clear
     end
 
     def teardown
       @controller&.close
       @client&.close
+      message(@redirection_count.get)
     end
 
     def test_the_state_of_cluster_down
@@ -189,19 +193,24 @@ module TestAgainstClusterState
     end
   end
 
-  PATTERN = ENV.fetch('TEST_CLASS_PATTERN', '')
-
   if PATTERN == 'PrimaryOnly' || PATTERN.empty?
     class PrimaryOnly < TestingWrapper
       include Mixin
 
       private
 
-      def new_test_client
+      def new_test_client(
+        custom: { redirection_count: @redirection_count },
+        middlewares: [::Middlewares::RedirectionCount],
+        **opts
+      )
         ::RedisClient.cluster(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          **TEST_GENERIC_OPTIONS
+          middlewares: middlewares,
+          custom: custom,
+          **TEST_GENERIC_OPTIONS,
+          **opts
         ).new_client
       end
     end
@@ -213,11 +222,18 @@ module TestAgainstClusterState
 
       private
 
-      def new_test_client
+      def new_test_client(
+        custom: { redirection_count: @redirection_count },
+        middlewares: [::Middlewares::RedirectionCount],
+        **opts
+      )
         ::RedisClient.cluster(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          **TEST_GENERIC_OPTIONS
+          middlewares: middlewares,
+          custom: custom,
+          **TEST_GENERIC_OPTIONS,
+          **opts
         ).new_pool(timeout: TEST_TIMEOUT_SEC, size: 2)
       end
     end
@@ -229,13 +245,20 @@ module TestAgainstClusterState
 
       private
 
-      def new_test_client
+      def new_test_client(
+        custom: { redirection_count: @redirection_count },
+        middlewares: [::Middlewares::RedirectionCount],
+        **opts
+      )
         ::RedisClient.cluster(
           nodes: TEST_NODE_URIS,
           replica: true,
           replica_affinity: :random,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          **TEST_GENERIC_OPTIONS
+          middlewares: middlewares,
+          custom: custom,
+          **TEST_GENERIC_OPTIONS,
+          **opts
         ).new_client
       end
     end
@@ -247,13 +270,20 @@ module TestAgainstClusterState
 
       private
 
-      def new_test_client
+      def new_test_client(
+        custom: { redirection_count: @redirection_count },
+        middlewares: [::Middlewares::RedirectionCount],
+        **opts
+      )
         ::RedisClient.cluster(
           nodes: TEST_NODE_URIS,
           replica: true,
           replica_affinity: :random_with_primary,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          **TEST_GENERIC_OPTIONS
+          middlewares: middlewares,
+          custom: custom,
+          **TEST_GENERIC_OPTIONS,
+          **opts
         ).new_client
       end
     end
@@ -265,13 +295,20 @@ module TestAgainstClusterState
 
       private
 
-      def new_test_client
+      def new_test_client(
+        custom: { redirection_count: @redirection_count },
+        middlewares: [::Middlewares::RedirectionCount],
+        **opts
+      )
         ::RedisClient.cluster(
           nodes: TEST_NODE_URIS,
           replica: true,
           replica_affinity: :latency,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          **TEST_GENERIC_OPTIONS
+          middlewares: middlewares,
+          custom: custom,
+          **TEST_GENERIC_OPTIONS,
+          **opts
         ).new_client
       end
     end

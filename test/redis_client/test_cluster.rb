@@ -18,9 +18,8 @@ class RedisClient
       def teardown
         @client&.call('FLUSHDB')
         wait_for_replication
-        raise @redirection_count.get.inspect unless @redirection_count.zero?
-
         @client&.close
+        flunk(@redirection_count.get) unless @redirection_count.zero?
       end
 
       def test_config
