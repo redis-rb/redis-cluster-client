@@ -39,9 +39,9 @@ module Middlewares
       super
     rescue ::RedisClient::CommandError => e
       if e.message.start_with?('MOVED')
-        cfg.custom[:redirection_count].moved
+        cfg.custom.fetch(:redirection_count).moved
       elsif e.message.start_with?('ASK')
-        cfg.custom[:redirection_count].ask
+        cfg.custom.fetch(:redirection_count).ask
       end
 
       raise
@@ -51,9 +51,9 @@ module Middlewares
       super
     rescue ::RedisClient::CommandError => e
       if e.message.start_with?('MOVED')
-        cfg.custom[:redirection_count].moved
+        cfg.custom.fetch(:redirection_count).moved
       elsif e.message.start_with?('ASK')
-        cfg.custom[:redirection_count].ask
+        cfg.custom.fetch(:redirection_count).ask
       end
 
       raise
