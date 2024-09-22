@@ -46,7 +46,7 @@ class TestAgainstClusterScale < TestingWrapper
                  .instance_variable_get(:@clients)
                  .size
     assert_equal(want, got, 'Case: number of nodes')
-    refute(@captured_commands.count('cluster', 'nodes').zero?)
+    refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
   end
 
   def test_02_scale_in
@@ -69,7 +69,7 @@ class TestAgainstClusterScale < TestingWrapper
                  .instance_variable_get(:@clients)
                  .size
     assert_equal(want, got, 'Case: number of nodes')
-    refute(@captured_commands.count('cluster', 'nodes').zero?)
+    refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
   end
 
   private

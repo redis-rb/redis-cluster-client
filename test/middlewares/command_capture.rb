@@ -34,7 +34,7 @@ module Middlewares
           next 0 if @array.empty?
 
           @array.count do |e|
-            cmd.size.times.all? { |i| cmd[i].downcase == e[i]&.downcase }
+            cmd.size.times.all? { |i| cmd[i].downcase == e.command[i]&.downcase }
           end
         end
       end
