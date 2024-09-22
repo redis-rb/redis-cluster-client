@@ -1,0 +1,62 @@
+# frozen_string_literal: true
+
+module Middlewares
+  module RedirectionCount
+    class Counter
+      Result = Struct.new('RedirectionCounterResult', :moved, :ask, keyword_init: true)
+
+      def initialize
+        @moved = 0
+        @ask = 0
+        @mutex = Mutex.new
+      end
+
+      def moved
+        @mutex.synchronize { @moved += 1 }
+      end
+
+      def ask
+        @mutex.synchronize { @ask += 1 }
+      end
+
+      def get
+        @mutex.synchronize { Result.new(moved: @moved, ask: @ask) }
+      end
+
+      def zero?
+        @mutex.synchronize { @moved == 0 && @ask == 0 }
+      end
+
+      def clear
+        @mutex.synchronize do
+          @moved = 0
+          @ask = 0
+        end
+      end
+    end
+
+    def call(cmd, cfg)
+      super
+    rescue ::RedisClient::CommandError => e
+      if e.message.start_with?('MOVED')
+        cfg.custom[:redirection_count].moved
+      elsif e.message.start_with?('ASK')
+        cfg.custom[:redirection_count].ask
+      end
+
+      raise
+    end
+
+    def call_pipelined(cmd, cfg)
+      super
+    rescue ::RedisClient::CommandError => e
+      if e.message.start_with?('MOVED')
+        cfg.custom[:redirection_count].moved
+      elsif e.message.start_with?('ASK')
+        cfg.custom[:redirection_count].ask
+      end
+
+      raise
+    end
+  end
+end

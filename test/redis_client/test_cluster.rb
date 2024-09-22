@@ -6,16 +6,20 @@ class RedisClient
   class TestCluster
     module Mixin
       def setup
-        @captured_commands = CommandCaptureMiddleware::CommandBuffer.new
+        @captured_commands = ::Middlewares::CommandCapture::CommandBuffer.new
+        @redirection_count = ::Middlewares::RedirectionCount::Counter.new
         @client = new_test_client
         @client.call('FLUSHDB')
         wait_for_replication
         @captured_commands.clear
+        @redirection_count.clear
       end
 
       def teardown
         @client&.call('FLUSHDB')
         wait_for_replication
+        raise @redirection_count.get.inspect unless @redirection_count.zero?
+
         @client&.close
       end
 
@@ -847,10 +851,10 @@ class RedisClient
         client2 = new_test_client(
           middlewares: [
             ::RedisClient::Cluster::ErrorIdentification::Middleware,
-            RedirectionEmulationMiddleware
+            ::Middlewares::RedirectionEmulation
           ],
           custom: {
-            redirect: RedirectionEmulationMiddleware::Setting.new(
+            redirect: ::Middlewares::RedirectionEmulation::Setting.new(
               slot: slot, to: broken_primary_key, command: %w[SET testkey client2]
             )
           }
@@ -921,7 +925,11 @@ class RedisClient
     class PrimaryOnly < TestingWrapper
       include Mixin
 
-      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
+      def new_test_client(
+        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        **opts
+      )
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
@@ -938,7 +946,11 @@ class RedisClient
     class ScaleReadRandom < TestingWrapper
       include Mixin
 
-      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
+      def new_test_client(
+        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        **opts
+      )
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
@@ -957,7 +969,11 @@ class RedisClient
     class ScaleReadRandomWithPrimary < TestingWrapper
       include Mixin
 
-      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
+      def new_test_client(
+        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        **opts
+      )
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
@@ -976,7 +992,11 @@ class RedisClient
     class ScaleReadLatency < TestingWrapper
       include Mixin
 
-      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
+      def new_test_client(
+        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        **opts
+      )
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           replica: true,
@@ -995,7 +1015,11 @@ class RedisClient
     class Pooled < TestingWrapper
       include Mixin
 
-      def new_test_client(custom: { captured_commands: @captured_commands }, middlewares: [CommandCaptureMiddleware], **opts)
+      def new_test_client(
+        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        **opts
+      )
         config = ::RedisClient::ClusterConfig.new(
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,

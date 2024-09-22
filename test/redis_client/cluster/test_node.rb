@@ -36,11 +36,11 @@ class RedisClient
         @test_nodes&.each { |n| n&.each(&:close) }
       end
 
-      def make_node(capture_buffer: CommandCaptureMiddleware::CommandBuffer.new, pool: nil, **kwargs)
+      def make_node(capture_buffer: ::Middlewares::CommandCapture::CommandBuffer.new, pool: nil, **kwargs)
         config = ::RedisClient::ClusterConfig.new(**{
           nodes: TEST_NODE_URIS,
           fixed_hostname: TEST_FIXED_HOSTNAME,
-          middlewares: [CommandCaptureMiddleware],
+          middlewares: [::Middlewares::CommandCapture],
           custom: { captured_commands: capture_buffer },
           **TEST_GENERIC_OPTIONS
         }.merge(kwargs))
@@ -596,7 +596,7 @@ class RedisClient
       end
 
       def test_reload
-        capture_buffer = CommandCaptureMiddleware::CommandBuffer.new
+        capture_buffer = ::Middlewares::CommandCapture::CommandBuffer.new
         test_node = make_node(replica: true, capture_buffer: capture_buffer)
 
         capture_buffer.clear
@@ -618,7 +618,7 @@ class RedisClient
 
       def test_reload_with_original_config
         bootstrap_node = TEST_NODE_URIS.first
-        capture_buffer = CommandCaptureMiddleware::CommandBuffer.new
+        capture_buffer = ::Middlewares::CommandCapture::CommandBuffer.new
         test_node = make_node(
           nodes: [bootstrap_node],
           replica: true,
@@ -640,7 +640,7 @@ class RedisClient
       end
 
       def test_reload_with_overriden_sample_size
-        capture_buffer = CommandCaptureMiddleware::CommandBuffer.new
+        capture_buffer = ::Middlewares::CommandCapture::CommandBuffer.new
         test_node = make_node(replica: true, capture_buffer: capture_buffer, max_startup_sample: 1)
 
         capture_buffer.clear
@@ -661,7 +661,7 @@ class RedisClient
       end
 
       def test_reload_concurrently
-        capture_buffer = CommandCaptureMiddleware::CommandBuffer.new
+        capture_buffer = ::Middlewares::CommandCapture::CommandBuffer.new
         test_node = make_node(replica: true, pool: { size: 2 }, capture_buffer: capture_buffer)
 
         # Simulate refetch_node_info_list taking a long time
