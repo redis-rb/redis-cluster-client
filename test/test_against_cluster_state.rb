@@ -23,7 +23,6 @@ module TestAgainstClusterState
     def teardown
       @controller&.close
       @client&.close
-      message(@redirection_count.get)
     end
 
     def test_the_state_of_cluster_down
@@ -38,6 +37,7 @@ module TestAgainstClusterState
       wait_for_replication
       1000.times { |i| assert_equal(i.to_s, @client.call('GET', "key#{i}")) }
       assert_equal('ok', fetch_cluster_info('cluster_state'))
+      refute(@redirection_count.zero?, @redirection_count.get)
     end
 
     def test_the_state_of_cluster_resharding
@@ -48,6 +48,8 @@ module TestAgainstClusterState
           assert_equal(want, got, "Case: GET: #{key}")
         end
       end
+
+      refute(@redirection_count.zero?, @redirection_count.get)
     end
 
     def test_the_state_of_cluster_resharding_with_pipelining
@@ -62,6 +64,8 @@ module TestAgainstClusterState
           assert_equal(want, got, "Case: GET: #{key}")
         end
       end
+
+      refute(@redirection_count.zero?, @redirection_count.get)
     end
 
     def test_the_state_of_cluster_resharding_with_transaction
@@ -84,6 +88,7 @@ module TestAgainstClusterState
       end
 
       assert_equal(1, call_cnt)
+      refute(@redirection_count.zero?, @redirection_count.get)
     end
 
     def test_the_state_of_cluster_resharding_with_transaction_and_watch
@@ -106,10 +111,11 @@ module TestAgainstClusterState
       end
 
       assert_equal(1, call_cnt)
+      refute(@redirection_count.zero?, @redirection_count.get)
     end
 
     def test_the_state_of_cluster_resharding_with_reexecuted_watch
-      client2 = new_test_client
+      client2 = new_test_client(middlewares: nil)
       call_cnt = 0
 
       @client.call('SET', 'watch_key', 'original_value')
@@ -133,6 +139,7 @@ module TestAgainstClusterState
       assert_equal(2, call_cnt)
       # The second call succeeded
       assert_equal('@client_value_2', @client.call('GET', 'watch_key'))
+      refute(@redirection_count.zero?, @redirection_count.get)
     ensure
       client2&.close
     end
@@ -160,6 +167,8 @@ module TestAgainstClusterState
         assert_equal('OK', res[i])
         assert_equal("value#{i}", @client.call_v(['GET', "key#{i}"]))
       end
+
+      refute(@redirection_count.zero?, @redirection_count.get)
     end
 
     private
