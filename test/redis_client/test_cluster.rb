@@ -418,7 +418,7 @@ class RedisClient
       end
 
       def test_transaction_does_not_retry_without_rewatching
-        client2 = new_test_client
+        client2 = new_test_client(middlewares: nil)
 
         @client.call('SET', 'key', 'original_value')
 
@@ -446,7 +446,7 @@ class RedisClient
       end
 
       def test_transaction_with_watch_retries_block
-        client2 = new_test_client
+        client2 = new_test_client(middlewares: nil)
         call_count = 0
 
         @client.call('SET', 'key', 'original_value')
@@ -527,7 +527,7 @@ class RedisClient
         @client.call('MSET', '{key}1', '1', '{key}2', '2')
 
         another = Fiber.new do
-          cli = new_test_client
+          cli = new_test_client(middlewares: nil)
           cli.call('MSET', '{key}1', '3', '{key}2', '4')
           cli.close
           Fiber.yield
@@ -911,7 +911,7 @@ class RedisClient
       end
 
       def publish_messages
-        client = new_test_client
+        client = new_test_client(middlewares: nil)
         yield client
         client.close
       end
