@@ -3,7 +3,7 @@
 module Middlewares
   module RedirectionCount
     class Counter
-      Result = Struct.new('RedirectionCounterResult', :moved, :ask, keyword_init: true)
+      Result = Struct.new('RedirectionCountResult', :moved, :ask, keyword_init: true)
 
       def initialize
         @moved = 0

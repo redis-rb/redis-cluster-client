@@ -2,7 +2,7 @@
 
 module Middlewares
   module CommandCapture
-    CapturedCommand = Struct.new(:server_url, :command, :pipelined, keyword_init: true) do
+    CapturedCommand = Struct.new('CapturedCommand', :server_url, :command, :pipelined, keyword_init: true) do
       def inspect
         "#<#{self.class.name} [on #{server_url}] #{command.join(' ')} >"
       end
@@ -26,6 +26,16 @@ module Middlewares
       def <<(command)
         @mutex.synchronize do
           @array << command
+        end
+      end
+
+      def count(*cmd)
+        @mutex.synchronize do
+          next 0 if @array.empty?
+
+          @array.count do |e|
+            cmd.size.times.all? { |i| cmd[i].downcase == e[i]&.downcase }
+          end
         end
       end
 
