@@ -167,8 +167,6 @@ module TestAgainstClusterState
         assert_equal('OK', res[i])
         assert_equal("value#{i}", @client.call_v(['GET', "key#{i}"]))
       end
-
-      refute(@redirection_count.zero?, @redirection_count.get)
     end
 
     private

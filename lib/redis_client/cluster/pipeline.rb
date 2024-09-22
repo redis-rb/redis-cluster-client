@@ -55,15 +55,18 @@ class RedisClient
           results = Array.new(commands.size)
           @pending_reads += size
           write_multi(commands)
-
           redirection_indices = nil
           first_exception = nil
+
           size.times do |index|
             timeout = timeouts && timeouts[index]
-            result = read(timeout)
+            result = read(connection_timeout(timeout))
             @pending_reads -= 1
+
             if result.is_a?(::RedisClient::Error)
               result._set_command(commands[index])
+              result._set_config(config)
+
               if result.is_a?(::RedisClient::CommandError) && result.message.start_with?('MOVED', 'ASK')
                 redirection_indices ||= []
                 redirection_indices << index
@@ -71,6 +74,7 @@ class RedisClient
                 first_exception ||= result
               end
             end
+
             results[index] = result
           end
 
