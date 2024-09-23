@@ -422,21 +422,26 @@ class RedisClient
         # performed the reload.
         # Probably in the future we should add a circuit breaker to #reload itself, and stop trying if the cluster is
         # obviously not working.
-        wait_start = Process.clock_gettime(Process::CLOCK_MONOTONIC, :second)
+        wait_start = obtain_current_time
         @mutex.synchronize do
           return if @last_reloaded_at && @last_reloaded_at > wait_start
 
           if @last_reloaded_at && @reload_times > 1
             # Mitigate load of servers by naive logic. Don't sleep with exponential backoff.
-            now = Process.clock_gettime(Process::CLOCK_MONOTONIC, :second)
-            return if now < @last_reloaded_at + @random.rand(STATE_REFRESH_INTERVAL)
+            now = obtain_current_time
+            elapsed = @last_reloaded_at + @random.rand(STATE_REFRESH_INTERVAL) * 1_000_000
+            return if now < elapsed
           end
 
           r = yield
-          @last_reloaded_at = Process.clock_gettime(Process::CLOCK_MONOTONIC, :second)
+          @last_reloaded_at = obtain_current_time
           @reload_times += 1
           r
         end
+      end
+
+      def obtain_current_time
+        Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond)
       end
     end
   end
