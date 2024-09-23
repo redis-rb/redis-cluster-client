@@ -107,32 +107,29 @@ class RedisClient
       rescue ::RedisClient::CommandError => e
         raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
 
+        retry_count -= 1
         if e.message.start_with?('MOVED')
           node = assign_redirection_node(e.message)
-          retry_count -= 1
           retry if retry_count >= 0
         elsif e.message.start_with?('ASK')
           node = assign_asking_node(e.message)
-          retry_count -= 1
           if retry_count >= 0
             node.call('ASKING')
             retry
           end
         elsif e.message.start_with?('CLUSTERDOWN Hash slot not served')
           @node.reload!
-          retry_count -= 1
           retry if retry_count >= 0
         end
+
         raise
       rescue ::RedisClient::ConnectionError => e
         raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
 
-        @node.reload!
-
-        raise if retry_count <= 0
-
         retry_count -= 1
-        retry
+        @node.reload!
+        retry if retry_count >= 0
+        raise
       end
 
       def scan(*command, seed: nil, **kwargs) # rubocop:disable Metrics/AbcSize
@@ -200,13 +197,13 @@ class RedisClient
         ::RedisClient::Cluster::KeySlotConverter.convert(key)
       end
 
-      def find_node(node_key, retry_count: 3)
+      def find_node(node_key, retry_count: 1)
         @node.find_by(node_key)
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
         raise ::RedisClient::Cluster::NodeMightBeDown if retry_count <= 0
 
-        @node.reload!
         retry_count -= 1
+        @node.reload!
         retry
       end
 
@@ -236,17 +233,15 @@ class RedisClient
 
       private
 
-      def send_wait_command(method, command, args, retry_count: 3, &block) # rubocop:disable Metrics/AbcSize
+      def send_wait_command(method, command, args, retry_count: 1, &block) # rubocop:disable Metrics/AbcSize
         @node.call_primaries(method, command, args).select { |r| r.is_a?(Integer) }.sum.then(&TSF.call(block))
       rescue ::RedisClient::Cluster::ErrorCollection => e
         raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
         raise if retry_count <= 0
-        raise if e.errors.values.none? do |err|
-          err.message.include?('WAIT cannot be used with replica instances')
-        end
+        raise if e.errors.values.none? { |err| err.message.include?('WAIT cannot be used with replica instances') }
 
-        @node.reload!
         retry_count -= 1
+        @node.reload!
         retry
       end
 
