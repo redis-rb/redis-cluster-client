@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 module Middlewares
-  module RedirectionCount
+  module RedirectCount
     class Counter
-      Result = Struct.new('RedirectionCountResult', :moved, :ask, keyword_init: true)
+      Result = Struct.new('RedirectCountResult', :moved, :ask, keyword_init: true)
 
       def initialize
         @moved = 0
@@ -39,9 +39,9 @@ module Middlewares
       super
     rescue ::RedisClient::CommandError => e
       if e.message.start_with?('MOVED')
-        cfg.custom.fetch(:redirection_count).moved
+        cfg.custom.fetch(:redirect_count).moved
       elsif e.message.start_with?('ASK')
-        cfg.custom.fetch(:redirection_count).ask
+        cfg.custom.fetch(:redirect_count).ask
       end
 
       raise
@@ -51,9 +51,9 @@ module Middlewares
       super
     rescue ::RedisClient::CommandError => e
       if e.message.start_with?('MOVED')
-        cfg.custom.fetch(:redirection_count).moved
+        cfg.custom.fetch(:redirect_count).moved
       elsif e.message.start_with?('ASK')
-        cfg.custom.fetch(:redirection_count).ask
+        cfg.custom.fetch(:redirect_count).ask
       end
 
       raise

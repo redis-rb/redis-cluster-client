@@ -7,8 +7,8 @@ require 'redis-cluster-client'
 require 'testing_constants'
 require 'cluster_controller'
 require 'middlewares/command_capture'
-require 'middlewares/redirection_emulation'
-require 'middlewares/redirection_count'
+require 'middlewares/redirect_count'
+require 'middlewares/redirect_fake'
 
 case ENV.fetch('REDIS_CONNECTION_DRIVER', 'ruby')
 when 'hiredis' then require 'hiredis-client'

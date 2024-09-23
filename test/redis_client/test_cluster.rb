@@ -7,19 +7,19 @@ class RedisClient
     module Mixin
       def setup
         @captured_commands = ::Middlewares::CommandCapture::CommandBuffer.new
-        @redirection_count = ::Middlewares::RedirectionCount::Counter.new
+        @redirect_count = ::Middlewares::RedirectCount::Counter.new
         @client = new_test_client
         @client.call('FLUSHDB')
         wait_for_replication
         @captured_commands.clear
-        @redirection_count.clear
+        @redirect_count.clear
       end
 
       def teardown
         @client&.call('FLUSHDB')
         wait_for_replication
         @client&.close
-        flunk(@redirection_count.get) unless @redirection_count.zero?
+        flunk(@redirect_count.get) unless @redirect_count.zero?
       end
 
       def test_config
@@ -850,10 +850,10 @@ class RedisClient
         client2 = new_test_client(
           middlewares: [
             ::RedisClient::Cluster::ErrorIdentification::Middleware,
-            ::Middlewares::RedirectionEmulation
+            ::Middlewares::RedirectFake
           ],
           custom: {
-            redirect: ::Middlewares::RedirectionEmulation::Setting.new(
+            redirect_fake: ::Middlewares::RedirectFake::Setting.new(
               slot: slot, to: broken_primary_key, command: %w[SET testkey client2]
             )
           }
@@ -925,8 +925,8 @@ class RedisClient
       include Mixin
 
       def new_test_client(
-        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
-        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        custom: { captured_commands: @captured_commands, redirect_count: @redirect_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectCount],
         **opts
       )
         config = ::RedisClient::ClusterConfig.new(
@@ -946,8 +946,8 @@ class RedisClient
       include Mixin
 
       def new_test_client(
-        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
-        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        custom: { captured_commands: @captured_commands, redirect_count: @redirect_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectCount],
         **opts
       )
         config = ::RedisClient::ClusterConfig.new(
@@ -969,8 +969,8 @@ class RedisClient
       include Mixin
 
       def new_test_client(
-        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
-        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        custom: { captured_commands: @captured_commands, redirect_count: @redirect_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectCount],
         **opts
       )
         config = ::RedisClient::ClusterConfig.new(
@@ -992,8 +992,8 @@ class RedisClient
       include Mixin
 
       def new_test_client(
-        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
-        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        custom: { captured_commands: @captured_commands, redirect_count: @redirect_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectCount],
         **opts
       )
         config = ::RedisClient::ClusterConfig.new(
@@ -1015,8 +1015,8 @@ class RedisClient
       include Mixin
 
       def new_test_client(
-        custom: { captured_commands: @captured_commands, redirection_count: @redirection_count },
-        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectionCount],
+        custom: { captured_commands: @captured_commands, redirect_count: @redirect_count },
+        middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectCount],
         **opts
       )
         config = ::RedisClient::ClusterConfig.new(
