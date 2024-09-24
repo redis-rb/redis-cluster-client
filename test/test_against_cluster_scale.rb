@@ -102,12 +102,14 @@ class TestAgainstClusterScale < TestingWrapper
 
   def retry_call(attempts:)
     loop do
-      break attempts <= 0 || yield
+      raise MaxRetryExceeded if attempts <= 0
+
+      attempts -= 1
+      break yield
     rescue ::RedisClient::CommandError => e
       raise unless e.message.start_with?('CLUSTERDOWN Hash slot not served')
 
       @cluster_down_error_count += 1
-      attempts -= 1
       sleep WAIT_SEC
     end
   end

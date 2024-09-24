@@ -80,16 +80,16 @@ class TestAgainstClusterBroken < TestingWrapper
     refute_nil(sacrifice, "#{sacrifice.config.host}:#{sacrifice.config.port}")
 
     loop do
-      break if kill_attempts <= 0
+      raise MaxRetryExceeded if kill_attempts <= 0
 
+      kill_attempts -= 1
       sacrifice.call('SHUTDOWN', 'NOSAVE')
     rescue ::RedisClient::CommandError => e
       raise unless e.message.include?('Errors trying to SHUTDOWN')
-
-      kill_attempts -= 1
-      sleep WAIT_SEC
     rescue ::RedisClient::ConnectionError
       break
+    ensure
+      sleep WAIT_SEC
     end
 
     assert_raises(::RedisClient::ConnectionError) { sacrifice.call('PING') }
@@ -97,10 +97,13 @@ class TestAgainstClusterBroken < TestingWrapper
 
   def wait_for_cluster_to_be_ready(wait_attempts:)
     loop do
-      break if wait_attempts <= 0 || @client.call('PING') == 'PONG'
+      raise MaxRetryExceeded if wait_attempts <= 0
+
+      wait_attempts -= 1
+      break if @client.call('PING') == 'PONG'
     rescue ::RedisClient::Cluster::NodeMightBeDown
       @cluster_down_error_count += 1
-      wait_attempts -= 1
+    ensure
       sleep WAIT_SEC
     end
   end
