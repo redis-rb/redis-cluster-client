@@ -3,6 +3,8 @@
 require 'testing_helper'
 
 class TestAgainstClusterScale < TestingWrapper
+  WAIT_SEC = 1
+  MAX_ATTEMPTS = 20
   NUMBER_OF_KEYS = 20_000
 
   def self.test_order
@@ -23,12 +25,15 @@ class TestAgainstClusterScale < TestingWrapper
     @client.call('echo', 'init')
     @captured_commands.clear
     @redirect_count.clear
+    @cluster_down_error_count = 0
   end
 
   def teardown
     @client&.close
     @controller&.close
-    print "#{@redirect_count.get}, ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')} = "
+    print "#{@redirect_count.get}, "\
+      "ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')}, "\
+      "ClusterDownError: #{@cluster_down_error_count} = "
   end
 
   def test_01_scale_out
@@ -57,12 +62,8 @@ class TestAgainstClusterScale < TestingWrapper
     @controller.scale_in
 
     NUMBER_OF_KEYS.times do |i|
-      assert_equal(i.to_s, @client.call('GET', "key#{i}"), "Case: key#{i}")
-    rescue ::RedisClient::CommandError => e
-      raise unless e.message.start_with?('CLUSTERDOWN Hash slot not served')
-
-      # FIXME: Why does the error occur?
-      p "key#{i}"
+      got = retry_call(attempts: MAX_ATTEMPTS) { @client.call('GET', "key#{i}") }
+      assert_equal(i.to_s, got, "Case: key#{i}")
     end
 
     want = TEST_NODE_URIS.size
@@ -97,5 +98,19 @@ class TestAgainstClusterScale < TestingWrapper
   def build_additional_node_urls
     max = TEST_REDIS_PORTS.max
     (max + 1..max + 2).map { |port| "#{TEST_REDIS_SCHEME}://#{TEST_REDIS_HOST}:#{port}" }
+  end
+
+  def retry_call(attempts:)
+    loop do
+      raise MaxRetryExceeded if attempts <= 0
+
+      attempts -= 1
+      break yield
+    rescue ::RedisClient::CommandError => e
+      raise unless e.message.start_with?('CLUSTERDOWN Hash slot not served')
+
+      @cluster_down_error_count += 1
+      sleep WAIT_SEC
+    end
   end
 end

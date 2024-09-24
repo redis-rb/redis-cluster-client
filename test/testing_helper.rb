@@ -14,6 +14,8 @@ case ENV.fetch('REDIS_CONNECTION_DRIVER', 'ruby')
 when 'hiredis' then require 'hiredis-client'
 end
 
+MaxRetryExceeded = Class.new(StandardError)
+
 class TestingWrapper < Minitest::Test
   private
 

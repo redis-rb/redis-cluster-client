@@ -3,7 +3,9 @@
 require 'testing_helper'
 
 class TestAgainstClusterBroken < TestingWrapper
-  WAIT_SEC = 3
+  WAIT_SEC = 1
+  MAX_ATTEMPTS = 60
+  NUMBER_OF_KEYS = 10
 
   def setup
     @captured_commands = ::Middlewares::CommandCapture::CommandBuffer.new
@@ -24,23 +26,26 @@ class TestAgainstClusterBroken < TestingWrapper
     )
     @captured_commands.clear
     @redirect_count.clear
+    @cluster_down_error_count = 0
   end
 
   def teardown
     @client&.close
     @controller&.close
-    print "#{@redirect_count.get}, ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')} = "
+    print "#{@redirect_count.get}, "\
+      "ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')}, "\
+      "ClusterDownError: #{@cluster_down_error_count} = "
   end
 
   def test_a_replica_is_down
     sacrifice = @controller.select_sacrifice_of_replica
-    do_test_a_node_is_down(sacrifice, number_of_keys: 10)
+    do_test_a_node_is_down(sacrifice, number_of_keys: NUMBER_OF_KEYS)
     refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
   end
 
   def test_a_primary_is_down
     sacrifice = @controller.select_sacrifice_of_primary
-    do_test_a_node_is_down(sacrifice, number_of_keys: 10)
+    do_test_a_node_is_down(sacrifice, number_of_keys: NUMBER_OF_KEYS)
     refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
   end
 
@@ -57,8 +62,8 @@ class TestAgainstClusterBroken < TestingWrapper
   def do_test_a_node_is_down(sacrifice, number_of_keys:)
     prepare_test_data(number_of_keys: number_of_keys)
 
-    kill_a_node(sacrifice, kill_attempts: 10)
-    wait_for_cluster_to_be_ready(wait_attempts: 10)
+    kill_a_node(sacrifice, kill_attempts: MAX_ATTEMPTS)
+    wait_for_cluster_to_be_ready(wait_attempts: MAX_ATTEMPTS)
 
     assert_equal('PONG', @client.call('PING'), 'Case: PING')
     do_assertions_without_pipelining(number_of_keys: number_of_keys)
@@ -75,15 +80,15 @@ class TestAgainstClusterBroken < TestingWrapper
     refute_nil(sacrifice, "#{sacrifice.config.host}:#{sacrifice.config.port}")
 
     loop do
-      break if kill_attempts <= 0
+      raise MaxRetryExceeded if kill_attempts <= 0
 
+      kill_attempts -= 1
       sacrifice.call('SHUTDOWN', 'NOSAVE')
     rescue ::RedisClient::CommandError => e
       raise unless e.message.include?('Errors trying to SHUTDOWN')
     rescue ::RedisClient::ConnectionError
       break
     ensure
-      kill_attempts -= 1
       sleep WAIT_SEC
     end
 
@@ -92,11 +97,13 @@ class TestAgainstClusterBroken < TestingWrapper
 
   def wait_for_cluster_to_be_ready(wait_attempts:)
     loop do
-      break if wait_attempts <= 0 || @client.call('PING') == 'PONG'
-    rescue ::RedisClient::Cluster::NodeMightBeDown
-      # ignore
-    ensure
+      raise MaxRetryExceeded if wait_attempts <= 0
+
       wait_attempts -= 1
+      break if @client.call('PING') == 'PONG'
+    rescue ::RedisClient::Cluster::NodeMightBeDown
+      @cluster_down_error_count += 1
+    ensure
       sleep WAIT_SEC
     end
   end

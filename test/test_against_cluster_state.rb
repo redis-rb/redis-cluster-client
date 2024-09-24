@@ -25,7 +25,8 @@ module TestAgainstClusterState
     def teardown
       @controller&.close
       @client&.close
-      print "#{@redirect_count.get}, ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')} = "
+      print "#{@redirect_count.get}, "\
+        "ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')} = "
     end
 
     def test_the_state_of_cluster_down
