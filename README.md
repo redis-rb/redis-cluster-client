@@ -442,6 +442,7 @@ Also, it should handle errors.
 * https://redis.io/docs/reference/cluster-spec/
 * https://github.com/redis/redis-rb/issues/1070
 * https://github.com/redis/redis/issues/8948
+* https://github.com/valkey-io/valkey/issues/384
 * https://github.com/antirez/redis-rb-cluster
 * https://twitter.com/antirez
 * http://antirez.com/latest/0
