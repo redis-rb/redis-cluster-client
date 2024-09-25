@@ -6,11 +6,14 @@ class ClusterController
   SLOT_SIZE = 16_384
   DEFAULT_SHARD_SIZE = 3
   DEFAULT_REPLICA_SIZE = 1
-  DEFAULT_MAX_ATTEMPTS = 600
+  DEFAULT_MAX_ATTEMPTS = 300
   DEFAULT_TIMEOUT_SEC = 5.0
+  SLEEP_SEC = 1.0
 
   private_constant :SLOT_SIZE, :DEFAULT_SHARD_SIZE, :DEFAULT_REPLICA_SIZE,
                    :DEFAULT_MAX_ATTEMPTS, :DEFAULT_TIMEOUT_SEC
+
+  MaxRetryExceeded = Class.new(StandardError)
 
   RedisNodeInfo = Struct.new(
     'RedisClusterNodeInfo',
@@ -55,7 +58,7 @@ class ClusterController
     @debug = ENV.fetch('DEBUG', '0')
   end
 
-  def wait_for_cluster_to_be_ready
+  def wait_for_cluster_to_be_ready(skip_clients: [])
     print_debug('wait for nodes to be recognized...')
     wait_meeting(@clients, max_attempts: @max_attempts)
     print_debug('wait for the cluster state to be ok...')
@@ -63,7 +66,7 @@ class ClusterController
     print_debug('wait for the replication to be established...')
     wait_replication(@clients, number_of_replicas: @number_of_replicas, max_attempts: @max_attempts)
     print_debug('wait for commands to be accepted...')
-    wait_cluster_recovering(@clients, max_attempts: @max_attempts)
+    wait_cluster_recovering(@clients, max_attempts: @max_attempts, skip_clients: skip_clients)
   end
 
   def rebuild
@@ -122,6 +125,7 @@ class ClusterController
 
     number_of_keys = src_client.call('CLUSTER', 'COUNTKEYSINSLOT', slot)
     keys = src_client.call('CLUSTER', 'GETKEYSINSLOT', slot, number_of_keys)
+    print_debug("#{src_client.config.host}:#{src_client.config.port} => #{dest_client.config.host}:#{dest_client.config.port} ... #{keys}")
     return if keys.empty?
 
     begin
@@ -148,6 +152,7 @@ class ClusterController
 
     ([dest, src] + rest).each do |cli|
       cli.call('CLUSTER', 'SETSLOT', slot, 'NODE', id)
+      print_debug("#{cli.config.host}:#{cli.config.port} ... CLUSTER SETSLOT #{slot} NODE #{id}")
     rescue ::RedisClient::CommandError => e
       raise unless e.message.start_with?('ERR Please use SETSLOT only with masters.')
       # how weird, ignore
@@ -176,7 +181,7 @@ class ClusterController
     primary_id = primary.call('CLUSTER', 'MYID')
     replica.call('CLUSTER', 'REPLICATE', primary_id)
     save_config(@clients)
-    wait_for_cluster_to_be_ready
+    wait_for_cluster_to_be_ready(skip_clients: [primary, replica])
 
     rows = associate_with_clients_and_nodes(@clients)
 
@@ -198,6 +203,7 @@ class ClusterController
     primary_info.slots.each do |slot|
       src = primary_info.node_key
       dest = rest_primary_node_keys.sample
+      print_debug("Resharding slot #{slot}: #{src} => #{dest}")
       start_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
       finish_resharding(slot: slot, src_node_key: src, dest_node_key: dest)
     end
@@ -340,7 +346,7 @@ class ClusterController
         rescue ::RedisClient::CommandError => e
           print_debug(e.message)
           # ERR Unknown node [node-id]
-          sleep 1.0
+          sleep SLEEP_SEC
           primary_id = primaries[i].call('CLUSTER', 'MYID')
           next
         end
@@ -402,11 +408,11 @@ class ClusterController
     end
   end
 
-  def wait_cluster_recovering(clients, max_attempts:)
+  def wait_cluster_recovering(clients, max_attempts:, skip_clients: [])
     key = 0
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       print_debug("#{client.config.host}:#{client.config.port} ... GET #{key}")
-      client.call('GET', key) if primary_client?(client)
+      client.call('GET', key) if primary_client?(client) && !skip_clients.include?(client)
       true
     rescue ::RedisClient::CommandError => e
       if e.message.start_with?('CLUSTERDOWN')
@@ -426,12 +432,12 @@ class ClusterController
     attempt_count = 1
     clients.each do |client|
       attempt_count.step(max_attempts) do |i|
-        break if i >= max_attempts
+        raise MaxRetryExceeded if i >= max_attempts
 
         attempt_count += 1
         break if yield(client)
 
-        sleep 0.1
+        sleep SLEEP_SEC
       end
     end
   end

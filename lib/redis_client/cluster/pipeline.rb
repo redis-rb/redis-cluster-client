@@ -183,6 +183,7 @@ class RedisClient
         end
 
         work_group.close
+        # TODO: implement @router.renew_cluster_state
         raise ::RedisClient::Cluster::ErrorCollection, errors unless errors.nil?
 
         required_redirections&.each do |node_key, v|
