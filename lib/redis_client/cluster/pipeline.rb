@@ -193,6 +193,7 @@ class RedisClient
             cluster_state_errors ||= {}
             cluster_state_errors[node_key] = v
           when StandardError
+            cluster_state_errors ||= {} if v.is_a?(::RedisClient::ConnectionError)
             errors ||= {}
             errors[node_key] = v
           else

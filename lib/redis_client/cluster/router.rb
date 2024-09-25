@@ -144,8 +144,10 @@ class RedisClient
       end
 
       def assign_node(command)
-        node_key = find_node_key(command)
-        find_node(node_key)
+        handle_node_reload_error do
+          node_key = find_node_key(command)
+          @node.find_by(node_key)
+        end
       end
 
       def find_node_key_by_key(key, seed: nil, primary: false)
@@ -158,8 +160,10 @@ class RedisClient
       end
 
       def find_primary_node_by_slot(slot)
-        node_key = @node.find_node_key_of_primary(slot)
-        find_node(node_key)
+        handle_node_reload_error do
+          node_key = @node.find_node_key_of_primary(slot)
+          @node.find_by(node_key)
+        end
       end
 
       def find_node_key(command, seed: nil)
@@ -184,14 +188,8 @@ class RedisClient
         ::RedisClient::Cluster::KeySlotConverter.convert(key)
       end
 
-      def find_node(node_key, retry_count: 1)
+      def find_node(node_key)
         @node.find_by(node_key)
-      rescue ::RedisClient::Cluster::Node::ReloadNeeded
-        raise ::RedisClient::Cluster::NodeMightBeDown if retry_count <= 0
-
-        retry_count -= 1
-        renew_cluster_state
-        retry
       end
 
       def command_exists?(name)
@@ -202,12 +200,12 @@ class RedisClient
         _, slot, node_key = err_msg.split
         slot = slot.to_i
         @node.update_slot(slot, node_key)
-        find_node(node_key)
+        handle_node_reload_error { @node.find_by(node_key) }
       end
 
       def assign_asking_node(err_msg)
         _, _, node_key = err_msg.split
-        find_node(node_key)
+        handle_node_reload_error { @node.find_by(node_key) }
       end
 
       def node_keys
@@ -261,7 +259,7 @@ class RedisClient
         end
       end
 
-      def send_cluster_command(method, command, args, &block)
+      def send_cluster_command(method, command, args, &block) # rubocop:disable Metrics/AbcSize
         case subcommand = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'addslots', 'delslots', 'failover', 'forget', 'meet', 'replicate',
              'reset', 'set-config-epoch', 'setslot'
@@ -270,7 +268,10 @@ class RedisClient
         when 'getkeysinslot'
           raise ArgumentError, command.join(' ') if command.size != 4
 
-          find_node(@node.find_node_key_of_replica(command[2])).public_send(method, *args, command, &block)
+          handle_node_reload_error do
+            node_key = @node.find_node_key_of_replica(command[2])
+            @node.find_by(node_key).public_send(method, *args, command, &block)
+          end
         else assign_node(command).public_send(method, *args, command, &block)
         end
       end
@@ -380,6 +381,16 @@ class RedisClient
         end
 
         raise
+      end
+
+      def handle_node_reload_error(retry_count: 1)
+        yield
+      rescue ::RedisClient::Cluster::Node::ReloadNeeded
+        raise ::RedisClient::Cluster::NodeMightBeDown if retry_count <= 0
+
+        retry_count -= 1
+        renew_cluster_state
+        retry
       end
     end
   end
