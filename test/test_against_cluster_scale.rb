@@ -10,6 +10,7 @@ module TestAgainstClusterScale
     MAX_ATTEMPTS = 20
     NUMBER_OF_KEYS = 20_000
     MAX_PIPELINE_SIZE = 40
+    HASH_TAG_FACTOR = 10
     SLICED_NUMBERS = (0...NUMBER_OF_KEYS).each_slice(MAX_PIPELINE_SIZE).freeze
 
     def setup
@@ -40,7 +41,10 @@ module TestAgainstClusterScale
     def test_01_scale_out
       SLICED_NUMBERS.each do |numbers|
         @client.pipelined do |pi|
-          numbers.each { |i| pi.call('SET', "key#{i}", i) }
+          numbers.each do |i|
+            pi.call('SET', "key#{i}", i)
+            pi.call('SET', "{group#{i % HASH_TAG_FACTOR}}:key#{i}", i)
+          end
         end
       end
 
@@ -183,11 +187,27 @@ module TestAgainstClusterScale
       end
 
       def do_test_after_scaled_out
-        # TODO: impl
+        NUMBER_OF_KEYS.times.group_by { |i| i % HASH_TAG_FACTOR }.each_value do |numbers|
+          keys = numbers.map { |i| "{group#{i % HASH_TAG_FACTOR}}:key#{i}" }
+          got = @client.multi(watch: keys) do |tx|
+            keys.each { |key| tx.call('INCR', key) }
+          end
+
+          want = numbers.map { |i| (i + 1).to_s }
+          assert_equal(want, got, 'Case: INCR')
+        end
       end
 
       def do_test_after_scaled_in
-        # TODO: impl
+        NUMBER_OF_KEYS.times.group_by { |i| i % HASH_TAG_FACTOR }.each_value do |numbers|
+          keys = numbers.map { |i| "{group#{i % HASH_TAG_FACTOR}}:key#{i}" }
+          got = @client.multi(watch: keys) do |tx|
+            keys.each { |key| tx.call('INCR', key) }
+          end
+
+          want = numbers.map { |i| (i + 1).to_s }
+          assert_equal(want, got, 'Case: INCR')
+        end
       end
     end
   end
