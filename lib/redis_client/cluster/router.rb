@@ -35,54 +35,38 @@ class RedisClient
       end
 
       def send_command(method, command, *args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        cmd = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
-        case cmd
-        when 'ping'     then @node.send_ping(method, command, args).first.then(&TSF.call(block))
-        when 'wait'     then send_wait_command(method, command, args, &block)
-        when 'keys'     then @node.call_replicas(method, command, args).flatten.sort_by(&:to_s).then(&TSF.call(block))
-        when 'dbsize'   then @node.call_replicas(method, command, args).select { |e| e.is_a?(Integer) }.sum.then(&TSF.call(block))
-        when 'scan'     then scan(command, seed: 1)
-        when 'lastsave' then @node.call_all(method, command, args).sort_by(&:to_i).then(&TSF.call(block))
-        when 'role'     then @node.call_all(method, command, args, &block)
-        when 'config'   then send_config_command(method, command, args, &block)
-        when 'client'   then send_client_command(method, command, args, &block)
-        when 'cluster'  then send_cluster_command(method, command, args, &block)
-        when 'memory'   then send_memory_command(method, command, args, &block)
-        when 'script'   then send_script_command(method, command, args, &block)
-        when 'pubsub'   then send_pubsub_command(method, command, args, &block)
-        when 'watch'    then send_watch_command(command, &block)
-        when 'mset', 'mget', 'del'
-          send_multiple_keys_command(cmd, method, command, args, &block)
-        when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save'
-          @node.call_all(method, command, args).first.then(&TSF.call(block))
-        when 'flushall', 'flushdb'
-          @node.call_primaries(method, command, args).first.then(&TSF.call(block))
-        when 'readonly', 'readwrite', 'shutdown'
-          raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, cmd
-        when 'discard', 'exec', 'multi', 'unwatch'
-          raise ::RedisClient::Cluster::AmbiguousNodeError, cmd
-        else
-          node = assign_node(command)
-          try_send(node, method, command, args, &block)
+        handle_cluster_state_errors do
+          cmd = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
+          case cmd
+          when 'ping'     then @node.send_ping(method, command, args).first.then(&TSF.call(block))
+          when 'wait'     then send_wait_command(method, command, args, &block)
+          when 'keys'     then @node.call_replicas(method, command, args).flatten.sort_by(&:to_s).then(&TSF.call(block))
+          when 'dbsize'   then @node.call_replicas(method, command, args).select { |e| e.is_a?(Integer) }.sum.then(&TSF.call(block))
+          when 'scan'     then scan(command, seed: 1)
+          when 'lastsave' then @node.call_all(method, command, args).sort_by(&:to_i).then(&TSF.call(block))
+          when 'role'     then @node.call_all(method, command, args, &block)
+          when 'config'   then send_config_command(method, command, args, &block)
+          when 'client'   then send_client_command(method, command, args, &block)
+          when 'cluster'  then send_cluster_command(method, command, args, &block)
+          when 'memory'   then send_memory_command(method, command, args, &block)
+          when 'script'   then send_script_command(method, command, args, &block)
+          when 'pubsub'   then send_pubsub_command(method, command, args, &block)
+          when 'watch'    then send_watch_command(command, &block)
+          when 'mset', 'mget', 'del'
+            send_multiple_keys_command(cmd, method, command, args, &block)
+          when 'acl', 'auth', 'bgrewriteaof', 'bgsave', 'quit', 'save'
+            @node.call_all(method, command, args).first.then(&TSF.call(block))
+          when 'flushall', 'flushdb'
+            @node.call_primaries(method, command, args).first.then(&TSF.call(block))
+          when 'readonly', 'readwrite', 'shutdown'
+            raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, cmd
+          when 'discard', 'exec', 'multi', 'unwatch'
+            raise ::RedisClient::Cluster::AmbiguousNodeError, cmd
+          else
+            node = assign_node(command)
+            try_send(node, method, command, args, &block)
+          end
         end
-      rescue ::RedisClient::CircuitBreaker::OpenCircuitError
-        raise
-      rescue ::RedisClient::ConnectionError
-        renew_cluster_state
-        raise
-      rescue ::RedisClient::Cluster::Node::ReloadNeeded
-        renew_cluster_state
-        raise ::RedisClient::Cluster::NodeMightBeDown
-      rescue ::RedisClient::Cluster::ErrorCollection => e
-        raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
-
-        renew_cluster_state if e.errors.values.any? do |err|
-          next false if ::RedisClient::Cluster::ErrorIdentification.identifiable?(err) && @node.none? { |c| ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(err, c) }
-
-          err.message.start_with?('CLUSTERDOWN Hash slot not served') || err.is_a?(::RedisClient::ConnectionError)
-        end
-
-        raise
       end
 
       # @see https://redis.io/docs/reference/cluster-spec/#redirection-and-resharding Redirection and resharding
@@ -151,13 +135,12 @@ class RedisClient
 
         command[1] = raw_cursor.to_s
 
-        result_cursor, result_keys = client.call_v(command)
+        result_cursor, result_keys = handle_cluster_state_errors { client.call_v(command) }
         result_cursor = Integer(result_cursor)
 
         client_index += 1 if result_cursor == 0
 
         [((result_cursor << 8) + client_index).to_s, result_keys]
-        # TODO: implement @router.renew_cluster_state
       end
 
       def assign_node(command)
@@ -372,6 +355,31 @@ class RedisClient
                  else replies
                  end
         block_given? ? yield(result) : result
+      end
+
+      def handle_cluster_state_errors # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        yield
+      rescue ::RedisClient::CircuitBreaker::OpenCircuitError
+        raise
+      rescue ::RedisClient::Cluster::Node::ReloadNeeded
+        renew_cluster_state
+        raise ::RedisClient::Cluster::NodeMightBeDown
+      rescue ::RedisClient::ConnectionError
+        renew_cluster_state
+        raise
+      rescue ::RedisClient::CommandError => e
+        renew_cluster_state if e.message.start_with?('CLUSTERDOWN Hash slot not served')
+        raise
+      rescue ::RedisClient::Cluster::ErrorCollection => e
+        raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
+
+        renew_cluster_state if e.errors.values.any? do |err|
+          next false if ::RedisClient::Cluster::ErrorIdentification.identifiable?(err) && @node.none? { |c| ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(err, c) }
+
+          err.message.start_with?('CLUSTERDOWN Hash slot not served') || err.is_a?(::RedisClient::ConnectionError)
+        end
+
+        raise
       end
     end
   end

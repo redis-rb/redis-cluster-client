@@ -55,8 +55,7 @@ class RedisClient
           results = Array.new(commands.size)
           @pending_reads += size
           write_multi(commands)
-          redirection_indices = nil
-          first_exception = nil
+          redirection_indices = stale_cluster_state = first_exception = nil
 
           size.times do |index|
             timeout = timeouts && timeouts[index]
@@ -73,18 +72,31 @@ class RedisClient
               elsif exception
                 first_exception ||= result
               end
+
+              stale_cluster_state = true if result.message.start_with?('CLUSTERDOWN Hash slot not served')
             end
 
             results[index] = result
           end
 
-          raise first_exception if exception && first_exception
-          return results if redirection_indices.nil?
+          if redirection_indices
+            err = ::RedisClient::Cluster::Pipeline::RedirectionNeeded.new
+            err.replies = results
+            err.indices = redirection_indices
+            err.first_exception = first_exception
+            raise err
+          end
 
-          err = ::RedisClient::Cluster::Pipeline::RedirectionNeeded.new
-          err.replies = results
-          err.indices = redirection_indices
-          raise err
+          if stale_cluster_state
+            err = ::RedisClient::Cluster::Pipeline::StaleClusterState.new
+            err.replies = results
+            err.first_exception = first_exception
+            raise err
+          end
+
+          raise first_exception if first_exception
+
+          results
         end
       end
 
@@ -98,8 +110,12 @@ class RedisClient
 
       ReplySizeError = Class.new(::RedisClient::Error)
 
+      class StaleClusterState < ::RedisClient::Error
+        attr_accessor :replies, :first_exception
+      end
+
       class RedirectionNeeded < ::RedisClient::Error
-        attr_accessor :replies, :indices
+        attr_accessor :replies, :indices, :first_exception
       end
 
       def initialize(router, command_builder, concurrent_worker, exception:, seed: Random.new_seed)
@@ -166,13 +182,16 @@ class RedisClient
           end
         end
 
-        all_replies = errors = required_redirections = nil
+        all_replies = errors = required_redirections = cluster_state_errors = nil
 
         work_group.each do |node_key, v|
           case v
           when ::RedisClient::Cluster::Pipeline::RedirectionNeeded
             required_redirections ||= {}
             required_redirections[node_key] = v
+          when ::RedisClient::Cluster::Pipeline::StaleClusterState
+            cluster_state_errors ||= {}
+            cluster_state_errors[node_key] = v
           when StandardError
             errors ||= {}
             errors[node_key] = v
@@ -183,14 +202,23 @@ class RedisClient
         end
 
         work_group.close
-        # TODO: implement @router.renew_cluster_state
+        @router.renew_cluster_state if cluster_state_errors
         raise ::RedisClient::Cluster::ErrorCollection, errors unless errors.nil?
 
         required_redirections&.each do |node_key, v|
+          raise v.first_exception if v.first_exception
+
           all_replies ||= Array.new(@size)
           pipeline = @pipelines[node_key]
           v.indices.each { |i| v.replies[i] = handle_redirection(v.replies[i], pipeline, i) }
           pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
+        end
+
+        cluster_state_errors&.each do |node_key, v|
+          raise v.first_exception if v.first_exception
+
+          all_replies ||= Array.new(@size)
+          @pipelines[node_key].outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
         end
 
         all_replies
