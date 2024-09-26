@@ -189,7 +189,7 @@ class RedisClient
       end
 
       def find_node(node_key)
-        @node.find_by(node_key)
+        handle_node_reload_error { @node.find_by(node_key) }
       end
 
       def command_exists?(name)
