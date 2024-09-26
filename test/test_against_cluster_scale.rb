@@ -261,17 +261,14 @@ module TestAgainstClusterScale
 
       def do_test_after_scaled_in
         all_keys = Array.new(NUMBER_OF_KEYS) { |i| ["key#{i}", "{group#{i / HASH_TAG_GRAIN}}:key#{i}"] }.flatten.sort
+        count = 0
 
-        retryable(attempts: 3) do
-          count = 0
-
-          @client.scan do |key|
-            count += 1
-            assert_includes(all_keys, key, 'Case: key')
-          end
-
-          assert_equal(all_keys.size, count, 'Case: count')
+        @client.scan do |key|
+          count += 1
+          assert_includes(all_keys, key, 'Case: key')
         end
+
+        assert_equal(all_keys.size, count, 'Case: count')
       end
     end
   end

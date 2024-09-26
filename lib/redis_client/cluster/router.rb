@@ -135,7 +135,7 @@ class RedisClient
 
         command[1] = raw_cursor.to_s
 
-        result_cursor, result_keys = handle_cluster_state_errors { client.call_v(command) }
+        result_cursor, result_keys = client.call_v(command)
         result_cursor = Integer(result_cursor)
 
         client_index += 1 if result_cursor == 0
