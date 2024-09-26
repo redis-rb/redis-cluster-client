@@ -223,25 +223,12 @@ module TestAgainstClusterScale
       end
 
       def do_test_after_scaled_out
-        NUMBER_OF_KEYS.times.group_by { |i| i / HASH_TAG_GRAIN }.each do |group, numbers|
-          channels = numbers.map { |i| "{group#{group}}:channel#{i}" }
+        NUMBER_OF_KEYS.times do |i|
           pubsub = @client.pubsub
-          pubsub.call('SSUBSCRIBE', *channels)
-
-          channels.each_with_index do |c, i|
-            event = pubsub.next_event(0.01)
-            break if event.nil?
-
-            assert_equal(['ssubscribe', c, i + 1], event)
-          end
-
-          channels.each_with_index do |c, i| # rubocop:disable Style/CombinableLoops
-            event = pubsub.next_event(0.01)
-            break if event.nil?
-
-            assert_equal(['ssubscribe', c, i + 1], event)
-          end
-
+          pubsub.call('SSUBSCRIBE', "chan#{i}")
+          event = pubsub.next_event(0.01)
+          event = pubsub.next_event(0.01) if event.nil? # state changed
+          assert_equal(['ssubscribe', "chan#{i}", 1], event)
           assert_nil(pubsub.next_event(0.01))
         ensure
           pubsub&.close
@@ -249,29 +236,7 @@ module TestAgainstClusterScale
       end
 
       def do_test_after_scaled_in
-        NUMBER_OF_KEYS.times.group_by { |i| i / HASH_TAG_GRAIN }.each do |group, numbers|
-          channels = numbers.map { |i| "{group#{group}}:channel#{i}" }
-          pubsub = @client.pubsub
-          pubsub.call('SSUBSCRIBE', *channels)
-
-          channels.each_with_index do |c, i|
-            event = pubsub.next_event(0.01)
-            break if event.nil?
-
-            assert_equal(['ssubscribe', c, i + 1], event)
-          end
-
-          channels.each_with_index do |c, i| # rubocop:disable Style/CombinableLoops
-            event = pubsub.next_event(0.01)
-            break if event.nil?
-
-            assert_equal(['ssubscribe', c, i + 1], event)
-          end
-
-          assert_nil(pubsub.next_event(0.01))
-        ensure
-          pubsub&.close
-        end
+        do_test_after_scaled_out # auto retry
       end
     end
   end
