@@ -42,6 +42,7 @@ jobs:
           - {task: test_cluster_scale, pattern: 'Pipeline', compose: compose.scale.yaml, startup: '8'}
           - {task: test_cluster_scale, pattern: 'Transaction', compose: compose.scale.yaml, startup: '8'}
           - {task: test_cluster_scale, pattern: 'PubSub', compose: compose.scale.yaml, startup: '8'}
+          - {task: test_cluster_scale, pattern: 'Scan', compose: compose.scale.yaml, startup: '8'}
           - {ruby: 'jruby'}
           - {ruby: 'truffleruby'}
           - {task: test_cluster_state, pattern: 'PrimaryOnly', compose: compose.valkey.yaml, redis: '8', replica: '2', startup: '9'}

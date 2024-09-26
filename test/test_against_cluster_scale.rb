@@ -238,4 +238,41 @@ module TestAgainstClusterScale
       alias do_test_after_scaled_in do_test_after_scaled_out
     end
   end
+
+  if PATTERN == 'Scan' || PATTERN.empty?
+    class Scan < TestingWrapper
+      include Mixin
+
+      def self.test_order
+        :alpha
+      end
+
+      def do_test_after_scaled_out
+        all_keys = NUMBER_OF_KEYS.map { |i| "key#{i}" }
+        count = 0
+
+        @client.scan do |key|
+          count += 1
+          assert_includes(all_keys, key, 'Case: key')
+        end
+
+        assert_equal(all_keys.size, count, 'Case: count')
+      end
+
+      def do_test_after_scaled_in
+        all_keys = NUMBER_OF_KEYS.map { |i| "key#{i}" }
+
+        retryable(attempts: 3) do
+          count = 0
+
+          @client.scan do |key|
+            count += 1
+            assert_includes(all_keys, key, 'Case: key')
+          end
+
+          assert_equal(all_keys.size, count, 'Case: count')
+        end
+      end
+    end
+  end
 end
