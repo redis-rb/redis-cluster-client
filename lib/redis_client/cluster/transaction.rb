@@ -122,7 +122,7 @@ class RedisClient
         end
       end
 
-      def send_pipeline(client, redirect:)
+      def send_pipeline(client, redirect:) # rubocop:disable Metrics/AbcSize
         replies = client.ensure_connected_cluster_scoped(retryable: @retryable) do |connection|
           commands = @pipeline._commands
           client.middlewares.call_pipelined(commands, client.config) do
@@ -138,6 +138,9 @@ class RedisClient
         return if replies.last.nil?
 
         coerce_results!(replies.last)
+      rescue ::RedisClient::ConnectionError
+        @router.renew_cluster_state if @watching_slot.nil?
+        raise
       end
 
       def coerce_results!(results, offset: 1)
@@ -167,6 +170,9 @@ class RedisClient
         elsif err.message.start_with?('ASK')
           node = @router.assign_asking_node(err.message)
           try_asking(node) ? send_transaction(node, redirect: redirect - 1) : err
+        elsif err.message.start_with?('CLUSTERDOWN Hash slot not served')
+          @router.renew_cluster_state if @watching_slot.nil?
+          raise err
         else
           raise err
         end
