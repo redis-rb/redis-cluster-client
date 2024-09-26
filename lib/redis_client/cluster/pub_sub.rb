@@ -24,6 +24,8 @@ class RedisClient
         def close
           @worker.exit if @worker&.alive?
           @client.close
+        rescue ::RedisClient::ConnectionError
+          # ignore
         end
 
         private
@@ -51,27 +53,33 @@ class RedisClient
         @command_builder = command_builder
         @queue = SizedQueue.new(BUF_SIZE)
         @state_dict = {}
+        @commands = []
       end
 
       def call(*args, **kwargs)
-        _call(@command_builder.generate(args, kwargs))
+        command = @command_builder.generate(args, kwargs)
+        _call(command)
+        @commands << command
         nil
       end
 
       def call_v(command)
-        _call(@command_builder.generate(command))
+        command = @command_builder.generate(command)
+        _call(command)
+        @commands << command
         nil
       end
 
       def close
         @state_dict.each_value(&:close)
         @state_dict.clear
+        @commands.clear
         @queue.clear
         @queue.close
         nil
       end
 
-      def next_event(timeout = nil)
+      def next_event(timeout = nil) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
         @state_dict.each_value(&:ensure_worker)
         max_duration = calc_max_duration(timeout)
         starting = obtain_current_time
@@ -80,6 +88,13 @@ class RedisClient
           break if max_duration > 0 && obtain_current_time - starting > max_duration
 
           case event = @queue.pop(true)
+          when ::RedisClient::CommandError
+            if event.message.start_with?('MOVED', 'CLUSTERDOWN Hash slot not served')
+              @router.renew_cluster_state
+              break start_over
+            end
+
+            raise event
           when StandardError then raise event
           when Array then break event
           end
@@ -99,13 +114,26 @@ class RedisClient
         end
       end
 
-      def call_to_single_state(command)
+      def call_to_single_state(command, retry_count: 1)
         node_key = @router.find_node_key(command)
-        try_call(node_key, command)
+        @state_dict[node_key] ||= State.new(@router.find_node(node_key).pubsub, @queue)
+        @state_dict[node_key].call(command)
+      rescue ::RedisClient::ConnectionError
+        @state_dict[node_key].close
+        @state_dict.delete(node_key)
+        @router.renew_cluster_state
+        retry_count -= 1
+        retry_count >= 0 ? retry : raise
       end
 
       def call_to_all_states(command)
-        @state_dict.each_value { |s| s.call(command) }
+        @state_dict.each do |node_key, state|
+          state.call(command)
+        rescue ::RedisClient::ConnectionError
+          @state_dict[node_key].close
+          @state_dict.delete(node_key)
+          @router.renew_cluster_state
+        end
       end
 
       def call_for_sharded_states(command)
@@ -116,30 +144,19 @@ class RedisClient
         end
       end
 
-      def try_call(node_key, command, retry_count: 1)
-        add_state(node_key).call(command)
-      rescue ::RedisClient::CommandError => e
-        raise if !e.message.start_with?('MOVED') || retry_count <= 0
-
-        # for sharded pub/sub
-        node_key = e.message.split[2]
-        retry_count -= 1
-        retry
-      end
-
-      def add_state(node_key)
-        return @state_dict[node_key] if @state_dict.key?(node_key)
-
-        state = State.new(@router.find_node(node_key).pubsub, @queue)
-        @state_dict[node_key] = state
-      end
-
       def obtain_current_time
         Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond)
       end
 
       def calc_max_duration(timeout)
         timeout.nil? || timeout < 0 ? 0 : timeout * 1_000_000
+      end
+
+      def start_over
+        @state_dict.each_value(&:close)
+        @state_dict.clear
+        @commands.each { |command| _call(command) }
+        nil
       end
     end
   end

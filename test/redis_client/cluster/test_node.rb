@@ -352,7 +352,7 @@ class RedisClient
         assert_equal(want, got, 'Case: scale read')
       end
 
-      def test_clients_for_scanning # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      def test_clients_for_scanning
         test_config = @test_node.instance_variable_get(:@config)
         want = @test_node_info_list.select(&:primary?)
                                    .map(&:node_key)

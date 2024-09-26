@@ -32,7 +32,7 @@ class RedisClient
       def initialize(errors)
         @errors = {}
         if !errors.is_a?(Hash) || errors.empty?
-          super('')
+          super(errors.to_s)
           return
         end
 

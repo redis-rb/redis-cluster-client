@@ -29,7 +29,7 @@ class RedisClient
         @pool = pool
         @client_kwargs = kwargs
         @node = ::RedisClient::Cluster::Node.new(concurrent_worker, config: config, pool: pool, **kwargs)
-        @node.reload!
+        renew_cluster_state
         @command = ::RedisClient::Cluster::Command.load(@node.replica_clients.shuffle, slow_command_timeout: config.slow_command_timeout)
         @command_builder = @config.command_builder
       end
@@ -68,15 +68,21 @@ class RedisClient
       rescue ::RedisClient::CircuitBreaker::OpenCircuitError
         raise
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
-        @node.reload!
+        renew_cluster_state
         raise ::RedisClient::Cluster::NodeMightBeDown
+      rescue ::RedisClient::ConnectionError
+        renew_cluster_state
+        raise
+      rescue ::RedisClient::CommandError => e
+        renew_cluster_state if e.message.start_with?('CLUSTERDOWN Hash slot not served')
+        raise
       rescue ::RedisClient::Cluster::ErrorCollection => e
         raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
 
-        @node.reload! if e.errors.values.any? do |err|
+        renew_cluster_state if e.errors.values.any? do |err|
           next false if ::RedisClient::Cluster::ErrorIdentification.identifiable?(err) && @node.none? { |c| ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(err, c) }
 
-          err.message.start_with?('CLUSTERDOWN Hash slot not served')
+          err.message.start_with?('CLUSTERDOWN Hash slot not served') || err.is_a?(::RedisClient::ConnectionError)
         end
 
         raise
@@ -118,7 +124,7 @@ class RedisClient
             retry
           end
         elsif e.message.start_with?('CLUSTERDOWN Hash slot not served')
-          @node.reload!
+          renew_cluster_state
           retry if retry_count >= 0
         end
 
@@ -127,7 +133,7 @@ class RedisClient
         raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
 
         retry_count -= 1
-        @node.reload!
+        renew_cluster_state
         retry if retry_count >= 0
         raise
       end
@@ -154,11 +160,16 @@ class RedisClient
         client_index += 1 if result_cursor == 0
 
         [((result_cursor << 8) + client_index).to_s, result_keys]
+      rescue ::RedisClient::ConnectionError
+        renew_cluster_state
+        raise
       end
 
       def assign_node(command)
-        node_key = find_node_key(command)
-        find_node(node_key)
+        handle_node_reload_error do
+          node_key = find_node_key(command)
+          @node.find_by(node_key)
+        end
       end
 
       def find_node_key_by_key(key, seed: nil, primary: false)
@@ -171,8 +182,10 @@ class RedisClient
       end
 
       def find_primary_node_by_slot(slot)
-        node_key = @node.find_node_key_of_primary(slot)
-        find_node(node_key)
+        handle_node_reload_error do
+          node_key = @node.find_node_key_of_primary(slot)
+          @node.find_by(node_key)
+        end
       end
 
       def find_node_key(command, seed: nil)
@@ -197,14 +210,8 @@ class RedisClient
         ::RedisClient::Cluster::KeySlotConverter.convert(key)
       end
 
-      def find_node(node_key, retry_count: 1)
-        @node.find_by(node_key)
-      rescue ::RedisClient::Cluster::Node::ReloadNeeded
-        raise ::RedisClient::Cluster::NodeMightBeDown if retry_count <= 0
-
-        retry_count -= 1
-        @node.reload!
-        retry
+      def find_node(node_key)
+        handle_node_reload_error { @node.find_by(node_key) }
       end
 
       def command_exists?(name)
@@ -215,16 +222,20 @@ class RedisClient
         _, slot, node_key = err_msg.split
         slot = slot.to_i
         @node.update_slot(slot, node_key)
-        find_node(node_key)
+        handle_node_reload_error { @node.find_by(node_key) }
       end
 
       def assign_asking_node(err_msg)
         _, _, node_key = err_msg.split
-        find_node(node_key)
+        handle_node_reload_error { @node.find_by(node_key) }
       end
 
       def node_keys
         @node.node_keys
+      end
+
+      def renew_cluster_state
+        @node.reload!
       end
 
       def close
@@ -241,7 +252,7 @@ class RedisClient
         raise if e.errors.values.none? { |err| err.message.include?('WAIT cannot be used with replica instances') }
 
         retry_count -= 1
-        @node.reload!
+        renew_cluster_state
         retry
       end
 
@@ -270,7 +281,7 @@ class RedisClient
         end
       end
 
-      def send_cluster_command(method, command, args, &block)
+      def send_cluster_command(method, command, args, &block) # rubocop:disable Metrics/AbcSize
         case subcommand = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'addslots', 'delslots', 'failover', 'forget', 'meet', 'replicate',
              'reset', 'set-config-epoch', 'setslot'
@@ -279,7 +290,10 @@ class RedisClient
         when 'getkeysinslot'
           raise ArgumentError, command.join(' ') if command.size != 4
 
-          find_node(@node.find_node_key_of_replica(command[2])).public_send(method, *args, command, &block)
+          handle_node_reload_error do
+            node_key = @node.find_node_key_of_replica(command[2])
+            @node.find_by(node_key).public_send(method, *args, command, &block)
+          end
         else assign_node(command).public_send(method, *args, command, &block)
         end
       end
@@ -364,6 +378,16 @@ class RedisClient
                  else replies
                  end
         block_given? ? yield(result) : result
+      end
+
+      def handle_node_reload_error(retry_count: 1)
+        yield
+      rescue ::RedisClient::Cluster::Node::ReloadNeeded
+        raise ::RedisClient::Cluster::NodeMightBeDown if retry_count <= 0
+
+        retry_count -= 1
+        renew_cluster_state
+        retry
       end
     end
   end

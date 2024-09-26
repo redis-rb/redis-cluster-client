@@ -11,7 +11,7 @@ class RedisClient
         @asking = false
       end
 
-      def watch(keys)
+      def watch(keys) # rubocop:disable Metrics/AbcSize
         slot = find_slot(keys)
         raise ::RedisClient::Cluster::Transaction::ConsistencyError, "unsafe watch: #{keys.join(' ')}" if slot.nil?
 
@@ -32,7 +32,13 @@ class RedisClient
                 c.call('UNWATCH')
                 raise
               end
+            rescue ::RedisClient::CommandError => e
+              @router.renew_cluster_state if e.message.start_with?('CLUSTERDOWN Hash slot not served')
+              raise
             end
+          rescue ::RedisClient::ConnectionError
+            @router.renew_cluster_state
+            raise
           end
         end
       end

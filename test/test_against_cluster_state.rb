@@ -3,10 +3,11 @@
 require 'testing_helper'
 
 module TestAgainstClusterState
-  SLOT_SIZE = 16_384
   PATTERN = ENV.fetch('TEST_CLASS_PATTERN', '')
 
   module Mixin
+    SLOT_SIZE = 16_384
+
     def setup
       @controller = ClusterController.new(
         TEST_NODE_URIS,
