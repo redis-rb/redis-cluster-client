@@ -248,7 +248,7 @@ module TestAgainstClusterScale
       end
 
       def do_test_after_scaled_out
-        all_keys = NUMBER_OF_KEYS.map { |i| "key#{i}" }
+        all_keys = Array.new(NUMBER_OF_KEYS) { |i| "key#{i}" }
         count = 0
 
         @client.scan do |key|
@@ -260,7 +260,7 @@ module TestAgainstClusterScale
       end
 
       def do_test_after_scaled_in
-        all_keys = NUMBER_OF_KEYS.map { |i| "key#{i}" }
+        all_keys = Array.new(NUMBER_OF_KEYS) { |i| "key#{i}" }
 
         retryable(attempts: 3) do
           count = 0
