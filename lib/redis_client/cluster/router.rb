@@ -175,7 +175,12 @@ class RedisClient
       def find_node_key_by_key(key, seed: nil, primary: false)
         if key && !key.empty?
           slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
-          primary ? @node.find_node_key_of_primary(slot) : @node.find_node_key_of_replica(slot)
+          node_key = primary ? @node.find_node_key_of_primary(slot) : @node.find_node_key_of_replica(slot)
+          if node_key.nil?
+            renew_cluster_state
+            raise ::RedisClient::Cluster::NodeMightBeDown
+          end
+          node_key
         else
           primary ? @node.any_primary_node_key(seed: seed) : @node.any_replica_node_key(seed: seed)
         end

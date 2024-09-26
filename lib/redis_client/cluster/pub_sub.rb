@@ -89,12 +89,13 @@ class RedisClient
 
           case event = @queue.pop(true)
           when ::RedisClient::CommandError
-            if event.message.start_with?('MOVED', 'CLUSTERDOWN Hash slot not served')
-              @router.renew_cluster_state
-              break start_over
-            end
+            raise event unless event.message.start_with?('MOVED', 'CLUSTERDOWN Hash slot not served')
 
-            raise event
+            @router.renew_cluster_state
+            break start_over
+          when ::RedisClient::ConnectionError
+            @router.renew_cluster_state
+            break start_over
           when StandardError then raise event
           when Array then break event
           end
@@ -114,25 +115,20 @@ class RedisClient
         end
       end
 
-      def call_to_single_state(command, retry_count: 1)
+      def call_to_single_state(command)
         node_key = @router.find_node_key(command)
-        @state_dict[node_key] ||= State.new(@router.find_node(node_key).pubsub, @queue)
-        @state_dict[node_key].call(command)
-      rescue ::RedisClient::ConnectionError
-        @state_dict[node_key].close
-        @state_dict.delete(node_key)
-        @router.renew_cluster_state
-        retry_count -= 1
-        retry_count >= 0 ? retry : raise
+
+        handle_connection_error(node_key) do
+          @state_dict[node_key] ||= State.new(@router.find_node(node_key).pubsub, @queue)
+          @state_dict[node_key].call(command)
+        end
       end
 
       def call_to_all_states(command)
         @state_dict.each do |node_key, state|
-          state.call(command)
-        rescue ::RedisClient::ConnectionError
-          @state_dict[node_key].close
-          @state_dict.delete(node_key)
-          @router.renew_cluster_state
+          handle_connection_error(node_key, ignore: true) do
+            state.call(command)
+          end
         end
       end
 
@@ -152,10 +148,27 @@ class RedisClient
         timeout.nil? || timeout < 0 ? 0 : timeout * 1_000_000
       end
 
+      def handle_connection_error(node_key, ignore: false)
+        yield
+      rescue ::RedisClient::ConnectionError
+        @state_dict[node_key].close
+        @state_dict.delete(node_key)
+        @router.renew_cluster_state
+        raise unless ignore
+      end
+
       def start_over
         @state_dict.each_value(&:close)
         @state_dict.clear
-        @commands.each { |command| _call(command) }
+        @commands.each do |command|
+          loop do
+            _call(command)
+            break
+          rescue ::RedisClient::ConnectionError
+            sleep 1.0
+          end
+        end
+
         nil
       end
     end
