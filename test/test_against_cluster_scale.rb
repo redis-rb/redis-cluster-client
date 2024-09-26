@@ -248,7 +248,7 @@ module TestAgainstClusterScale
       end
 
       def do_test_after_scaled_out
-        all_keys = NUMBER_OF_KEYS.flat_map { |i| ["key#{i}", "{group#{i / HASH_TAG_GRAIN}}:key#{i}"] }.sort
+        all_keys = Array.new(NUMBER_OF_KEYS) { |i| ["key#{i}", "{group#{i / HASH_TAG_GRAIN}}:key#{i}"] }.flatten.sort
         count = 0
 
         @client.scan do |key|
@@ -260,7 +260,7 @@ module TestAgainstClusterScale
       end
 
       def do_test_after_scaled_in
-        all_keys = NUMBER_OF_KEYS.flat_map { |i| ["key#{i}", "{group#{i / HASH_TAG_GRAIN}}:key#{i}"] }.sort
+        all_keys = Array.new(NUMBER_OF_KEYS) { |i| ["key#{i}", "{group#{i / HASH_TAG_GRAIN}}:key#{i}"] }.flatten.sort
 
         retryable(attempts: 3) do
           count = 0
