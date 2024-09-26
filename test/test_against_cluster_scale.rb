@@ -227,7 +227,7 @@ module TestAgainstClusterScale
           channels = numbers.map { |i| "{group#{group}}:channel#{i}" }
           pubsub = @client.pubsub
           pubsub.call('SSUBSCRIBE', *channels)
-          channels.each { |c| assert_equal(['ssubscribe', c, 1], pubsub.next_event(0.01)) }
+          channels.each_with_index { |c, i| assert_equal(['ssubscribe', c, i + 1], pubsub.next_event(0.01)) }
           assert_nil(pubsub.next_event(0.01))
         ensure
           pubsub&.close
@@ -239,7 +239,7 @@ module TestAgainstClusterScale
           channels = numbers.map { |i| "{group#{group}}:channel#{i}" }
           pubsub = @client.pubsub
           pubsub.call('SSUBSCRIBE', *channels)
-          channels.each { |c| assert_equal(['ssubscribe', c, 1], pubsub.next_event(0.01)) }
+          channels.each_with_index { |c, i| assert_equal(['ssubscribe', c, i + 1], pubsub.next_event(0.01)) }
           assert_nil(pubsub.next_event(0.01))
         ensure
           pubsub&.close
