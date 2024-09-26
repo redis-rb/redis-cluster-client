@@ -189,7 +189,7 @@ module TestAgainstClusterScale
       def do_test_after_scaled_out
         NUMBER_OF_KEYS.times.group_by { |i| i / HASH_TAG_GRAIN }.each_value do |numbers|
           keys = numbers.map { |i| "{group#{i / HASH_TAG_GRAIN}}:key#{i}" }
-          got = @client.multi(watch: keys) do |tx|
+          got = @client.multi(watch: (i / HASH_TAG_GRAIN).odd? ? nil : keys) do |tx|
             keys.each { |key| tx.call('INCR', key) }
           end
 
@@ -201,8 +201,10 @@ module TestAgainstClusterScale
       def do_test_after_scaled_in
         NUMBER_OF_KEYS.times.group_by { |i| i / HASH_TAG_GRAIN }.each_value do |numbers|
           keys = numbers.map { |i| "{group#{i / HASH_TAG_GRAIN}}:key#{i}" }
-          got = @client.multi(watch: keys) do |tx|
-            keys.each { |key| tx.call('INCR', key) }
+          got = retryable(attempts: MAX_ATTEMPTS) do
+            @client.multi(watch: (i / HASH_TAG_GRAIN).odd? ? nil : keys) do |tx|
+              keys.each { |key| tx.call('INCR', key) }
+            end
           end
 
           want = numbers.map { |i| (i + 2) }
