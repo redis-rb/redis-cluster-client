@@ -737,7 +737,7 @@ class RedisClient
         end
       end
 
-      def test_dedicated_commands # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      def test_dedicated_commands
         10.times { |i| @client.call('SET', "key#{i}", i) }
         wait_for_replication
         [

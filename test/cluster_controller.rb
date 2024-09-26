@@ -105,7 +105,7 @@ class ClusterController
     wait_cluster_recovering(@clients, max_attempts: @max_attempts)
   end
 
-  def start_resharding(slot:, src_node_key:, dest_node_key:) # rubocop:disable Metrics/CyclomaticComplexity
+  def start_resharding(slot:, src_node_key:, dest_node_key:)
     rows = associate_with_clients_and_nodes(@clients)
     src_info = rows.find { |r| r.node_key == src_node_key || r.client_node_key == src_node_key }
     dest_info = rows.find { |r| r.node_key == dest_node_key || r.client_node_key == dest_node_key }
@@ -140,7 +140,7 @@ class ClusterController
     wait_replication_delay(@clients, replica_size: @replica_size, timeout: @timeout)
   end
 
-  def finish_resharding(slot:, src_node_key:, dest_node_key:) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  def finish_resharding(slot:, src_node_key:, dest_node_key:)
     rows = associate_with_clients_and_nodes(@clients)
     src_info = rows.find { |r| r.node_key == src_node_key || r.client_node_key == src_node_key }
     dest_info = rows.find { |r| r.node_key == dest_node_key || r.client_node_key == dest_node_key }
@@ -161,7 +161,7 @@ class ClusterController
     wait_replication_delay(@clients, replica_size: @replica_size, timeout: @timeout)
   end
 
-  def scale_out(primary_url:, replica_url:) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  def scale_out(primary_url:, replica_url:)
     # @see https://redis.io/docs/manual/scaling/
     rows = associate_with_clients_and_nodes(@clients)
     target_host, target_port = rows.find(&:primary?)&.node_key&.split(':')
@@ -193,7 +193,7 @@ class ClusterController
     end
   end
 
-  def scale_in # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  def scale_in
     rows = associate_with_clients_and_nodes(@clients)
 
     primary_info = rows.reject(&:empty_slots?).min_by(&:slot_size)
@@ -465,7 +465,7 @@ class ClusterController
     end
   end
 
-  def parse_cluster_nodes(rows) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  def parse_cluster_nodes(rows)
     rows.map do |row|
       flags = row[2].split(',')
       slots = if row[8].nil?
