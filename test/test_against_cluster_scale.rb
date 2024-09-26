@@ -223,11 +223,25 @@ module TestAgainstClusterScale
       end
 
       def do_test_after_scaled_out
-        # TODO: impl
+        NUMBER_OF_KEYS.times.group_by { |i| i / HASH_TAG_GRAIN }.each do |group, numbers|
+          channels = numbers.map { |i| "{group#{group}}:channel#{i}" }
+          pubsub = @client.pubsub
+          pubsub.call('SSUBSCRIBE', *channels)
+          assert_equal(['ssubscribe', 'what?', 1], pubsub.next_event(0.01))
+        ensure
+          pubsub&.close
+        end
       end
 
       def do_test_after_scaled_in
-        # TODO: impl
+        NUMBER_OF_KEYS.times.group_by { |i| i / HASH_TAG_GRAIN }.each do |group, numbers|
+          channels = numbers.map { |i| "{group#{group}}:channel#{i}" }
+          pubsub = @client.pubsub
+          pubsub.call('SSUBSCRIBE', *channels)
+          assert_equal(['ssubscribe', 'what?', 1], pubsub.next_event(0.01))
+        ensure
+          pubsub&.close
+        end
       end
     end
   end
