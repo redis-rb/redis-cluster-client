@@ -223,7 +223,7 @@ module TestAgainstClusterScale
       end
 
       def do_test_after_scaled_out
-        NUMBER_OF_KEYS.times do |i|
+        1000.times do |i|
           pubsub = @client.pubsub
           pubsub.call('SSUBSCRIBE', "chan#{i}")
           event = pubsub.next_event(0.01)
@@ -235,9 +235,7 @@ module TestAgainstClusterScale
         end
       end
 
-      def do_test_after_scaled_in
-        do_test_after_scaled_out # auto retry
-      end
+      alias do_test_after_scaled_in do_test_after_scaled_out
     end
   end
 end
