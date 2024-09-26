@@ -14,6 +14,14 @@ Metrics/AbcSize:
   Exclude:
     - 'test/**/*'
 
+Metrics/CyclomaticComplexity:
+  Exclude:
+    - 'test/**/*'
+
+Metrics/PerceivedComplexity:
+  Exclude:
+    - 'test/**/*'
+
 Metrics/ClassLength:
   Max: 500
 

@@ -227,7 +227,21 @@ module TestAgainstClusterScale
           channels = numbers.map { |i| "{group#{group}}:channel#{i}" }
           pubsub = @client.pubsub
           pubsub.call('SSUBSCRIBE', *channels)
-          channels.each_with_index { |c, i| assert_equal(['ssubscribe', c, i + 1], pubsub.next_event(0.01)) }
+
+          channels.each_with_index do |c, i|
+            event = pubsub.next_event(0.01)
+            break if event.nil?
+
+            assert_equal(['ssubscribe', c, i + 1], event)
+          end
+
+          channels.each_with_index do |c, i| # rubocop:disable Style/CombinableLoops
+            event = pubsub.next_event(0.01)
+            break if event.nil?
+
+            assert_equal(['ssubscribe', c, i + 1], event)
+          end
+
           assert_nil(pubsub.next_event(0.01))
         ensure
           pubsub&.close
@@ -239,7 +253,21 @@ module TestAgainstClusterScale
           channels = numbers.map { |i| "{group#{group}}:channel#{i}" }
           pubsub = @client.pubsub
           pubsub.call('SSUBSCRIBE', *channels)
-          channels.each_with_index { |c, i| assert_equal(['ssubscribe', c, i + 1], pubsub.next_event(0.01)) }
+
+          channels.each_with_index do |c, i|
+            event = pubsub.next_event(0.01)
+            break if event.nil?
+
+            assert_equal(['ssubscribe', c, i + 1], event)
+          end
+
+          channels.each_with_index do |c, i| # rubocop:disable Style/CombinableLoops
+            event = pubsub.next_event(0.01)
+            break if event.nil?
+
+            assert_equal(['ssubscribe', c, i + 1], event)
+          end
+
           assert_nil(pubsub.next_event(0.01))
         ensure
           pubsub&.close
