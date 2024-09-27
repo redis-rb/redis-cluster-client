@@ -73,7 +73,7 @@ class RedisClient
                 first_exception ||= result
               end
 
-              stale_cluster_state = true if result.message.start_with?('CLUSTERDOWN Hash slot not served')
+              stale_cluster_state = true if result.message.start_with?('CLUSTERDOWN')
             end
 
             results[index] = result

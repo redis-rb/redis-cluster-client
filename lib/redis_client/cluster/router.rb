@@ -74,7 +74,7 @@ class RedisClient
         renew_cluster_state
         raise
       rescue ::RedisClient::CommandError => e
-        renew_cluster_state if e.message.start_with?('CLUSTERDOWN Hash slot not served')
+        renew_cluster_state if e.message.start_with?('CLUSTERDOWN')
         raise
       rescue ::RedisClient::Cluster::ErrorCollection => e
         raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
@@ -82,7 +82,7 @@ class RedisClient
         renew_cluster_state if e.errors.values.any? do |err|
           next false if ::RedisClient::Cluster::ErrorIdentification.identifiable?(err) && @node.none? { |c| ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(err, c) }
 
-          err.message.start_with?('CLUSTERDOWN Hash slot not served') || err.is_a?(::RedisClient::ConnectionError)
+          err.message.start_with?('CLUSTERDOWN') || err.is_a?(::RedisClient::ConnectionError)
         end
 
         raise
@@ -123,7 +123,7 @@ class RedisClient
             node.call('ASKING')
             retry
           end
-        elsif e.message.start_with?('CLUSTERDOWN Hash slot not served')
+        elsif e.message.start_with?('CLUSTERDOWN')
           renew_cluster_state
           retry if retry_count >= 0
         end

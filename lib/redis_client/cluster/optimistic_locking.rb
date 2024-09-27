@@ -33,7 +33,7 @@ class RedisClient
                 raise
               end
             rescue ::RedisClient::CommandError => e
-              @router.renew_cluster_state if e.message.start_with?('CLUSTERDOWN Hash slot not served')
+              @router.renew_cluster_state if e.message.start_with?('CLUSTERDOWN')
               raise
             end
           rescue ::RedisClient::ConnectionError

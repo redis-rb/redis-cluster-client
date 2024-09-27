@@ -37,8 +37,8 @@ class RedisClient
         end
 
         @errors = errors
-        messages = @errors.map { |node_key, error| "#{node_key}: #{error.message}" }
-        super("Errors occurred on any node: #{messages.join(', ')}")
+        messages = @errors.map { |node_key, error| "#{node_key}: (#{error.class}) #{error.message}" }
+        super(messages.join(', '))
       end
     end
 

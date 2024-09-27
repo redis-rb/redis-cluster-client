@@ -1,0 +1,108 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'bundler/setup'
+require 'redis_cluster_client'
+
+module SinglePipTxDebug
+  module_function
+
+  def spawn_single(cli)
+    Thread.new(cli) do |r|
+      role = '     Single'
+
+      loop do
+        handle_errors(role) do
+          reply = r.call('incr', 'single')
+          log "#{role}: #{reply}"
+        end
+      ensure
+        sleep 1.0
+      end
+    rescue StandardError => e
+      log "#{role}: dead: #{e.class}: #{e.message}"
+      raise
+    end
+  end
+
+  def spawn_pipeline(cli)
+    Thread.new(cli) do |r|
+      role = '   Pipeline'
+
+      loop do
+        handle_errors(role) do
+          reply = r.pipelined do |pi|
+            pi.call('incr', 'pipeline')
+            pi.call('incr', 'pipeline')
+          end
+
+          log "#{role}: #{reply}"
+        end
+      ensure
+        sleep 1.0
+      end
+    rescue StandardError => e
+      log "#{role}: dead: #{e.class}: #{e.message}"
+      raise
+    end
+  end
+
+  def spawn_transaction(cli)
+    Thread.new(cli) do |r|
+      role = 'Transaction'
+
+      loop do
+        handle_errors(role) do
+          reply = r.multi do |tx|
+            tx.call('incr', 'transaction')
+            tx.call('incr', 'transaction')
+            tx.call('incr', 'transaction')
+          end
+
+          log "#{role}: #{reply}"
+        end
+      ensure
+        sleep 1.0
+      end
+    rescue StandardError => e
+      log "#{role}: dead: #{e.class}: #{e.message}"
+      raise
+    end
+  end
+
+  def handle_errors(role) # rubocop:disable Metrics/AbcSize
+    yield
+  rescue RedisClient::ConnectionError, RedisClient::Cluster::InitialSetupError, RedisClient::Cluster::NodeMightBeDown => e
+    log "#{role}: #{e.class}"
+  rescue RedisClient::CommandError => e
+    log "#{role}: #{e.class}: #{e.message}"
+    raise unless e.message.start_with?('CLUSTERDOWN')
+  rescue RedisClient::Cluster::ErrorCollection => e
+    log "#{role}: #{e.class}: #{e.message}"
+    raise unless e.errors.values.all? do |err|
+      err.message.start_with?('CLUSTERDOWN') || err.is_a?(::RedisClient::ConnectionError)
+    end
+  rescue StandardError => e
+    log "#{role}: #{e.class}: #{e.message}"
+    raise
+  end
+
+  def log(msg)
+    print "#{msg}\n"
+  end
+end
+
+clients = Array.new(3) { RedisClient.cluster(connect_with_original_config: true).new_client }
+threads = []
+
+Signal.trap(:INT) do
+  threads.each(&:exit)
+  clients.each(&:close)
+  SinglePipTxDebug.log("\nBye bye")
+  exit 0
+end
+
+threads << SinglePipTxDebug.spawn_single(clients[0])
+threads << SinglePipTxDebug.spawn_pipeline(clients[1])
+threads << SinglePipTxDebug.spawn_transaction(clients[2])
+threads.each(&:join)
