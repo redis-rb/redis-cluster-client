@@ -170,7 +170,7 @@ class RedisClient
         elsif err.message.start_with?('ASK')
           node = @router.assign_asking_node(err.message)
           try_asking(node) ? send_transaction(node, redirect: redirect - 1) : err
-        elsif err.message.start_with?('CLUSTERDOWN Hash slot not served')
+        elsif err.message.start_with?('CLUSTERDOWN')
           @router.renew_cluster_state if @watching_slot.nil?
           raise err
         else

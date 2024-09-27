@@ -65,7 +65,7 @@ module PubSubDebug
     log "#{role}: recv: #{e.class}"
   rescue RedisClient::CommandError => e
     log "#{role}: recv: #{e.class}: #{e.message}"
-    raise unless e.message.start_with?('CLUSTERDOWN Hash slot not served')
+    raise unless e.message.start_with?('CLUSTERDOWN')
   rescue StandardError => e
     log "#{role}: recv: #{e.class}: #{e.message}"
     raise

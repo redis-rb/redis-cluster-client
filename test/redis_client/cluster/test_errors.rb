@@ -5,7 +5,7 @@ require 'testing_helper'
 class RedisClient
   class Cluster
     class TestErrors < TestingWrapper
-      DummyError = Struct.new('DummyError', :message)
+      DummyError = Class.new(StandardError)
 
       def test_initial_setup_error
         [
@@ -44,11 +44,11 @@ class RedisClient
         [
           {
             errors: { '127.0.0.1:6379' => DummyError.new('foo') },
-            want: { msg: 'Errors occurred on any node: 127.0.0.1:6379: foo', size: 1 }
+            want: { msg: '127.0.0.1:6379: (RedisClient::Cluster::TestErrors::DummyError) foo', size: 1 }
           },
           {
             errors: { '127.0.0.1:6379' => DummyError.new('foo'), '127.0.0.1:6380' => DummyError.new('bar') },
-            want: { msg: 'Errors occurred on any node: 127.0.0.1:6379: foo, 127.0.0.1:6380: bar', size: 2 }
+            want: { msg: '127.0.0.1:6379: (RedisClient::Cluster::TestErrors::DummyError) foo, 127.0.0.1:6380: (RedisClient::Cluster::TestErrors::DummyError) bar', size: 2 }
           },
           { errors: {}, want: { msg: '{}', size: 0 } },
           { errors: [], want: { msg: '[]', size: 0 } },

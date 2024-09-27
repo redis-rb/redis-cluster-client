@@ -90,11 +90,10 @@ class RedisClient
 
           case event = @queue.pop(true)
           when ::RedisClient::CommandError
-            raise event unless event.message.start_with?('MOVED', 'CLUSTERDOWN Hash slot not served')
+            raise event unless event.message.start_with?('MOVED', 'CLUSTERDOWN')
 
             break start_over
-          when ::RedisClient::ConnectionError
-            break start_over
+          when ::RedisClient::ConnectionError then break start_over
           when StandardError then raise event
           when Array then break event
           end

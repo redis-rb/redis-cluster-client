@@ -115,7 +115,7 @@ module TestAgainstClusterScale
         attempts -= 1
         break yield
       rescue ::RedisClient::CommandError => e
-        raise unless e.message.start_with?('CLUSTERDOWN Hash slot not served')
+        raise unless e.message.start_with?('CLUSTERDOWN')
 
         @cluster_down_error_count += 1
         sleep WAIT_SEC
