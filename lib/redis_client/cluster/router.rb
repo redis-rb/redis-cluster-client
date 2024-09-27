@@ -29,7 +29,7 @@ class RedisClient
         @pool = pool
         @client_kwargs = kwargs
         @node = ::RedisClient::Cluster::Node.new(concurrent_worker, config: config, pool: pool, **kwargs)
-        renew_cluster_state
+        @node.reload!
         @command = ::RedisClient::Cluster::Command.load(@node.replica_clients.shuffle, slow_command_timeout: config.slow_command_timeout)
         @command_builder = @config.command_builder
       end
@@ -241,6 +241,8 @@ class RedisClient
 
       def renew_cluster_state
         @node.reload!
+      rescue ::RedisClient::Cluster::InitialSetupError
+        # ignore
       end
 
       def close

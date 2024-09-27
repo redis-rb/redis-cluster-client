@@ -1,0 +1,92 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'bundler/setup'
+require 'redis_cluster_client'
+
+module PubSubDebug
+  module_function
+
+  def spawn_publisher(cli, chan)
+    Thread.new(cli, chan) do |r, c|
+      role = ' Publisher'
+      i = 0
+
+      loop do
+        handle_errors(role) do
+          msg = format('%05d', i)
+          r.call('spublish', c, msg)
+          log "#{role}: sent: #{msg}"
+          i += 1
+        end
+      ensure
+        sleep 1.0
+      end
+    rescue StandardError => e
+      log "#{role}: dead: #{e.class}: #{e.message}"
+      raise
+    end
+  end
+
+  def spawn_subscriber(cli, chan) # rubocop:disable Metrics/AbcSize
+    Thread.new(cli, chan) do |r, c|
+      role = 'Subscriber'
+      ps = nil
+
+      loop do
+        ps = r.pubsub
+        ps.call('ssubscribe', c)
+        log "#{role}: done: subscription started to #{c}"
+        break
+      rescue StandardError => e
+        log "#{role}: init: #{e.class}: #{e.message}"
+        ps&.close
+      ensure
+        sleep 1.0
+      end
+
+      loop do
+        handle_errors('Subscriber') do
+          e = ps.next_event(0.01)
+          log "#{role}: recv: #{e.nil? ? 'nil' : e}"
+        end
+      ensure
+        sleep 1.0
+      end
+    rescue StandardError => e
+      log "#{role}: dead: #{e.class}: #{e.message}"
+      raise
+    end
+  end
+
+  def handle_errors(role)
+    yield
+  rescue RedisClient::ConnectionError, RedisClient::Cluster::InitialSetupError, RedisClient::Cluster::NodeMightBeDown => e
+    log "#{role}: recv: #{e.class}"
+  rescue RedisClient::CommandError => e
+    log "#{role}: recv: #{e.class}: #{e.message}"
+    raise unless e.message.start_with?('CLUSTERDOWN Hash slot not served')
+  rescue StandardError => e
+    log "#{role}: recv: #{e.class}: #{e.message}"
+    raise
+  end
+
+  def log(msg)
+    print "#{msg}\n"
+  end
+end
+
+clients = Array.new(2) { RedisClient.cluster(connect_with_original_config: true).new_client }
+threads = []
+channel = 'chan1'
+
+Signal.trap(:INT) do
+  threads.each(&:exit)
+  clients.each(&:close)
+  PubSubDebug.log("\nBye bye")
+  exit 0
+end
+
+threads << PubSubDebug.spawn_subscriber(clients[0], channel)
+threads << PubSubDebug.spawn_publisher(clients[1], channel)
+threads.each(&:join)
