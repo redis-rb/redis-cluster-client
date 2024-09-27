@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'redis_client'
+require 'redis_client/cluster/errors'
 require 'redis_client/cluster/normalized_cmd_name'
 
 class RedisClient
@@ -91,10 +92,8 @@ class RedisClient
           when ::RedisClient::CommandError
             raise event unless event.message.start_with?('MOVED', 'CLUSTERDOWN Hash slot not served')
 
-            @router.renew_cluster_state
             break start_over
           when ::RedisClient::ConnectionError
-            @router.renew_cluster_state
             break start_over
           when StandardError then raise event
           when Array then break event
@@ -151,25 +150,23 @@ class RedisClient
       def handle_connection_error(node_key, ignore: false)
         yield
       rescue ::RedisClient::ConnectionError
-        @state_dict[node_key].close
+        @state_dict[node_key]&.close
         @state_dict.delete(node_key)
         @router.renew_cluster_state
         raise unless ignore
       end
 
       def start_over
-        @state_dict.each_value(&:close)
-        @state_dict.clear
-        @commands.each do |command|
-          loop do
-            _call(command)
-            break
-          rescue ::RedisClient::ConnectionError
-            sleep 1.0
-          end
+        loop do
+          @router.renew_cluster_state
+          @state_dict.each_value(&:close)
+          @state_dict.clear
+          @queue.clear
+          @commands.each { |command| _call(command) }
+          break
+        rescue ::RedisClient::ConnectionError, ::RedisClient::Cluster::NodeMightBeDown
+          sleep 1.0
         end
-
-        nil
       end
     end
   end
