@@ -61,7 +61,7 @@ module PubSubDebug
 
   def handle_errors(role)
     yield
-  rescue RedisClient::CannotConnectError, RedisClient::Cluster::InitialSetupError, RedisClient::Cluster::NodeMightBeDown => e
+  rescue RedisClient::ConnectionError, RedisClient::Cluster::InitialSetupError, RedisClient::Cluster::NodeMightBeDown => e
     log "#{role}: recv: #{e.class}"
   rescue RedisClient::CommandError => e
     log "#{role}: recv: #{e.class}: #{e.message}"
