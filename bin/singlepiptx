@@ -50,10 +50,12 @@ module SinglePipTxDebug
   def spawn_transaction(cli)
     Thread.new(cli) do |r|
       role = 'Transaction'
+      i = 0
 
       loop do
         handle_errors(role) do
-          reply = r.multi do |tx|
+          reply = r.multi(watch: i.odd? ? %w[transaction] : nil) do |tx|
+            i += 1
             tx.call('incr', 'transaction')
             tx.call('incr', 'transaction')
             tx.call('incr', 'transaction')
