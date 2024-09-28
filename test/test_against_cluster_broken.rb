@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'json'
 require 'testing_helper'
 
 class TestAgainstClusterBroken < TestingWrapper
@@ -37,38 +38,29 @@ class TestAgainstClusterBroken < TestingWrapper
       "ClusterDownError: #{@cluster_down_error_count} = "
   end
 
-  def test_a_replica_is_down
-    sacrifice = @controller.select_sacrifice_of_replica
-    do_test_a_node_is_down(sacrifice, number_of_keys: NUMBER_OF_KEYS)
-    refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
-  end
+  def test_client_patience
+    prepare_test_data(number_of_keys: NUMBER_OF_KEYS)
 
-  def test_a_primary_is_down
-    sacrifice = @controller.select_sacrifice_of_primary
-    do_test_a_node_is_down(sacrifice, number_of_keys: NUMBER_OF_KEYS)
+    # a replica
+    kill_a_node(@controller.select_sacrifice_of_replica)
+    wait_for_cluster_to_be_ready(wait_attempts: MAX_ATTEMPTS)
+    do_assertions(number_of_keys: NUMBER_OF_KEYS)
+    refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
+
+    # a primary
+    kill_a_node(@controller.select_sacrifice_of_primary)
+    wait_for_cluster_to_be_ready(wait_attempts: MAX_ATTEMPTS)
+    do_assertions(number_of_keys: NUMBER_OF_KEYS)
+    refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
+
+    # recovery
+    revive_dead_nodes
+    wait_for_cluster_to_be_ready(wait_attempts: MAX_ATTEMPTS)
+    do_assertions(number_of_keys: NUMBER_OF_KEYS)
     refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
   end
 
   private
-
-  def wait_for_replication
-    client_side_timeout = TEST_TIMEOUT_SEC + 1.0
-    server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
-    swap_timeout(@client, timeout: 0.1) do |client|
-      client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
-    end
-  end
-
-  def do_test_a_node_is_down(sacrifice, number_of_keys:)
-    prepare_test_data(number_of_keys: number_of_keys)
-
-    kill_a_node(sacrifice, kill_attempts: MAX_ATTEMPTS)
-    wait_for_cluster_to_be_ready(wait_attempts: MAX_ATTEMPTS)
-
-    assert_equal('PONG', @client.call('PING'), 'Case: PING')
-    do_assertions_without_pipelining(number_of_keys: number_of_keys)
-    do_assertions_with_pipelining(number_of_keys: number_of_keys)
-  end
 
   def prepare_test_data(number_of_keys:)
     number_of_keys.times { |i| @client.call('SET', "pre-#{i}", i) }
@@ -76,23 +68,12 @@ class TestAgainstClusterBroken < TestingWrapper
     wait_for_replication
   end
 
-  def kill_a_node(sacrifice, kill_attempts:)
-    refute_nil(sacrifice, "#{sacrifice.config.host}:#{sacrifice.config.port}")
-
-    loop do
-      raise MaxRetryExceeded if kill_attempts <= 0
-
-      kill_attempts -= 1
-      sacrifice.call('SHUTDOWN', 'NOSAVE')
-    rescue ::RedisClient::CommandError => e
-      raise unless e.message.include?('Errors trying to SHUTDOWN')
-    rescue ::RedisClient::ConnectionError
-      break
-    ensure
-      sleep WAIT_SEC
+  def wait_for_replication
+    client_side_timeout = TEST_TIMEOUT_SEC + 1.0
+    server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
+    swap_timeout(@client, timeout: 0.1) do |client|
+      client.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
     end
-
-    assert_raises(::RedisClient::ConnectionError) { sacrifice.call('PING') }
   end
 
   def wait_for_cluster_to_be_ready(wait_attempts:)
@@ -108,12 +89,32 @@ class TestAgainstClusterBroken < TestingWrapper
     end
   end
 
-  def do_assertions_without_pipelining(number_of_keys:)
-    number_of_keys.times { |i| assert_equal(i.to_s, @client.call('GET', "pre-#{i}"), "Case: pre-#{i}: GET") }
-    number_of_keys.times { |i| assert_equal('OK', @client.call('SET', "post-#{i}", i), "Case: post-#{i}: SET") }
+  def kill_a_node(sacrifice)
+    refute_nil(sacrifice, "#{sacrifice.config.host}:#{sacrifice.config.port}")
+
+    `docker compose ps --format json`.lines.map { |line| JSON.parse(line) }.each do |service|
+      published_ports = service.fetch('Publishers').map { |e| e.fetch('PublishedPort') }.uniq
+      next unless published_ports.include?(sacrifice.config.port)
+
+      service_name = service.fetch('Service')
+      system("docker compose --progress quiet pause #{service_name}", exception: true)
+      break
+    end
+
+    assert_raises(::RedisClient::ConnectionError) { sacrifice.call('PING') }
   end
 
-  def do_assertions_with_pipelining(number_of_keys:)
+  def revive_dead_nodes
+    `docker compose ps --format json --status paused`.lines.map { |line| JSON.parse(line) }.each do |service|
+      service_name = service.fetch('Service')
+      system("docker compose --progress quiet unpause #{service_name}", exception: true)
+    end
+  end
+
+  def do_assertions(number_of_keys:)
+    number_of_keys.times { |i| assert_equal(i.to_s, @client.call('GET', "pre-#{i}"), "Case: pre-#{i}: GET") }
+    number_of_keys.times { |i| assert_equal('OK', @client.call('SET', "post-#{i}", i), "Case: post-#{i}: SET") }
+
     want = Array.new(number_of_keys, &:to_s)
     got = @client.pipelined { |pi| number_of_keys.times { |i| pi.call('GET', "pre-pipelined-#{i}") } }
     assert_equal(want, got, 'Case: pre-pipelined: GET')
