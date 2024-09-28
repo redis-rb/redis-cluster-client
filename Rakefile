@@ -7,7 +7,7 @@ require 'bundler/gem_helper'
 RuboCop::RakeTask.new
 Bundler::GemHelper.install_tasks
 
-SLUGGISH_TEST_TYPES = %w[broken scale state].freeze
+SLUGGISH_TEST_TYPES = %w[down broken scale state].freeze
 
 task default: :test
 

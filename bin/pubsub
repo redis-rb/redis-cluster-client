@@ -53,8 +53,9 @@ module PubSubDebug
       ensure
         sleep 1.0
       end
-    rescue StandardError => e
+    rescue StandardError, SignalException => e
       log "#{role}: dead: #{e.class}: #{e.message}"
+      ps&.close
       raise
     end
   end
