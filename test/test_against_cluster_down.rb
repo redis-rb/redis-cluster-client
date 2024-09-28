@@ -32,13 +32,13 @@ class TestAgainstClusterDown < TestingWrapper
     @threads << spawn_transaction(@clients[2])
     @threads << spawn_subscriber(@clients[3])
     @threads << spawn_publisher(@clients[4])
+    wait_for_jobs_to_be_stable
 
     system('docker compose --progress quiet down', exception: true)
     system('docker system prune --force --volumes', exception: true, out: File::NULL)
     system('docker compose --progress quiet up --detach', exception: true)
     @controller = build_controller
     @controller.wait_for_cluster_to_be_ready
-
     wait_for_jobs_to_be_stable
 
     refute(@cluster_down_counter.get.zero?, 'Case: cluster down count')
@@ -52,7 +52,7 @@ class TestAgainstClusterDown < TestingWrapper
     transaction_value1 = client.call('get', 'transaction', &:to_i)
     pubsub_message1 = @pubsub_recorder.get.to_i
 
-    wait_until_jobs_to_progress_enough
+    wait_for_jobs_to_be_stable
 
     single_value2 = client.call('get', 'single', &:to_i)
     pipeline_value2 = client.call('get', 'pipeline', &:to_i)
@@ -199,14 +199,10 @@ class TestAgainstClusterDown < TestingWrapper
 
       attempts -= 1
       before = @cluster_down_counter.get
-      wait_until_jobs_to_progress_enough
+      sleep WAIT_SEC * (@threads.size * 2)
       after = @cluster_down_counter.get
       break if before == after && @pubsub_recorder.updated?(now)
     end
-  end
-
-  def wait_until_jobs_to_progress_enough
-    sleep WAIT_SEC * (@threads.size * 2)
   end
 
   class Counter
@@ -243,6 +239,8 @@ class TestAgainstClusterDown < TestingWrapper
     end
 
     def updated?(microsecond)
+      return false if @updated_at.nil?
+
       microsecond < @updated_at
     end
   end
