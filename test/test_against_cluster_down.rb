@@ -191,7 +191,7 @@ class TestAgainstClusterDown < TestingWrapper
     @cluster_down_counter.increment
   end
 
-  def wait_for_jobs_to_be_stable(attempts: 30)
+  def wait_for_jobs_to_be_stable(attempts: 100)
     now = Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond)
 
     loop do
