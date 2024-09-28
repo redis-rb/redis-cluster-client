@@ -4,15 +4,16 @@ require 'testing_helper'
 
 class TestAgainstClusterDown < TestingWrapper
   WAIT_SEC = 0.1
+  NUMBER_OF_JOBS = 5
 
   def setup
     @captured_commands = ::Middlewares::CommandCapture::CommandBuffer.new
     @redirect_count = ::Middlewares::RedirectCount::Counter.new
-    @clients = Array.new(5) { build_client }
+    @clients = Array.new(NUMBER_OF_JOBS) { build_client }
     @threads = []
     @controller = nil
     @cluster_down_counter = Counter.new
-    @pubsub_recorder = Recorder.new
+    @recorders = Array.new(NUMBER_OF_JOBS) { Recorder.new }
     @captured_commands.clear
     @redirect_count.clear
   end
@@ -27,11 +28,12 @@ class TestAgainstClusterDown < TestingWrapper
   end
 
   def test_recoverability_from_cluster_down
-    @threads << spawn_single(@clients[0])
-    @threads << spawn_pipeline(@clients[1])
-    @threads << spawn_transaction(@clients[2])
-    @threads << spawn_subscriber(@clients[3])
-    @threads << spawn_publisher(@clients[4])
+    cases = %w[Single Pipeline Transaction Subscriber Publisher]
+    @threads << spawn_single(@clients[0], @recorders[0])
+    @threads << spawn_pipeline(@clients[1], @recorders[1])
+    @threads << spawn_transaction(@clients[2], @recorders[2])
+    @threads << spawn_subscriber(@clients[3], @recorders[3])
+    @threads << spawn_publisher(@clients[4], @recorders[4])
     wait_for_jobs_to_be_stable
 
     system('docker compose --progress quiet down', exception: true)
@@ -44,25 +46,12 @@ class TestAgainstClusterDown < TestingWrapper
     refute(@cluster_down_counter.get.zero?, 'Case: cluster down count')
     refute(@captured_commands.count('cluster', 'nodes').zero?, 'Case: cluster nodes calls')
 
-    client = build_client(custom: nil, middlewares: nil)
-    @clients << client
-
-    single_value1 = client.call('get', 'single', &:to_i)
-    pipeline_value1 = client.call('get', 'pipeline', &:to_i)
-    transaction_value1 = client.call('get', 'transaction', &:to_i)
-    pubsub_message1 = @pubsub_recorder.get.to_i
-
+    @values_a = @recorders.map { |r| r.get.to_i }
     wait_for_jobs_to_be_stable
-
-    single_value2 = client.call('get', 'single', &:to_i)
-    pipeline_value2 = client.call('get', 'pipeline', &:to_i)
-    transaction_value2 = client.call('get', 'transaction', &:to_i)
-    pubsub_message2 = @pubsub_recorder.get.to_i
-
-    assert(single_value1 < single_value2, "Single: #{single_value1} < #{single_value2}")
-    assert(pipeline_value1 < pipeline_value2, "Pipeline: #{pipeline_value1} < #{pipeline_value2}")
-    assert(transaction_value1 < transaction_value2, "Transaction: #{transaction_value1} < #{transaction_value2}")
-    assert(pubsub_message1 < pubsub_message2, "PubSub: #{pubsub_message1} < #{pubsub_message2}")
+    @values_b = @recorders.map { |r| r.get.to_i }
+    @recorders.each_with_index do |_, i|
+      assert(@values_a[i] < @values_b[i], "#{cases[i]}: #{@values_a[i]} < #{@values_b[i]}")
+    end
   end
 
   private
@@ -91,12 +80,13 @@ class TestAgainstClusterDown < TestingWrapper
     )
   end
 
-  def spawn_single(cli)
-    Thread.new(cli) do |r|
+  def spawn_single(cli, rec)
+    Thread.new(cli, rec) do |c, r|
       loop do
         handle_errors do
-          r.call('incr', 'single')
-          r.call('incr', 'single')
+          c.call('incr', 'single')
+          reply = c.call('incr', 'single')
+          r.set(reply)
         end
       ensure
         sleep WAIT_SEC
@@ -104,14 +94,16 @@ class TestAgainstClusterDown < TestingWrapper
     end
   end
 
-  def spawn_pipeline(cli)
-    Thread.new(cli) do |r|
+  def spawn_pipeline(cli, rec)
+    Thread.new(cli, rec) do |c, r|
       loop do
         handle_errors do
-          r.pipelined do |pi|
+          reply = c.pipelined do |pi|
             pi.call('incr', 'pipeline')
             pi.call('incr', 'pipeline')
           end
+
+          r.set(reply[1])
         end
       ensure
         sleep WAIT_SEC
@@ -119,16 +111,18 @@ class TestAgainstClusterDown < TestingWrapper
     end
   end
 
-  def spawn_transaction(cli)
-    Thread.new(cli) do |r|
+  def spawn_transaction(cli, rec)
+    Thread.new(cli, rec) do |c, r|
       i = 0
       loop do
         handle_errors do
-          r.multi(watch: i.odd? ? %w[transaction] : nil) do |tx|
+          reply = c.multi(watch: i.odd? ? %w[transaction] : nil) do |tx|
             i += 1
             tx.call('incr', 'transaction')
             tx.call('incr', 'transaction')
           end
+
+          r.set(reply[1])
         end
       ensure
         sleep WAIT_SEC
@@ -136,12 +130,13 @@ class TestAgainstClusterDown < TestingWrapper
     end
   end
 
-  def spawn_publisher(cli)
-    Thread.new(cli) do |r|
+  def spawn_publisher(cli, rec)
+    Thread.new(cli, rec) do |c, r|
       i = 0
       loop do
         handle_errors do
-          r.call('spublish', 'chan', i)
+          c.call('spublish', 'chan', i)
+          r.set(i)
           i += 1
         end
       ensure
@@ -150,12 +145,12 @@ class TestAgainstClusterDown < TestingWrapper
     end
   end
 
-  def spawn_subscriber(cli)
-    Thread.new(cli) do |r|
+  def spawn_subscriber(cli, rec)
+    Thread.new(cli, rec) do |c, r|
       ps = nil
 
       loop do
-        ps = r.pubsub
+        ps = c.pubsub
         ps.call('ssubscribe', 'chan')
         break
       rescue StandardError
@@ -168,7 +163,7 @@ class TestAgainstClusterDown < TestingWrapper
         handle_errors do
           event = ps.next_event(0.01)
           case event&.first
-          when 'smessage' then @pubsub_recorder.set(event[2])
+          when 'smessage' then r.set(event[2])
           end
         end
       ensure
@@ -197,16 +192,21 @@ class TestAgainstClusterDown < TestingWrapper
   end
 
   def wait_for_jobs_to_be_stable(attempts: 100)
-    now = Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond)
+    start = Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond)
+    sleep_sec = WAIT_SEC * (@threads.size * 2)
 
-    loop do
-      raise MaxRetryExceeded if attempts <= 0
+    @recorders.each do |recorder|
+      loop do
+        raise MaxRetryExceeded if attempts <= 0
 
-      attempts -= 1
-      before = @cluster_down_counter.get
-      sleep WAIT_SEC * (@threads.size * 2)
-      after = @cluster_down_counter.get
-      break if before == after && @pubsub_recorder.updated?(now)
+        attempts -= 1
+        next sleep(sleep_sec) unless recorder.updated?(start)
+
+        value_a = recorder.get.to_i
+        sleep sleep_sec
+        value_b = recorder.get.to_i
+        break if value_a < value_b
+      end
     end
   end
 
