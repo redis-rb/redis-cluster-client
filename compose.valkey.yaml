@@ -86,22 +86,3 @@ services:
         condition: service_healthy
       node9:
         condition: service_healthy
-  ruby:
-    image: "ruby:${RUBY_VERSION:-3}"
-    restart: always
-    working_dir: /client
-    volumes:
-      - .:/client
-    command:
-      - ruby
-      - "-e"
-      - 'Signal.trap(:INT, "EXIT"); Signal.trap(:TERM, "EXIT"); loop { sleep 1 }'
-    environment:
-      REDIS_HOST: node1
-    cap_drop:
-      - ALL
-    healthcheck:
-      test: ["CMD", "ruby", "-e", "'puts 1'"]
-      interval: "5s"
-      timeout: "3s"
-      retries: 3

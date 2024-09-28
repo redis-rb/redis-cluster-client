@@ -28,6 +28,7 @@ jobs:
       matrix:
         include:
           - {redis: '7.2', ruby: '3.3'}
+          - {task: test_cluster_broken, restart: 'no', startup: '6'}
           - {redis: '7.2', ruby: '3.3', compose: compose.ssl.yaml}
           - {redis: '7.2', ruby: '3.3', driver: 'hiredis'}
           - {redis: '7.2', ruby: '3.3', driver: 'hiredis', compose: compose.ssl.yaml}
@@ -39,7 +40,6 @@ jobs:
           - {task: test_cluster_state, pattern: 'ScaleReadLatency', compose: compose.valkey.yaml, redis: '8', replica: '2', startup: '9'}
           - {ruby: 'jruby'}
           - {ruby: 'truffleruby'}
-          - {task: test_cluster_broken, restart: 'no', startup: '6'}
           - {task: test_cluster_down}
           - {redis: '8',   ruby: '3.3', compose: compose.valkey.yaml, replica: '2'}
           - {redis: '7.2', ruby: '3.2', compose: compose.auth.yaml}
