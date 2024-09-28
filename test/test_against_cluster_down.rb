@@ -3,7 +3,7 @@
 require 'testing_helper'
 
 class TestAgainstClusterDown < TestingWrapper
-  WAIT_SEC = 1
+  WAIT_SEC = 0.1
 
   def setup
     @captured_commands = ::Middlewares::CommandCapture::CommandBuffer.new
@@ -15,6 +15,8 @@ class TestAgainstClusterDown < TestingWrapper
     @last_pubsub_message = nil
     @down_counter_lock = Mutex.new
     @pubsub_message_lock = Mutex.new
+    @captured_commands.clear
+    @redirect_count.clear
   end
 
   def teardown
@@ -39,6 +41,11 @@ class TestAgainstClusterDown < TestingWrapper
     @controller = build_controller
     @controller.wait_for_cluster_to_be_ready
 
+    wait_for_threads_to_be_stable
+
+    refute(refer_down_count.zero?, 'Case: cluster down count')
+    refute(@captured_commands.count('cluster', 'nodes').zero?, 'Case: cluster nodes calls')
+
     client = build_client
     @clients << client
 
@@ -47,7 +54,7 @@ class TestAgainstClusterDown < TestingWrapper
     transaction_value1 = client.call('get', 'transaction', &:to_i)
     pubsub_message1 = refer_pubsub_message.to_i
 
-    sleep WAIT_SEC * 3
+    sleep WAIT_SEC * 30
 
     single_value2 = client.call('get', 'single', &:to_i)
     pipeline_value2 = client.call('get', 'pipeline', &:to_i)
@@ -194,7 +201,22 @@ class TestAgainstClusterDown < TestingWrapper
     @pubsub_message_lock.synchronize { @last_pubsub_message = message }
   end
 
+  def refer_down_count
+    @down_counter_lock.synchronize { @cluster_down_error_count }
+  end
+
   def refer_pubsub_message
     @pubsub_message_lock.synchronize { @last_pubsub_message }
+  end
+
+  def wait_for_threads_to_be_stable(attempts: 30)
+    loop do
+      raise MaxRetryExceeded if attempts <= 0
+
+      attempts -= 1
+      before = refer_down_count
+      sleep WAIT_SEC * (@threads.size * 2)
+      break if before == refer_down_count
+    end
   end
 end

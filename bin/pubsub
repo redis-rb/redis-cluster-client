@@ -55,6 +55,7 @@ module PubSubDebug
       end
     rescue StandardError => e
       log "#{role}: dead: #{e.class}: #{e.message}"
+      ps&.close
       raise
     end
   end
