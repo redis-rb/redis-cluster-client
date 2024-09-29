@@ -7,7 +7,7 @@ require 'testing_helper'
 class TestAgainstClusterBroken < TestingWrapper
   WAIT_SEC = 1
   MAX_ATTEMPTS = 15
-  NUMBER_OF_KEYS = 10
+  NUMBER_OF_KEYS = 100
   MAX_PIPELINE_SIZE = 40
   HASH_TAG_GRAIN = 5
   SLICED_NUMBERS = (0...NUMBER_OF_KEYS).each_slice(MAX_PIPELINE_SIZE).freeze
@@ -60,6 +60,7 @@ class TestAgainstClusterBroken < TestingWrapper
 
   def prepare_test_data
     client = build_client(custom: nil, middlewares: nil)
+    client.call('FLUSHDB')
 
     SLICED_NUMBERS.each do |numbers|
       client.pipelined do |pi|
@@ -82,7 +83,7 @@ class TestAgainstClusterBroken < TestingWrapper
         NUMBER_OF_KEYS.times do |i|
           retryable do
             assert_equal((i + offset).to_s, @clients[0].call_once('GET', "single:#{i}"), 'Case: Single GET')
-            assert_equal(i + offset + 1, @clients[0].call_once('INCR', "single:#{i}"), 'Case: Single INCR')
+            assert_equal('OK', @clients[0].call_once('SET', "single:#{i}", i + offset + 1), 'Case: Single SET')
           end
         end
       end
@@ -93,15 +94,15 @@ class TestAgainstClusterBroken < TestingWrapper
           retryable do
             want = numbers.map { |i| (i + offset).to_s }
             got = @clients[1].pipelined do |pi|
-              numbers.each { |i| pi.call('GET', "Pipeline:#{i}") }
+              numbers.each { |i| pi.call('GET', "pipeline:#{i}") }
             end
             assert_equal(want, got, 'Case: Pipeline GET')
 
-            want = numbers.map { |i| i + offset + 1 }
+            want = numbers.map { 'OK' }
             got = @clients[1].pipelined do |pi|
-              numbers.each { |i| pi.call('INCR', "Pipeline:#{i}") }
+              numbers.each { |i| pi.call('SET', "pipeline:#{i}", i + offset + 1) }
             end
-            assert_equal(want, got, 'Case: Pipeline INCR')
+            assert_equal(want, got, 'Case: Pipeline SET')
           end
         end
       end
@@ -110,12 +111,12 @@ class TestAgainstClusterBroken < TestingWrapper
         # Transaction
         NUMBER_OF_KEYS.times.group_by { |i| i / HASH_TAG_GRAIN }.each do |group, numbers|
           retryable do
-            want = numbers.map { |i| (i + offset + 1) }
-            keys = numbers.map { |i| "{group#{group}}:transaction#{i}" }
+            want = numbers.map { 'OK' }
+            keys = numbers.map { |i| "{group#{group}}:transaction:#{i}" }
             got = @clients[2].multi(watch: group.odd? ? nil : keys) do |tx|
-              keys.each { |key| tx.call('INCR', key) }
+              keys.each { |key| tx.call('SET', key, i + offset + 1) }
             end
-            assert_equal(want, got, 'Case: Transaction: INCR')
+            assert_equal(want, got, 'Case: Transaction: SET')
           end
         end
       end
@@ -202,7 +203,7 @@ class TestAgainstClusterBroken < TestingWrapper
       fixed_hostname: TEST_FIXED_HOSTNAME,
       custom: custom,
       middlewares: middlewares,
-      **TEST_GENERIC_OPTIONS.merge(timeout: 1.5),
+      **TEST_GENERIC_OPTIONS.merge(timeout: 0.01),
       **opts
     ).new_client
   end
@@ -211,7 +212,7 @@ class TestAgainstClusterBroken < TestingWrapper
     ClusterController.new(
       TEST_NODE_URIS,
       replica_size: TEST_REPLICA_SIZE,
-      **TEST_GENERIC_OPTIONS.merge(timeout: 5.0)
+      **TEST_GENERIC_OPTIONS.merge(timeout: 0.1)
     )
   end
 end
