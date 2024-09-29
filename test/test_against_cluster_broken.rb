@@ -6,7 +6,7 @@ require 'testing_helper'
 
 class TestAgainstClusterBroken < TestingWrapper
   WAIT_SEC = 1
-  MAX_ATTEMPTS = 20
+  MAX_ATTEMPTS = 5
   NUMBER_OF_KEYS = 1000
   MAX_PIPELINE_SIZE = 40
   HASH_TAG_GRAIN = 5
@@ -81,8 +81,8 @@ class TestAgainstClusterBroken < TestingWrapper
         # Single
         NUMBER_OF_KEYS.times do |i|
           retryable do
-            assert_equal((i + offset).to_s, @clients[0].call('GET', "single:#{i}"), 'Case: Single GET')
-            assert_equal(i + offset + 1, @clients[0].call('INCR', "single:#{i}"), 'Case: Single INCR')
+            assert_equal((i + offset).to_s, @clients[0].call_once('GET', "single:#{i}"), 'Case: Single GET')
+            assert_equal(i + offset + 1, @clients[0].call_once('INCR', "single:#{i}"), 'Case: Single INCR')
           end
         end
       end
@@ -202,7 +202,7 @@ class TestAgainstClusterBroken < TestingWrapper
       fixed_hostname: TEST_FIXED_HOSTNAME,
       custom: custom,
       middlewares: middlewares,
-      **TEST_GENERIC_OPTIONS,
+      **TEST_GENERIC_OPTIONS.merge(timeout: 1.5),
       **opts
     ).new_client
   end
