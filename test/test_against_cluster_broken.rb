@@ -203,7 +203,7 @@ class TestAgainstClusterBroken < TestingWrapper
       fixed_hostname: TEST_FIXED_HOSTNAME,
       custom: custom,
       middlewares: middlewares,
-      **TEST_GENERIC_OPTIONS.merge(timeout: 0.1, read_timeout: 0.01),
+      **TEST_GENERIC_OPTIONS.merge(timeout: 0.01),
       **opts
     ).new_client
   end
