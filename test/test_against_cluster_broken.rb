@@ -5,8 +5,8 @@ require 'json'
 require 'testing_helper'
 
 class TestAgainstClusterBroken < TestingWrapper
-  WAIT_SEC = 0.3
-  MAX_ATTEMPTS = 40
+  WAIT_SEC = 0.1
+  MAX_ATTEMPTS = 100
   NUMBER_OF_KEYS = 1600
   MAX_PIPELINE_SIZE = 40
   HASH_TAG_GRAIN = 5
@@ -203,7 +203,7 @@ class TestAgainstClusterBroken < TestingWrapper
       fixed_hostname: TEST_FIXED_HOSTNAME,
       custom: custom,
       middlewares: middlewares,
-      **TEST_GENERIC_OPTIONS.merge(timeout: 0.01),
+      **TEST_GENERIC_OPTIONS.merge(timeout: 0.1),
       **opts
     ).new_client
   end
