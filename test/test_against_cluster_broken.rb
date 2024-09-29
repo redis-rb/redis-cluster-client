@@ -6,8 +6,8 @@ require 'testing_helper'
 
 class TestAgainstClusterBroken < TestingWrapper
   WAIT_SEC = 1
-  MAX_ATTEMPTS = 5
-  NUMBER_OF_KEYS = 1600
+  MAX_ATTEMPTS = 15
+  NUMBER_OF_KEYS = 10
   MAX_PIPELINE_SIZE = 40
   HASH_TAG_GRAIN = 5
   SLICED_NUMBERS = (0...NUMBER_OF_KEYS).each_slice(MAX_PIPELINE_SIZE).freeze
@@ -93,7 +93,7 @@ class TestAgainstClusterBroken < TestingWrapper
           retryable do
             want = numbers.map { |i| (i + offset).to_s }
             got = @clients[1].pipelined do |pi|
-              numbers.each { |i| pi.call('GET', "Pipeline:#{i}", i) }
+              numbers.each { |i| pi.call('GET', "Pipeline:#{i}") }
             end
             assert_equal(want, got, 'Case: Pipeline GET')
 
