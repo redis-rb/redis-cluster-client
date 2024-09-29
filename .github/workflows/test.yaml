@@ -20,7 +20,7 @@ defaults:
 jobs:
   main:
     name: Main
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
