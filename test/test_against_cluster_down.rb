@@ -243,10 +243,14 @@ class TestAgainstClusterDown < TestingWrapper
       @mutex.synchronize { @last_value }
     end
 
-    def updated?(microsecond)
-      return false if @updated_at.nil?
-
-      microsecond < @updated_at
+    def updated?(since)
+      @mutex.synchronize do
+        if @updated_at.nil?
+          false
+        else
+          since < @updated_at
+        end
+      end
     end
   end
 end

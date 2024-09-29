@@ -94,7 +94,7 @@ class ClusterController
     replica_info = rows.find { |row| row.primary_id == primary_info.id }
 
     wait_replication_delay(@clients, replica_size: @replica_size, timeout: @timeout)
-    replica_info.client.call('CLUSTER', 'FAILOVER', 'TAKEOVER')
+    replica_info.client.call_once('CLUSTER', 'FAILOVER', 'TAKEOVER')
     wait_failover(
       @clients,
       primary_node_key: primary_info.node_key,
@@ -117,24 +117,24 @@ class ClusterController
     dest_host, dest_port = dest_info.node_key.split(':')
 
     # @see https://redis.io/commands/cluster-setslot/#redis-cluster-live-resharding-explained
-    dest_client.call('CLUSTER', 'SETSLOT', slot, 'IMPORTING', src_node_id)
-    src_client.call('CLUSTER', 'SETSLOT', slot, 'MIGRATING', dest_node_id)
+    dest_client.call_once('CLUSTER', 'SETSLOT', slot, 'IMPORTING', src_node_id)
+    src_client.call_once('CLUSTER', 'SETSLOT', slot, 'MIGRATING', dest_node_id)
 
     db_idx = '0'
     timeout_msec = @timeout.to_i * 1000
 
-    number_of_keys = src_client.call('CLUSTER', 'COUNTKEYSINSLOT', slot)
-    keys = src_client.call('CLUSTER', 'GETKEYSINSLOT', slot, number_of_keys)
+    number_of_keys = src_client.call_once('CLUSTER', 'COUNTKEYSINSLOT', slot)
+    keys = src_client.call_once('CLUSTER', 'GETKEYSINSLOT', slot, number_of_keys)
     print_debug("#{src_client.config.host}:#{src_client.config.port} => #{dest_client.config.host}:#{dest_client.config.port} ... #{keys}")
     return if keys.empty?
 
     begin
-      src_client.call('MIGRATE', dest_host, dest_port, '', db_idx, timeout_msec, 'KEYS', *keys)
+      src_client.call_once('MIGRATE', dest_host, dest_port, '', db_idx, timeout_msec, 'KEYS', *keys)
     rescue ::RedisClient::CommandError => e
       raise unless e.message.start_with?('IOERR')
 
       # retry once
-      src_client.call('MIGRATE', dest_host, dest_port, '', db_idx, timeout_msec, 'REPLACE', 'KEYS', *keys)
+      src_client.call_once('MIGRATE', dest_host, dest_port, '', db_idx, timeout_msec, 'REPLACE', 'KEYS', *keys)
     end
 
     wait_replication_delay(@clients, replica_size: @replica_size, timeout: @timeout)
@@ -151,7 +151,7 @@ class ClusterController
     rest = rows.reject { |r| r.replica? || r.client.equal?(src) || r.client.equal?(dest) }.map(&:client)
 
     ([dest, src] + rest).each do |cli|
-      cli.call('CLUSTER', 'SETSLOT', slot, 'NODE', id)
+      cli.call_once('CLUSTER', 'SETSLOT', slot, 'NODE', id)
       print_debug("#{cli.config.host}:#{cli.config.port} ... CLUSTER SETSLOT #{slot} NODE #{id}")
     rescue ::RedisClient::CommandError => e
       raise unless e.message.start_with?('ERR Please use SETSLOT only with masters.')
@@ -174,12 +174,12 @@ class ClusterController
     @shard_size += 1
     @number_of_replicas = @replica_size * @shard_size
 
-    primary.call('CLUSTER', 'MEET', target_host, target_port)
-    replica.call('CLUSTER', 'MEET', target_host, target_port)
+    primary.call_once('CLUSTER', 'MEET', target_host, target_port)
+    replica.call_once('CLUSTER', 'MEET', target_host, target_port)
     wait_meeting(@clients, max_attempts: @max_attempts)
 
-    primary_id = primary.call('CLUSTER', 'MYID')
-    replica.call('CLUSTER', 'REPLICATE', primary_id)
+    primary_id = primary.call_once('CLUSTER', 'MYID')
+    replica.call_once('CLUSTER', 'REPLICATE', primary_id)
     save_config(@clients)
     wait_for_cluster_to_be_ready(skip_clients: [primary, replica])
 
@@ -213,16 +213,16 @@ class ClusterController
     threads = @clients.map do |cli|
       Thread.new(cli) do |c|
         c.pipelined do |pi|
-          pi.call('CLUSTER', 'FORGET', replica_info.id)
-          pi.call('CLUSTER', 'FORGET', primary_info.id)
+          pi.call_once('CLUSTER', 'FORGET', replica_info.id)
+          pi.call_once('CLUSTER', 'FORGET', primary_info.id)
         end
       rescue ::RedisClient::Error
         # ignore
       end
     end
     threads.each(&:join)
-    replica.call('CLUSTER', 'RESET', 'SOFT')
-    primary.call('CLUSTER', 'RESET', 'SOFT')
+    replica.call_once('CLUSTER', 'RESET', 'SOFT')
+    primary.call_once('CLUSTER', 'RESET', 'SOFT')
     @clients.reject! { |c| c.equal?(primary) || c.equal?(replica) }
     @shard_size -= 1
     @number_of_replicas = @replica_size * @shard_size
@@ -266,7 +266,7 @@ class ClusterController
 
   def flush_all_data(clients)
     clients.each do |c|
-      c.call('FLUSHALL')
+      c.call_once('FLUSHALL')
       print_debug("#{c.config.host}:#{c.config.port} ... FLUSHALL")
     rescue ::RedisClient::CommandError, ::RedisClient::ReadOnlyError
       # READONLY You can't write against a read only replica.
@@ -277,7 +277,7 @@ class ClusterController
 
   def reset_cluster(clients)
     clients.each do |c|
-      c.call('CLUSTER', 'RESET', 'HARD')
+      c.call_once('CLUSTER', 'RESET', 'HARD')
       print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER RESET HARD")
     rescue ::RedisClient::ConnectionError => e
       print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER RESET HARD: #{e.class}: #{e.message}")
@@ -294,7 +294,7 @@ class ClusterController
     slot_idx = 0
     primaries.zip(slot_sizes).each do |c, s|
       slot_range = slot_idx..slot_idx + s - 1
-      c.call('CLUSTER', 'ADDSLOTS', *slot_range.to_a)
+      c.call_once('CLUSTER', 'ADDSLOTS', *slot_range.to_a)
       slot_idx += s
       print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER ADDSLOTS #{slot_range.to_a}")
     end
@@ -302,7 +302,7 @@ class ClusterController
 
   def save_config_epoch(clients)
     clients.each_with_index do |c, i|
-      c.call('CLUSTER', 'SET-CONFIG-EPOCH', i + 1)
+      c.call_once('CLUSTER', 'SET-CONFIG-EPOCH', i + 1)
       print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER SET-CONFIG-EPOCH #{i + 1}")
     rescue ::RedisClient::CommandError
       # ERR Node config epoch is already non-zero
@@ -315,7 +315,7 @@ class ClusterController
     rows = parse_cluster_nodes(rows)
     target_host, target_port = rows.first.node_key.split(':')
     clients.drop(1).each do |c|
-      c.call('CLUSTER', 'MEET', target_host, target_port)
+      c.call_once('CLUSTER', 'MEET', target_host, target_port)
       print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER MEET #{target_host}:#{target_port}")
     end
   end
@@ -335,19 +335,19 @@ class ClusterController
     replicas = take_replicas(clients, shard_size: shard_size)
 
     replicas.each_slice(replica_size).each_with_index do |subset, i|
-      primary_id = primaries[i].call('CLUSTER', 'MYID')
+      primary_id = primaries[i].call_once('CLUSTER', 'MYID')
 
       loop do
         begin
           subset.each do |replica|
-            replica.call('CLUSTER', 'REPLICATE', primary_id)
+            replica.call_once('CLUSTER', 'REPLICATE', primary_id)
             print_debug("#{replica.config.host}:#{replica.config.port} ... CLUSTER REPLICATE #{primaries[i].config.host}:#{primaries[i].config.port}")
           end
         rescue ::RedisClient::CommandError => e
           print_debug(e.message)
           # ERR Unknown node [node-id]
           sleep SLEEP_SEC
-          primary_id = primaries[i].call('CLUSTER', 'MYID')
+          primary_id = primaries[i].call_once('CLUSTER', 'MYID')
           next
         end
 
@@ -358,7 +358,7 @@ class ClusterController
 
   def save_config(clients)
     clients.each do |c|
-      c.call('CLUSTER', 'SAVECONFIG')
+      c.call_once('CLUSTER', 'SAVECONFIG')
       print_debug("#{c.config.host}:#{c.config.port} ... CLUSTER SAVECONFIG")
     end
   end
@@ -412,7 +412,7 @@ class ClusterController
     key = 0
     wait_for_state(clients, max_attempts: max_attempts) do |client|
       print_debug("#{client.config.host}:#{client.config.port} ... GET #{key}")
-      client.call('GET', key) if primary_client?(client) && !skip_clients.include?(client)
+      client.call_once('GET', key) if primary_client?(client) && !skip_clients.include?(client)
       true
     rescue ::RedisClient::CommandError => e
       if e.message.start_with?('CLUSTERDOWN')
@@ -443,11 +443,11 @@ class ClusterController
   end
 
   def hashify_cluster_info(client)
-    client.call('CLUSTER', 'INFO').split("\r\n").to_h { |v| v.split(':') }
+    client.call_once('CLUSTER', 'INFO').split("\r\n").to_h { |v| v.split(':') }
   end
 
   def fetch_cluster_nodes(client)
-    client.call('CLUSTER', 'NODES').split("\n").map(&:split)
+    client.call_once('CLUSTER', 'NODES').split("\n").map(&:split)
   end
 
   def associate_with_clients_and_nodes(clients)
@@ -502,11 +502,11 @@ class ClusterController
   end
 
   def primary_client?(client)
-    client.call('ROLE').first == 'master'
+    client.call_once('ROLE').first == 'master'
   end
 
   def replica_client?(client)
-    client.call('ROLE').first == 'slave'
+    client.call_once('ROLE').first == 'slave'
   end
 
   def print_debug(msg)
