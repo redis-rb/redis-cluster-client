@@ -7,7 +7,7 @@ require 'testing_helper'
 class TestAgainstClusterBroken < TestingWrapper
   WAIT_SEC = 1
   MAX_ATTEMPTS = 15
-  NUMBER_OF_KEYS = 100
+  NUMBER_OF_KEYS = 1600
   MAX_PIPELINE_SIZE = 40
   HASH_TAG_GRAIN = 5
   SLICED_NUMBERS = (0...NUMBER_OF_KEYS).each_slice(MAX_PIPELINE_SIZE).freeze
@@ -80,7 +80,7 @@ class TestAgainstClusterBroken < TestingWrapper
     log_info('assertions') do
       log_info('assertions: single') do
         # Single
-        NUMBER_OF_KEYS.times do |i|
+        (NUMBER_OF_KEYS / MAX_PIPELINE_SIZE).times do |i|
           retryable do
             assert_equal((i + offset).to_s, @clients[0].call_once('GET', "single:#{i}"), 'Case: Single GET')
             assert_equal('OK', @clients[0].call_once('SET', "single:#{i}", i + offset + 1), 'Case: Single SET')
@@ -109,12 +109,12 @@ class TestAgainstClusterBroken < TestingWrapper
 
       log_info('assertions: transaction') do
         # Transaction
-        NUMBER_OF_KEYS.times.group_by { |i| i / HASH_TAG_GRAIN }.each do |group, numbers|
+        (NUMBER_OF_KEYS / (MAX_PIPELINE_SIZE / HASH_TAG_GRAIN)).times.group_by { |i| i / HASH_TAG_GRAIN }.each do |group, numbers|
           retryable do
             want = numbers.map { 'OK' }
             keys = numbers.map { |i| "{group#{group}}:transaction:#{i}" }
             got = @clients[2].multi(watch: group.odd? ? nil : keys) do |tx|
-              keys.each { |key| tx.call('SET', key, i + offset + 1) }
+              keys.each_with_index { |key, i| tx.call('SET', key, numbers[i] + offset + 1) }
             end
             assert_equal(want, got, 'Case: Transaction: SET')
           end
@@ -203,7 +203,7 @@ class TestAgainstClusterBroken < TestingWrapper
       fixed_hostname: TEST_FIXED_HOSTNAME,
       custom: custom,
       middlewares: middlewares,
-      **TEST_GENERIC_OPTIONS.merge(timeout: 0.01),
+      **TEST_GENERIC_OPTIONS.merge(timeout: 0.1, read_timeout: 0.01),
       **opts
     ).new_client
   end
