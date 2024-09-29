@@ -5,8 +5,8 @@ require 'json'
 require 'testing_helper'
 
 class TestAgainstClusterBroken < TestingWrapper
-  WAIT_SEC = 1
-  MAX_ATTEMPTS = 15
+  WAIT_SEC = 0.3
+  MAX_ATTEMPTS = 40
   NUMBER_OF_KEYS = 1600
   MAX_PIPELINE_SIZE = 40
   HASH_TAG_GRAIN = 5
@@ -169,7 +169,7 @@ class TestAgainstClusterBroken < TestingWrapper
     @logger.info(" done: #{message}")
   end
 
-  def retryable(attempts: MAX_ATTEMPTS)
+  def retryable(attempts: MAX_ATTEMPTS, wait_sec: WAIT_SEC)
     loop do
       raise MaxRetryExceeded if attempts <= 0
 
@@ -188,7 +188,7 @@ class TestAgainstClusterBroken < TestingWrapper
 
       @cluster_down_error_count += 1
     ensure
-      sleep WAIT_SEC
+      sleep wait_sec
     end
   end
 
