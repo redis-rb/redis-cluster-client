@@ -79,45 +79,47 @@ class TestAgainstClusterBroken < TestingWrapper
   def do_assertions(offset:)
     log_info('assertions') do
       log_info('assertions: single') do
-        # Single
         (NUMBER_OF_KEYS / MAX_PIPELINE_SIZE).times do |i|
-          retryable do
-            assert_equal((i + offset).to_s, @clients[0].call_once('GET', "single:#{i}"), 'Case: Single GET')
-            assert_equal('OK', @clients[0].call_once('SET', "single:#{i}", i + offset + 1), 'Case: Single SET')
-          end
+          want = (i + offset).to_s
+          got = retryable { @clients[0].call_once('GET', "single:#{i}") }
+          assert_equal(want, got, 'Case: Single GET')
+
+          want = 'OK'
+          got = retryable { @clients[0].call_once('SET', "single:#{i}", i + offset + 1) }
+          assert_equal(want, got, 'Case: Single SET')
         end
       end
 
       log_info('assertions: pipeline') do
-        # Pipeline
         SLICED_NUMBERS.each do |numbers|
-          retryable do
-            want = numbers.map { |i| (i + offset).to_s }
-            got = @clients[1].pipelined do |pi|
+          want = numbers.map { |i| (i + offset).to_s }
+          got = retryable do
+            @clients[1].pipelined do |pi|
               numbers.each { |i| pi.call('GET', "pipeline:#{i}") }
             end
-            assert_equal(want, got, 'Case: Pipeline GET')
+          end
+          assert_equal(want, got, 'Case: Pipeline GET')
 
-            want = numbers.map { 'OK' }
-            got = @clients[1].pipelined do |pi|
+          want = numbers.map { 'OK' }
+          got = retryable do
+            @clients[1].pipelined do |pi|
               numbers.each { |i| pi.call('SET', "pipeline:#{i}", i + offset + 1) }
             end
-            assert_equal(want, got, 'Case: Pipeline SET')
           end
+          assert_equal(want, got, 'Case: Pipeline SET')
         end
       end
 
       log_info('assertions: transaction') do
-        # Transaction
         (NUMBER_OF_KEYS / (MAX_PIPELINE_SIZE / HASH_TAG_GRAIN)).times.group_by { |i| i / HASH_TAG_GRAIN }.each do |group, numbers|
-          retryable do
-            want = numbers.map { 'OK' }
-            keys = numbers.map { |i| "{group#{group}}:transaction:#{i}" }
-            got = @clients[2].multi(watch: group.odd? ? nil : keys) do |tx|
+          want = numbers.map { 'OK' }
+          keys = numbers.map { |i| "{group#{group}}:transaction:#{i}" }
+          got = retryable do
+            @clients[2].multi(watch: group.odd? ? nil : keys) do |tx|
               keys.each_with_index { |key, i| tx.call('SET', key, numbers[i] + offset + 1) }
             end
-            assert_equal(want, got, 'Case: Transaction: SET')
           end
+          assert_equal(want, got, 'Case: Transaction: SET')
         end
       end
     end
