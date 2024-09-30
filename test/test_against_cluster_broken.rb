@@ -7,7 +7,7 @@ require 'testing_helper'
 class TestAgainstClusterBroken < TestingWrapper
   WAIT_SEC = 0.1
   MAX_ATTEMPTS = 100
-  NUMBER_OF_KEYS = 1600
+  NUMBER_OF_KEYS = 16_000
   MAX_PIPELINE_SIZE = 40
   HASH_TAG_GRAIN = 5
   SLICED_NUMBERS = (0...NUMBER_OF_KEYS).each_slice(MAX_PIPELINE_SIZE).freeze
@@ -79,7 +79,7 @@ class TestAgainstClusterBroken < TestingWrapper
   def do_assertions(offset:)
     log_info('assertions') do
       log_info('assertions: single') do
-        (NUMBER_OF_KEYS / MAX_PIPELINE_SIZE).times do |i|
+        NUMBER_OF_KEYS.times do |i|
           want = (i + offset).to_s
           got = retryable { @clients[0].call_once('GET', "single:#{i}") }
           assert_equal(want, got, 'Case: Single GET')
@@ -111,7 +111,7 @@ class TestAgainstClusterBroken < TestingWrapper
       end
 
       log_info('assertions: transaction') do
-        (NUMBER_OF_KEYS / (MAX_PIPELINE_SIZE / HASH_TAG_GRAIN)).times.group_by { |i| i / HASH_TAG_GRAIN }.each do |group, numbers|
+        NUMBER_OF_KEYS.times.group_by { |i| i / HASH_TAG_GRAIN }.each do |group, numbers|
           want = numbers.map { 'OK' }
           keys = numbers.map { |i| "{group#{group}}:transaction:#{i}" }
           got = retryable do
@@ -179,17 +179,18 @@ class TestAgainstClusterBroken < TestingWrapper
       break yield
     rescue ::RedisClient::ConnectionError, ::RedisClient::Cluster::NodeMightBeDown
       @cluster_down_error_count += 1
+      sleep wait_sec
     rescue ::RedisClient::CommandError => e
       raise unless e.message.start_with?('CLUSTERDOWN')
 
       @cluster_down_error_count += 1
+      sleep wait_sec
     rescue ::RedisClient::Cluster::ErrorCollection => e
       raise unless e.errors.values.all? do |err|
         err.message.start_with?('CLUSTERDOWN') || err.is_a?(::RedisClient::ConnectionError)
       end
 
       @cluster_down_error_count += 1
-    ensure
       sleep wait_sec
     end
   end
