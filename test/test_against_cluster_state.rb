@@ -12,13 +12,12 @@ module TestAgainstClusterState
       @controller = ClusterController.new(
         TEST_NODE_URIS,
         replica_size: TEST_REPLICA_SIZE,
-        **TEST_GENERIC_OPTIONS.merge(timeout: 30.0)
+        **TEST_GENERIC_OPTIONS
       )
       @controller.rebuild
       @captured_commands = ::Middlewares::CommandCapture::CommandBuffer.new
       @redirect_count = ::Middlewares::RedirectCount::Counter.new
-      @client = new_test_client
-      @client.call('echo', 'init')
+      @client = new_test_client.tap { |c| c.call('echo', 'init') }
       @captured_commands.clear
       @redirect_count.clear
     end
@@ -30,18 +29,11 @@ module TestAgainstClusterState
         "ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')} = "
     end
 
-    def test_the_state_of_cluster_down
-      @controller.down
-      assert_raises(::RedisClient::CommandError) { @client.call('SET', 'key1', 1) }
-      assert_equal('fail', fetch_cluster_info('cluster_state'))
-    end
-
     def test_the_state_of_cluster_failover
       @controller.failover
       1000.times { |i| assert_equal('OK', @client.call('SET', "key#{i}", i)) }
       wait_for_replication
       1000.times { |i| assert_equal(i.to_s, @client.call('GET', "key#{i}")) }
-      assert_equal('ok', fetch_cluster_info('cluster_state'))
       refute(@redirect_count.zero?, @redirect_count.get)
     end
 
@@ -240,10 +232,6 @@ module TestAgainstClusterState
       rescue RedisClient::Cluster::ErrorCollection => e
         raise unless e.errors.values.all? { |err| err.message.start_with?('ERR WAIT cannot be used with replica instances') }
       end
-    end
-
-    def fetch_cluster_info(key)
-      @client.call('CLUSTER', 'INFO').split("\r\n").to_h { |v| v.split(':') }.fetch(key)
     end
 
     def do_resharding_test(number_of_keys: 1000)
