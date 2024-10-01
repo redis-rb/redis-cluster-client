@@ -164,6 +164,7 @@ class TestAgainstClusterDown < TestingWrapper
           event = ps.next_event(0.01)
           case event&.first
           when 'smessage' then r.set(event[2])
+          when 'sunsubscribe' then ps.call('ssubscribe', 'chan')
           end
         end
       ensure
