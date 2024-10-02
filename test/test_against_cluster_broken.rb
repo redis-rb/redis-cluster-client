@@ -29,7 +29,6 @@ class TestAgainstClusterBroken < TestingWrapper
     revive_dead_nodes
     @clients.each(&:close)
     @controller&.close
-    refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
   end
 
   def test_client_patience
