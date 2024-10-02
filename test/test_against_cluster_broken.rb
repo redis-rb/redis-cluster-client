@@ -78,6 +78,7 @@ class TestAgainstClusterBroken < TestingWrapper
   def do_assertions(offset:)
     @captured_commands.clear
     @redirect_count.clear
+    @cluster_down_error_count = 0
 
     log_info('assertions') do
       log_info('assertions: single') do
