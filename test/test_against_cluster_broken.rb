@@ -33,7 +33,7 @@ class TestAgainstClusterBroken < TestingWrapper
   end
 
   def test_client_patience
-    failover_manually
+    do_manual_failover
     wait_for_cluster_to_be_ready
     do_assertions(offset: 0)
 
@@ -143,7 +143,7 @@ class TestAgainstClusterBroken < TestingWrapper
     end
   end
 
-  def failover_manually
+  def do_manual_failover
     log_info('failover') do
       @controller.failover
     end
