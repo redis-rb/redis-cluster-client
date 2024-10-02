@@ -29,14 +29,6 @@ module TestAgainstClusterState
         "ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')} = "
     end
 
-    def test_the_state_of_cluster_failover
-      @controller.failover
-      1000.times { |i| assert_equal('OK', @client.call('SET', "key#{i}", i)) }
-      wait_for_replication
-      1000.times { |i| assert_equal(i.to_s, @client.call('GET', "key#{i}")) }
-      refute(@redirect_count.zero?, @redirect_count.get)
-    end
-
     def test_the_state_of_cluster_resharding
       resharded_keys = nil
       do_resharding_test do |keys|

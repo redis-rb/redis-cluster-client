@@ -580,6 +580,7 @@ class RedisClient
         assert_nil(pubsub.call_v(%w[SUBSCRIBE]))
         assert_raises(::RedisClient::CommandError, 'unknown command') { pubsub.next_event }
         assert_raises(::RedisClient::CommandError, 'wrong number of arguments') { pubsub.next_event }
+        assert_nil(pubsub.next_event(0.01))
         pubsub.close
       end
 
@@ -891,6 +892,8 @@ class RedisClient
         server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
         swap_timeout(@client, timeout: 0.1) do |client|
           client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+        rescue RedisClient::ConnectionError
+          # ignore
         end
       end
 

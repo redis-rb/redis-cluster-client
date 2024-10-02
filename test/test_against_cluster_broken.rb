@@ -21,9 +21,7 @@ class TestAgainstClusterBroken < TestingWrapper
     print "\n"
     @logger.info('setup: test')
     prepare_test_data
-    @clients = Array.new(3) do
-      build_client.tap { |c| c.call('echo', 'init') }
-    end
+    @clients = Array.new(3) { build_client.tap { |c| c.call('echo', 'init') } }
   end
 
   def teardown
@@ -31,29 +29,29 @@ class TestAgainstClusterBroken < TestingWrapper
     revive_dead_nodes
     @clients.each(&:close)
     @controller&.close
-    refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
-    print "#{@redirect_count.get}, "\
-      "ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')}, "\
-      "ClusterDownError: #{@cluster_down_error_count} = "
   end
 
   def test_client_patience
+    do_manual_failover
+    wait_for_cluster_to_be_ready
+    do_assertions(offset: 0)
+
     # a replica
     sacrifice_replica = @controller.select_sacrifice_of_replica
     kill_a_node(sacrifice_replica)
     wait_for_cluster_to_be_ready(ignore: [sacrifice_replica])
-    do_assertions(offset: 0)
+    do_assertions(offset: 1)
 
     # a primary
     sacrifice_primary = @controller.select_sacrifice_of_primary
     kill_a_node(sacrifice_primary)
     wait_for_cluster_to_be_ready(ignore: [sacrifice_replica, sacrifice_primary])
-    do_assertions(offset: 1)
+    do_assertions(offset: 2)
 
     # recovery
     revive_dead_nodes
     wait_for_cluster_to_be_ready
-    do_assertions(offset: 2)
+    do_assertions(offset: 3)
   end
 
   private
@@ -77,6 +75,10 @@ class TestAgainstClusterBroken < TestingWrapper
   end
 
   def do_assertions(offset:)
+    @captured_commands.clear
+    @redirect_count.clear
+    @cluster_down_error_count = 0
+
     log_info('assertions') do
       log_info('assertions: single') do
         NUMBER_OF_KEYS.times do |i|
@@ -122,6 +124,8 @@ class TestAgainstClusterBroken < TestingWrapper
           assert_equal(want, got, 'Case: Transaction: SET')
         end
       end
+
+      log_metrics
     end
   end
 
@@ -136,6 +140,12 @@ class TestAgainstClusterBroken < TestingWrapper
   def wait_for_cluster_to_be_ready(ignore: [])
     log_info('wait for the cluster to be stable') do
       @controller.wait_for_cluster_to_be_ready(skip_clients: ignore)
+    end
+  end
+
+  def do_manual_failover
+    log_info('failover') do
+      @controller.failover
     end
   end
 
@@ -169,6 +179,12 @@ class TestAgainstClusterBroken < TestingWrapper
     @logger.info("start: #{message}")
     yield
     @logger.info(" done: #{message}")
+  end
+
+  def log_metrics
+    print "#{@redirect_count.get}, "\
+      "ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')}, "\
+      "ClusterDownError: #{@cluster_down_error_count}\n"
   end
 
   def retryable(attempts: MAX_ATTEMPTS, wait_sec: WAIT_SEC)

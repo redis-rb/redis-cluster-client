@@ -6,6 +6,7 @@ gemspec name: 'redis-cluster-client'
 gem 'async-redis', platform: :mri
 gem 'benchmark-ips'
 gem 'hiredis-client', '~> 0.6'
+gem 'logger'
 gem 'memory_profiler'
 gem 'minitest'
 gem 'rake'
