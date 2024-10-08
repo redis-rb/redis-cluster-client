@@ -892,8 +892,9 @@ class RedisClient
         server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
         swap_timeout(@client, timeout: 0.1) do |client|
           client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
-        rescue RedisClient::ConnectionError
-          # ignore
+        rescue RedisClient::Cluster::ErrorCollection => e
+          # FIXME: flaky in jruby on #test_pubsub_with_wrong_command
+          raise unless e.errors.values.all? { |err| err.is_a?(::RedisClient::ConnectionError) }
         end
       end
 

@@ -4,7 +4,12 @@ require 'testing_helper'
 
 class TestAgainstClusterDown < TestingWrapper
   WAIT_SEC = 0.1
-  NUMBER_OF_JOBS = 5
+  CASES = %w[Single Pipeline Transaction Subscriber Publisher].freeze
+  SINGLE_KEYS = %w[single1 single3 single4].freeze
+  PIPELINE_KEYS = %w[pipeline1 pipeline2 pipeline4].freeze
+  TRANSACTION_KEYS = %w[transaction1 transaction3 transaction4].freeze
+  CHANNELS = %w[chan1 chan2 chan3].freeze
+  NUMBER_OF_JOBS = SINGLE_KEYS.size + PIPELINE_KEYS.size + TRANSACTION_KEYS.size + CHANNELS.size * 2
 
   def setup
     @captured_commands = ::Middlewares::CommandCapture::CommandBuffer.new
@@ -28,12 +33,13 @@ class TestAgainstClusterDown < TestingWrapper
   end
 
   def test_recoverability_from_cluster_down
-    cases = %w[Single Pipeline Transaction Subscriber Publisher]
-    @threads << spawn_single(@clients[0], @recorders[0])
-    @threads << spawn_pipeline(@clients[1], @recorders[1])
-    @threads << spawn_transaction(@clients[2], @recorders[2])
-    @threads << spawn_subscriber(@clients[3], @recorders[3])
-    @threads << spawn_publisher(@clients[4], @recorders[4])
+    SINGLE_KEYS.each_with_index { |key, i| @threads << spawn_single(@clients[i], @recorders[i], key) }
+    PIPELINE_KEYS.each_with_index { |key, i| @threads << spawn_pipeline(@clients[i + 3], @recorders[i + 3], key) }
+    TRANSACTION_KEYS.each_with_index { |key, i| @threads << spawn_transaction(@clients[i + 6], @recorders[i + 6], key) }
+    CHANNELS.each_with_index do |channel, i|
+      @threads << spawn_subscriber(@clients[i + 9], @recorders[i + 9], channel)
+      @threads << spawn_publisher(@clients[i + 12], @recorders[i + 12], channel)
+    end
     wait_for_jobs_to_be_stable
 
     system('docker compose --progress quiet down', exception: true)
@@ -50,7 +56,7 @@ class TestAgainstClusterDown < TestingWrapper
     wait_for_jobs_to_be_stable
     @values_b = @recorders.map { |r| r.get.to_i }
     @recorders.each_with_index do |_, i|
-      assert(@values_a[i] < @values_b[i], "#{cases[i]}: #{@values_a[i]} < #{@values_b[i]}")
+      assert(@values_a[i] < @values_b[i], "#{CASES[i]}: #{@values_a[i]} < #{@values_b[i]}")
     end
   end
 
@@ -80,13 +86,12 @@ class TestAgainstClusterDown < TestingWrapper
     )
   end
 
-  def spawn_single(cli, rec)
-    Thread.new(cli, rec) do |c, r|
+  def spawn_single(client, recorder, key)
+    Thread.new(client, recorder, key) do |cli, rec, k|
       loop do
         handle_errors do
-          c.call('incr', 'single')
-          reply = c.call('incr', 'single')
-          r.set(reply)
+          reply = cli.call('incr', k)
+          rec.set(reply)
         end
       ensure
         sleep WAIT_SEC
@@ -94,16 +99,16 @@ class TestAgainstClusterDown < TestingWrapper
     end
   end
 
-  def spawn_pipeline(cli, rec)
-    Thread.new(cli, rec) do |c, r|
+  def spawn_pipeline(client, recorder, key)
+    Thread.new(client, recorder, key) do |cli, rec, k|
       loop do
         handle_errors do
-          reply = c.pipelined do |pi|
-            pi.call('incr', 'pipeline')
-            pi.call('incr', 'pipeline')
+          reply = cli.pipelined do |pi|
+            pi.call('incr', k)
+            pi.call('incr', k)
           end
 
-          r.set(reply[1])
+          rec.set(reply.last)
         end
       ensure
         sleep WAIT_SEC
@@ -111,32 +116,17 @@ class TestAgainstClusterDown < TestingWrapper
     end
   end
 
-  def spawn_transaction(cli, rec)
-    Thread.new(cli, rec) do |c, r|
+  def spawn_transaction(client, recorder, key)
+    Thread.new(client, recorder, key) do |cli, rec, k|
       i = 0
       loop do
         handle_errors do
-          reply = c.multi(watch: i.odd? ? %w[transaction] : nil) do |tx|
-            i += 1
-            tx.call('incr', 'transaction')
-            tx.call('incr', 'transaction')
+          reply = cli.multi(watch: i.odd? ? [k] : nil) do |tx|
+            tx.call('incr', k)
+            tx.call('incr', k)
           end
 
-          r.set(reply[1])
-        end
-      ensure
-        sleep WAIT_SEC
-      end
-    end
-  end
-
-  def spawn_publisher(cli, rec)
-    Thread.new(cli, rec) do |c, r|
-      i = 0
-      loop do
-        handle_errors do
-          c.call('spublish', 'chan', i)
-          r.set(i)
+          rec.set(reply.last)
           i += 1
         end
       ensure
@@ -145,13 +135,29 @@ class TestAgainstClusterDown < TestingWrapper
     end
   end
 
-  def spawn_subscriber(cli, rec)
-    Thread.new(cli, rec) do |c, r|
+  def spawn_publisher(client, recorder, channel)
+    Thread.new(client, recorder, channel) do |cli, rec, chan|
+      i = 0
+      loop do
+        handle_errors do
+          cli.call('spublish', chan, i)
+        end
+
+        rec.set(i)
+        i += 1
+      ensure
+        sleep WAIT_SEC
+      end
+    end
+  end
+
+  def spawn_subscriber(client, recorder, channel)
+    Thread.new(client, recorder, channel) do |cli, rec, chan|
       ps = nil
 
       loop do
-        ps = c.pubsub
-        ps.call('ssubscribe', 'chan')
+        ps = cli.pubsub
+        ps.call('ssubscribe', chan)
         break
       rescue StandardError
         ps&.close
@@ -161,14 +167,12 @@ class TestAgainstClusterDown < TestingWrapper
 
       loop do
         handle_errors do
-          event = ps.next_event(0.01)
+          event = ps.next_event(WAIT_SEC)
           case event&.first
-          when 'smessage' then r.set(event[2])
-          when 'sunsubscribe' then ps.call('ssubscribe', 'chan')
+          when 'smessage' then rec.set(event[2])
+          when 'sunsubscribe' then ps.call('ssubscribe', chan)
           end
         end
-      ensure
-        sleep WAIT_SEC
       end
     rescue StandardError, SignalException
       ps&.close
