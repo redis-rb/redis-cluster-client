@@ -15,10 +15,10 @@ class RedisClient
 
     attr_reader :config
 
-    def initialize(config, pool: nil, concurrency: nil, **kwargs)
-      @config = config
+    def initialize(config = nil, pool: nil, concurrency: nil, **kwargs)
+      @config = config.nil? ? ClusterConfig.new(**kwargs) : config
       @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create(**(concurrency || {}))
-      @command_builder = config.command_builder
+      @command_builder = @config.command_builder
 
       @pool = pool
       @kwargs = kwargs

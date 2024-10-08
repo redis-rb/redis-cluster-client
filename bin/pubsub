@@ -5,57 +5,57 @@ require 'bundler/setup'
 require 'redis_cluster_client'
 
 module PubSubDebug
+  WAIT_SEC = 2.0
+
   module_function
 
-  def spawn_publisher(cli, chan)
-    Thread.new(cli, chan) do |r, c|
-      role = ' Publisher'
+  def spawn_publisher(client, channel)
+    Thread.new(client, channel) do |cli, chan|
+      role = 'Publisher'
       i = 0
 
       loop do
         handle_errors(role) do
-          msg = format('%05d', i)
-          r.call('spublish', c, msg)
-          log "#{role}: sent: #{msg}"
+          cli.call('spublish', chan, i)
+          log(role, :spublish, chan, i)
           i += 1
         end
       ensure
-        sleep 1.0
+        sleep WAIT_SEC
       end
     rescue StandardError => e
-      log "#{role}: dead: #{e.class}: #{e.message}"
+      log(role, :dead, e.class, e.message)
       raise
     end
   end
 
-  def spawn_subscriber(cli, chan) # rubocop:disable Metrics/AbcSize
-    Thread.new(cli, chan) do |r, c|
+  def spawn_subscriber(client, channel) # rubocop:disable Metrics/AbcSize
+    Thread.new(client, channel) do |cli, chan|
       role = 'Subscriber'
       ps = nil
 
       loop do
-        ps = r.pubsub
-        ps.call('ssubscribe', c)
-        log "#{role}: done: subscription started to #{c}"
+        ps = cli.pubsub
+        ps.call('ssubscribe', chan)
         break
       rescue StandardError => e
-        log "#{role}: init: #{e.class}: #{e.message}"
+        log(role, :init, e.class, e.message)
         ps&.close
       ensure
-        sleep 1.0
+        sleep WAIT_SEC
       end
 
       loop do
         handle_errors('Subscriber') do
-          e = ps.next_event(0.01)
-          log "#{role}: recv: #{e.nil? ? 'nil' : e}"
-          ps.call('ssubscribe', c) if !e.nil? && e.first == 'sunsubscribe'
+          event = ps.next_event(WAIT_SEC)
+          log(role, *event) unless event.nil?
+          case event&.first
+          when 'sunsubscribe' then ps.call('ssubscribe', chan)
+          end
         end
-      ensure
-        sleep 1.0
       end
     rescue StandardError, SignalException => e
-      log "#{role}: dead: #{e.class}: #{e.message}"
+      log(role, :dead, e.class, e.message)
       ps&.close
       raise
     end
@@ -64,23 +64,26 @@ module PubSubDebug
   def handle_errors(role)
     yield
   rescue RedisClient::ConnectionError, RedisClient::Cluster::InitialSetupError, RedisClient::Cluster::NodeMightBeDown => e
-    log "#{role}: recv: #{e.class}"
+    log(role, e.class)
   rescue RedisClient::CommandError => e
-    log "#{role}: recv: #{e.class}: #{e.message}"
+    log(role, e.class, e.message)
     raise unless e.message.start_with?('CLUSTERDOWN')
   rescue StandardError => e
-    log "#{role}: recv: #{e.class}: #{e.message}"
+    log(role, e.class, e.message)
     raise
   end
 
-  def log(msg)
-    print "#{msg}\n"
+  def log(*texts)
+    return if texts.nil? || texts.empty?
+
+    message = texts.map { |text| "#{' ' * [15 - text.to_s.size, 0].max}#{text}" }.join(': ')
+    print "#{message}\n"
   end
 end
 
-clients = Array.new(2) { RedisClient.cluster(connect_with_original_config: true).new_client }
+nodes = (6379..6384).map { |port| "redis://127.0.0.1:#{port}" }.freeze
+clients = Array.new(6) { RedisClient.cluster(nodes: nodes, connect_with_original_config: true).new_client }.freeze
 threads = []
-channel = 'chan1'
 
 Signal.trap(:INT) do
   threads.each(&:exit)
@@ -89,6 +92,9 @@ Signal.trap(:INT) do
   exit 0
 end
 
-threads << PubSubDebug.spawn_subscriber(clients[0], channel)
-threads << PubSubDebug.spawn_publisher(clients[1], channel)
+%w[chan1 chan2 chan3].each_with_index do |channel, i|
+  threads << PubSubDebug.spawn_subscriber(clients[i], channel)
+  threads << PubSubDebug.spawn_publisher(clients[i + 3], channel)
+end
+
 threads.each(&:join)
