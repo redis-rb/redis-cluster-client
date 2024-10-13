@@ -36,10 +36,18 @@ class RedisClient
           # It is a fixed size but we can modify the size with some environment variables.
           # So it consumes memory 1 MB multiplied a number of workers.
           Thread.new(client, queue) do |pubsub, q|
+            prev_err = nil
+
             loop do
               q << pubsub.next_event
+              prev_err = nil
             rescue StandardError => e
-              q << e
+              if e.instance_of?(prev_err.class) && e.message == prev_err&.message
+                sleep 0.005
+              else
+                q << e
+                prev_err = e
+              end
             end
           end
         end
@@ -160,7 +168,6 @@ class RedisClient
           @router.renew_cluster_state
           @state_dict.each_value(&:close)
           @state_dict.clear
-          @queue.clear
           @commands.each { |command| _call(command) }
           break
         rescue ::RedisClient::ConnectionError, ::RedisClient::Cluster::NodeMightBeDown
