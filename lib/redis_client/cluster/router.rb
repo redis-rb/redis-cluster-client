@@ -90,7 +90,7 @@ class RedisClient
 
       # @see https://redis.io/docs/reference/cluster-spec/#redirection-and-resharding Redirection and resharding
       def try_send(node, method, command, args, retry_count: 3, &block)
-        handle_redirection(node, retry_count: retry_count) do |on_node|
+        handle_redirection(node, command, retry_count: retry_count) do |on_node|
           if args.empty?
             # prevent memory allocation for variable-length args
             on_node.public_send(method, command, &block)
@@ -101,12 +101,12 @@ class RedisClient
       end
 
       def try_delegate(node, method, *args, retry_count: 3, **kwargs, &block)
-        handle_redirection(node, retry_count: retry_count) do |on_node|
+        handle_redirection(node, nil, retry_count: retry_count) do |on_node|
           on_node.public_send(method, *args, **kwargs, &block)
         end
       end
 
-      def handle_redirection(node, retry_count:) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      def handle_redirection(node, command, retry_count:) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         yield node
       rescue ::RedisClient::CircuitBreaker::OpenCircuitError
         raise
@@ -134,6 +134,17 @@ class RedisClient
 
         retry_count -= 1
         renew_cluster_state
+
+        if retry_count >= 0
+          # Find the node to use for this command - if this fails for some reason, though, re-use
+          # the old node.
+          begin
+            node = find_node(find_node_key(command)) if command
+          rescue StandardError # rubocop:disable Lint/SuppressedException
+          end
+          retry
+        end
+
         retry if retry_count >= 0
         raise
       end
