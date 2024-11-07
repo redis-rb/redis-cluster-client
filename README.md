@@ -267,59 +267,6 @@ end
 but because you may have written non-idempotent code inside your block, the block is called once if e.g. the slot
 it is operating on moves to a different node.
 
-#### IMO
-
-https://redis.io/docs/interact/transactions/#errors-inside-a-transaction
-
-> Errors happening after EXEC instead are not handled in a special way: all the other commands will be executed even if some command fails during the transaction.
-> It's important to note that even when a command fails, all the other commands in the queue are processed - Redis will not stop the processing of commands.
-
-```
-$ telnet 127.0.0.1 6379
-set key3 a
-+OK
-multi
-+OK
-set key3 b
-+QUEUED
-incr key3
-+QUEUED
-exec
-*2
-+OK
--ERR value is not an integer or out of range
-get key3
-$1
-b
-```
-
-The `SET` command was processed because the `INCR` command was queued.
-
-```
-multi
-+OK
-set key3 c
-+QUEUED
-mybad key3 d
--ERR unknown command 'mybad', with args beginning with: 'key3' 'd'
-exec
--EXECABORT Transaction discarded because of previous errors.
-get key3
-$1
-b
-```
-
-The `SET` command wasn't processed because of the error during the queueing.
-
-https://redis.io/docs/interact/transactions/#what-about-rollbacks
-
-> Redis does not support rollbacks of transactions since supporting rollbacks would have a significant impact on the simplicity and performance of Redis.
-
-It's hard to validate them perfectly in advance on the client side.
-It seems that Redis aims to prior simplicity and performance efficiency.
-So I think it's wrong to use the transaction feature by complex ways.
-To say nothing of the cluster mode because of the CAP theorem. Redis is just a key-value store.
-
 ## ACL
 The cluster client internally calls [COMMAND](https://redis.io/commands/command/) and [CLUSTER NODES](https://redis.io/commands/cluster-nodes/) commands to operate correctly.
 So please permit it like the followings.
