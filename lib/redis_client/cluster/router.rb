@@ -21,10 +21,10 @@ class RedisClient
 
       private_constant :ZERO_CURSOR_FOR_SCAN, :TSF
 
+      attr_reader :config
+
       def initialize(config, concurrent_worker, pool: nil, **kwargs)
-        @config = config.dup
-        @original_config = config.dup if config.connect_with_original_config
-        @connect_with_original_config = config.connect_with_original_config
+        @config = config
         @concurrent_worker = concurrent_worker
         @pool = pool
         @client_kwargs = kwargs
@@ -32,6 +32,9 @@ class RedisClient
         @node.reload!
         @command = ::RedisClient::Cluster::Command.load(@node.replica_clients.shuffle, slow_command_timeout: config.slow_command_timeout)
         @command_builder = @config.command_builder
+      rescue ::RedisClient::Cluster::InitialSetupError => e
+        e.with_config(config)
+        raise
       end
 
       def send_command(method, command, *args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
@@ -58,9 +61,9 @@ class RedisClient
         when 'flushall', 'flushdb'
           @node.call_primaries(method, command, args).first.then(&TSF.call(block))
         when 'readonly', 'readwrite', 'shutdown'
-          raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, cmd
+          raise ::RedisClient::Cluster::OrchestrationCommandNotSupported.from_command(cmd).with_config(@config)
         when 'discard', 'exec', 'multi', 'unwatch'
-          raise ::RedisClient::Cluster::AmbiguousNodeError, cmd
+          raise ::RedisClient::Cluster::AmbiguousNodeError.from_command(cmd).with_config(@config)
         else
           node = assign_node(command)
           try_send(node, method, command, args, &block)
@@ -69,7 +72,7 @@ class RedisClient
         raise
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
         renew_cluster_state
-        raise ::RedisClient::Cluster::NodeMightBeDown
+        raise ::RedisClient::Cluster::NodeMightBeDown.new.with_config(@config)
       rescue ::RedisClient::ConnectionError
         renew_cluster_state
         raise
@@ -77,6 +80,7 @@ class RedisClient
         renew_cluster_state if e.message.start_with?('CLUSTERDOWN')
         raise
       rescue ::RedisClient::Cluster::ErrorCollection => e
+        e.with_config(@config)
         raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
 
         renew_cluster_state if e.errors.values.any? do |err|
@@ -189,7 +193,7 @@ class RedisClient
           node_key = primary ? @node.find_node_key_of_primary(slot) : @node.find_node_key_of_replica(slot)
           if node_key.nil?
             renew_cluster_state
-            raise ::RedisClient::Cluster::NodeMightBeDown
+            raise ::RedisClient::Cluster::NodeMightBeDown.new.with_config(@config)
           end
           node_key
         else
@@ -303,7 +307,7 @@ class RedisClient
         case subcommand = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_subcommand(command)
         when 'addslots', 'delslots', 'failover', 'forget', 'meet', 'replicate',
              'reset', 'set-config-epoch', 'setslot'
-          raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, ['cluster', subcommand]
+          raise ::RedisClient::Cluster::OrchestrationCommandNotSupported.from_command(['cluster', subcommand]).with_config(@config)
         when 'saveconfig' then @node.call_all(method, command, args).first.then(&TSF.call(block))
         when 'getkeysinslot'
           raise ArgumentError, command.join(' ') if command.size != 4
@@ -347,7 +351,10 @@ class RedisClient
       end
 
       def send_watch_command(command)
-        raise ::RedisClient::Cluster::Transaction::ConsistencyError, 'A block required. And you need to use the block argument as a client for the transaction.' unless block_given?
+        unless block_given?
+          msg = 'A block required. And you need to use the block argument as a client for the transaction.'
+          raise ::RedisClient::Cluster::Transaction::ConsistencyError.new(msg).with_config(@config)
+        end
 
         ::RedisClient::Cluster::OptimisticLocking.new(self).watch(command[1..]) do |c, slot, asking|
           transaction = ::RedisClient::Cluster::Transaction.new(
@@ -401,7 +408,7 @@ class RedisClient
       def handle_node_reload_error(retry_count: 1)
         yield
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
-        raise ::RedisClient::Cluster::NodeMightBeDown if retry_count <= 0
+        raise ::RedisClient::Cluster::NodeMightBeDown.new.with_config(@config) if retry_count <= 0
 
         retry_count -= 1
         renew_cluster_state

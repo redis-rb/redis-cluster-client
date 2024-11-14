@@ -21,7 +21,7 @@ class RedisClient
           { errors: '', want: 'Redis client could not fetch cluster information: ' },
           { errors: nil, want: 'Redis client could not fetch cluster information: ' }
         ].each_with_index do |c, idx|
-          raise ::RedisClient::Cluster::InitialSetupError, c[:errors]
+          raise ::RedisClient::Cluster::InitialSetupError.from_errors(c[:errors])
         rescue StandardError => e
           assert_equal(c[:want], e.message, "Case: #{idx}")
         end
@@ -34,7 +34,7 @@ class RedisClient
           { command: '', want: ' command should be' },
           { command: nil, want: ' command should be' }
         ].each_with_index do |c, idx|
-          raise ::RedisClient::Cluster::OrchestrationCommandNotSupported, c[:command]
+          raise ::RedisClient::Cluster::OrchestrationCommandNotSupported.from_command(c[:command])
         rescue StandardError => e
           assert(e.message.start_with?(c[:want]), "Case: #{idx}")
         end
@@ -55,7 +55,7 @@ class RedisClient
           { errors: '', want: { msg: '', size: 0 } },
           { errors: nil, want: { msg: '', size: 0 } }
         ].each_with_index do |c, idx|
-          raise ::RedisClient::Cluster::ErrorCollection, c[:errors]
+          raise ::RedisClient::Cluster::ErrorCollection.with_errors(c[:errors])
         rescue StandardError => e
           assert_equal(c[:want][:msg], e.message, "Case: #{idx}")
           assert_equal(c[:want][:size], e.errors.size, "Case: #{idx}")
@@ -67,7 +67,7 @@ class RedisClient
           { command: 'MULTI', want: "Cluster client doesn't know which node the MULTI command should be sent to." },
           { command: nil, want: "Cluster client doesn't know which node the  command should be sent to." }
         ].each_with_index do |c, idx|
-          raise ::RedisClient::Cluster::AmbiguousNodeError, c[:command]
+          raise ::RedisClient::Cluster::AmbiguousNodeError.from_command(c[:command])
         rescue StandardError => e
           assert_equal(e.message, c[:want], "Case: #{idx}")
         end

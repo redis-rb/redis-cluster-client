@@ -25,7 +25,7 @@ class RedisClient
       )
 
       class << self
-        def load(nodes, slow_command_timeout: -1)
+        def load(nodes, slow_command_timeout: -1) # rubocop:disable Metrics/AbcSize
           cmd = errors = nil
 
           nodes&.each do |node|
@@ -43,7 +43,7 @@ class RedisClient
 
           return cmd unless cmd.nil?
 
-          raise ::RedisClient::Cluster::InitialSetupError, errors
+          raise ::RedisClient::Cluster::InitialSetupError.from_errors(errors)
         end
 
         private
