@@ -28,7 +28,7 @@ class RedisClient
       private_constant :USE_CHAR_ARRAY_SLOT, :SLOT_SIZE, :MIN_SLOT, :MAX_SLOT,
                        :DEAD_FLAGS, :ROLE_FLAGS, :EMPTY_ARRAY, :EMPTY_HASH
 
-      ReloadNeeded = Class.new(::RedisClient::Error)
+      ReloadNeeded = Class.new(::RedisClient::Cluster::Error)
 
       Info = Struct.new(
         'RedisClusterNode',
@@ -148,7 +148,7 @@ class RedisClient
 
         raise ReloadNeeded if errors.values.any?(::RedisClient::ConnectionError)
 
-        raise ::RedisClient::Cluster::ErrorCollection, errors
+        raise ::RedisClient::Cluster::ErrorCollection.with_errors(errors)
       end
 
       def clients_for_scanning(seed: nil)
@@ -267,7 +267,7 @@ class RedisClient
         result_values, errors = call_multiple_nodes(clients, method, command, args, &block)
         return result_values if errors.nil? || errors.empty?
 
-        raise ::RedisClient::Cluster::ErrorCollection, errors
+        raise ::RedisClient::Cluster::ErrorCollection.with_errors(errors)
       end
 
       def try_map(clients, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
@@ -334,7 +334,7 @@ class RedisClient
 
         work_group.close
 
-        raise ::RedisClient::Cluster::InitialSetupError, errors if node_info_list.nil?
+        raise ::RedisClient::Cluster::InitialSetupError.from_errors(errors) if node_info_list.nil?
 
         grouped = node_info_list.compact.group_by do |info_list|
           info_list.sort_by!(&:id)

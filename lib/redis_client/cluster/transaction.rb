@@ -1,12 +1,13 @@
 # frozen_string_literal: true
 
 require 'redis_client'
+require 'redis_client/cluster/errors'
 require 'redis_client/cluster/pipeline'
 
 class RedisClient
   class Cluster
     class Transaction
-      ConsistencyError = Class.new(::RedisClient::Error)
+      ConsistencyError = Class.new(::RedisClient::Cluster::Error)
 
       MAX_REDIRECTION = 2
       EMPTY_ARRAY = [].freeze
@@ -67,7 +68,7 @@ class RedisClient
         @pending_commands.each(&:call)
 
         return EMPTY_ARRAY if @pipeline._empty?
-        raise ConsistencyError, "couldn't determine the node: #{@pipeline._commands}" if @node.nil?
+        raise ConsistencyError.new("couldn't determine the node: #{@pipeline._commands}").with_config(@router.config) if @node.nil?
 
         commit
       end
@@ -163,7 +164,7 @@ class RedisClient
 
       def handle_command_error!(err, redirect:) # rubocop:disable Metrics/AbcSize
         if err.message.start_with?('CROSSSLOT')
-          raise ConsistencyError, "#{err.message}: #{err.command}"
+          raise ConsistencyError.new("#{err.message}: #{err.command}").with_config(@router.config)
         elsif err.message.start_with?('MOVED')
           node = @router.assign_redirection_node(err.message)
           send_transaction(node, redirect: redirect - 1)
@@ -183,7 +184,7 @@ class RedisClient
         return if slots.size == 1 && @watching_slot.nil?
         return if slots.size == 1 && @watching_slot == slots.first
 
-        raise(ConsistencyError, "the transaction should be executed to a slot in a node: #{commands}")
+        raise ConsistencyError.new("the transaction should be executed to a slot in a node: #{commands}").with_config(@router.config)
       end
 
       def try_asking(node)

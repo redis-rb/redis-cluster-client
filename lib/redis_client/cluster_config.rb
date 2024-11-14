@@ -3,6 +3,7 @@
 require 'uri'
 require 'redis_client'
 require 'redis_client/cluster'
+require 'redis_client/cluster/errors'
 require 'redis_client/cluster/node_key'
 require 'redis_client/command_builder'
 
@@ -27,7 +28,7 @@ class RedisClient
                      :VALID_SCHEMES, :VALID_NODES_KEYS, :MERGE_CONFIG_KEYS, :IGNORE_GENERIC_CONFIG_KEYS,
                      :MAX_WORKERS, :SLOW_COMMAND_TIMEOUT, :MAX_STARTUP_SAMPLE
 
-    InvalidClientConfigError = Class.new(::RedisClient::Error)
+    InvalidClientConfigError = Class.new(::RedisClient::Cluster::Error)
 
     attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout,
                 :connect_with_original_config, :startup_nodes, :max_startup_sample
@@ -90,6 +91,18 @@ class RedisClient
       config = ::RedisClient::Cluster::NodeKey.hashify(node_key)
       config[:port] = ensure_integer(config[:port])
       augment_client_config(config)
+    end
+
+    def resolved?
+      true
+    end
+
+    def sentinel?
+      false
+    end
+
+    def server_url
+      nil
     end
 
     private
