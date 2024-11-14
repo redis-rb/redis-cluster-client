@@ -31,7 +31,7 @@ class RedisClient
     InvalidClientConfigError = Class.new(::RedisClient::Cluster::Error)
 
     attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout,
-                :connect_with_original_config, :startup_nodes, :max_startup_sample
+                :connect_with_original_config, :startup_nodes, :max_startup_sample, :id
 
     def initialize( # rubocop:disable Metrics/ParameterLists
       nodes: DEFAULT_NODES,
@@ -60,6 +60,7 @@ class RedisClient
       @client_implementation = client_implementation
       @slow_command_timeout = slow_command_timeout
       @max_startup_sample = max_startup_sample
+      @id = client_config[:id]
     end
 
     def inspect

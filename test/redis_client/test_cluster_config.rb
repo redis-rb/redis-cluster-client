@@ -190,5 +190,10 @@ class RedisClient
                      custom: { foo: 'bar' }
                    }, config.client_config_for_node('9.9.9.9:9999'))
     end
+
+    def test_client_config_id
+      assert_equal('foo-cluster', ::RedisClient::ClusterConfig.new(id: 'foo-cluster').id)
+      assert_nil(::RedisClient::ClusterConfig.new.id)
+    end
   end
 end
