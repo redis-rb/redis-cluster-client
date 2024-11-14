@@ -44,7 +44,6 @@ class RedisClient
       slow_command_timeout: SLOW_COMMAND_TIMEOUT,
       command_builder: ::RedisClient::CommandBuilder,
       max_startup_sample: MAX_STARTUP_SAMPLE,
-      id: nil,
       **client_config
     )
 
@@ -61,7 +60,7 @@ class RedisClient
       @client_implementation = client_implementation
       @slow_command_timeout = slow_command_timeout
       @max_startup_sample = max_startup_sample
-      @id = id
+      @id = client_config[:id]
     end
 
     def inspect
