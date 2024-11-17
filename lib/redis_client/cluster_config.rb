@@ -65,7 +65,7 @@ class RedisClient
     end
 
     def inspect
-      "#<#{self.class.name} #{startup_nodes.values.map { |v| v.except(:command_builder) }}>"
+      "#<#{self.class.name} #{startup_nodes.values.map { |v| v.reject { |k| k == :command_builder } }}>"
     end
 
     def read_timeout
