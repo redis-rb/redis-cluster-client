@@ -104,12 +104,6 @@ class RedisClient
         end
       end
 
-      def try_delegate(node, method, *args, retry_count: 3, **kwargs, &block)
-        handle_redirection(node, nil, retry_count: retry_count) do |on_node|
-          on_node.public_send(method, *args, **kwargs, &block)
-        end
-      end
-
       def handle_redirection(node, command, retry_count:) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         yield node
       rescue ::RedisClient::CircuitBreaker::OpenCircuitError
@@ -153,9 +147,7 @@ class RedisClient
         raise
       end
 
-      def scan(*command, seed: nil, **kwargs) # rubocop:disable Metrics/AbcSize
-        command = @command_builder.generate(command, kwargs)
-
+      def scan(command, seed: nil) # rubocop:disable Metrics/AbcSize
         command[1] = ZERO_CURSOR_FOR_SCAN if command.size == 1
         input_cursor = Integer(command[1])
 
@@ -178,6 +170,19 @@ class RedisClient
       rescue ::RedisClient::ConnectionError
         renew_cluster_state
         raise
+      end
+
+      def scan_single_key(command, arity:, &block)
+        node = assign_node(command)
+
+        handle_redirection(node, nil, retry_count: 3) do |on_node|
+          loop do
+            cursor, values = on_node.call_v(command)
+            command[2] = cursor
+            arity < 2 ? values.each(&block) : values.each_slice(arity, &block)
+            break if cursor == ZERO_CURSOR_FOR_SCAN
+          end
+        end
       end
 
       def assign_node(command)
