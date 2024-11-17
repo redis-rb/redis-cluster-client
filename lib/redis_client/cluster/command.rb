@@ -71,18 +71,7 @@ class RedisClient
         i = determine_first_key_position(command)
         return EMPTY_STRING if i == 0
 
-        (command[i].is_a?(Array) ? command[i].flatten.first : command[i]).to_s
-      end
-
-      def extract_all_keys(command)
-        keys_start = determine_first_key_position(command)
-        keys_end = determine_last_key_position(command, keys_start)
-        keys_step = determine_key_step(command)
-        return EMPTY_ARRAY if [keys_start, keys_end, keys_step].any?(&:zero?)
-
-        keys_end = [keys_end, command.size - 1].min
-        # use .. inclusive range because keys_end is a valid index.
-        (keys_start..keys_end).step(keys_step).map { |i| command[i] }
+        command[i]
       end
 
       def should_send_to_primary?(command)
@@ -116,44 +105,9 @@ class RedisClient
         end
       end
 
-      # IMPORTANT: this determines the last key position INCLUSIVE of the last key -
-      # i.e. command[determine_last_key_position(command)] is a key.
-      # This is in line with what Redis returns from COMMANDS.
-      def determine_last_key_position(command, keys_start) # rubocop:disable Metrics/AbcSize
-        case name = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
-        when 'eval', 'evalsha', 'zinterstore', 'zunionstore'
-          # EVALSHA sha1 numkeys [key [key ...]] [arg [arg ...]]
-          # ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE <SUM | MIN | MAX>]
-          command[2].to_i + 2
-        when 'object', 'memory'
-          # OBJECT [ENCODING | FREQ | IDLETIME | REFCOUNT] key
-          # MEMORY USAGE key [SAMPLES count]
-          keys_start
-        when 'migrate'
-          # MIGRATE host port <key | ""> destination-db timeout [COPY] [REPLACE] [AUTH password | AUTH2 username password] [KEYS key [key ...]]
-          command[3].empty? ? (command.length - 1) : 3
-        when 'xread', 'xreadgroup'
-          # XREAD [COUNT count] [BLOCK milliseconds] STREAMS key [key ...] id [id ...]
-          keys_start + ((command.length - keys_start) / 2) - 1
-        else
-          # If there is a fixed, non-variable number of keys, don't iterate past that.
-          if @commands[name].last_key_position >= 0
-            @commands[name].last_key_position
-          else
-            command.length + @commands[name].last_key_position
-          end
-        end
-      end
-
-      def determine_optional_key_position(command, option_name) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        idx = command&.flatten&.map(&:to_s)&.map(&:downcase)&.index(option_name&.downcase)
+      def determine_optional_key_position(command, option_name)
+        idx = command.map { |e| e.to_s.downcase }.index(option_name&.downcase)
         idx.nil? ? 0 : idx + 1
-      end
-
-      def determine_key_step(command)
-        name = ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
-        # Some commands like EVALSHA have zero as the step in COMMANDS somehow.
-        @commands[name].key_step == 0 ? 1 : @commands[name].key_step
       end
     end
   end

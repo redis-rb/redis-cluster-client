@@ -87,8 +87,6 @@ class RedisClient
           { command: %w[GET foo{bar}baz], want: 'foo{bar}baz' },
           { command: %w[MGET foo bar baz], want: 'foo' },
           { command: %w[UNKNOWN foo bar], want: '' },
-          { command: [['GET'], 'foo'], want: 'foo' },
-          { command: ['GET', ['foo']], want: 'foo' },
           { command: [], want: '' },
           { command: nil, want: '' }
         ].each_with_index do |c, idx|
@@ -151,7 +149,6 @@ class RedisClient
         cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
         [
           { command: %w[EVAL "return ARGV[1]" 0 hello], want: 3 },
-          { command: [['EVAL'], '"return ARGV[1]"', 0, 'hello'], want: 3 },
           { command: %w[EVALSHA sha1 2 foo bar baz zap], want: 3 },
           { command: %w[MIGRATE host port key 0 5 COPY], want: 3 },
           { command: ['MIGRATE', 'host', 'port', '', '0', '5', 'COPY', 'KEYS', 'key'], want: 8 },
@@ -164,7 +161,7 @@ class RedisClient
           { command: %w[XREADGROUP GROUP group consumer STREAMS key id], want: 5 },
           { command: %w[SET foo 1], want: 1 },
           { command: %w[set foo 1], want: 1 },
-          { command: [['SET'], 'foo', 1], want: 1 },
+          { command: ['SET', 'foo', 1], want: 1 },
           { command: %w[GET foo], want: 1 }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
@@ -179,59 +176,13 @@ class RedisClient
           { params: { command: %w[XREAD COUNT 2 STREAMS mystream writers 0-0 0-0], option_name: 'streams' }, want: 4 },
           { params: { command: %w[XREADGROUP GROUP group consumer STREAMS key id], option_name: 'streams' }, want: 5 },
           { params: { command: %w[GET foo], option_name: 'bar' }, want: 0 },
-          { params: { command: ['FOO', ['BAR'], 'BAZ'], option_name: 'bar' }, want: 2 },
+          { params: { command: %w[FOO BAR BAZ], option_name: 'bar' }, want: 2 },
           { params: { command: %w[FOO BAR BAZ], option_name: 'BAR' }, want: 2 },
           { params: { command: [], option_name: nil }, want: 0 },
-          { params: { command: [], option_name: '' }, want: 0 },
-          { params: { command: nil, option_name: nil }, want: 0 }
+          { params: { command: [], option_name: '' }, want: 0 }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
           got = cmd.send(:determine_optional_key_position, c[:params][:command], c[:params][:option_name])
-          assert_equal(c[:want], got, msg)
-        end
-      end
-
-      def test_determine_key_step
-        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
-        [
-          { name: 'MSET', want: 2 },
-          { name: 'MGET', want: 1 },
-          { name: 'DEL', want: 1 },
-          { name: 'EVALSHA', want: 1 }
-        ].each_with_index do |c, idx|
-          msg = "Case: #{idx}"
-          got = cmd.send(:determine_key_step, c[:name])
-          assert_equal(c[:want], got, msg)
-        end
-      end
-
-      def test_extract_all_keys
-        cmd = ::RedisClient::Cluster::Command.load(@raw_clients)
-        [
-          { command: ['EVAL', 'return ARGV[1]', '0', 'hello'], want: [] },
-          { command: ['EVAL', 'return ARGV[1]', '3', 'key1', 'key2', 'key3', 'arg1', 'arg2'], want: %w[key1 key2 key3] },
-          { command: [['EVAL'], '"return ARGV[1]"', 0, 'hello'], want: [] },
-          { command: %w[EVALSHA sha1 2 foo bar baz zap], want: %w[foo bar] },
-          { command: %w[MIGRATE host port key 0 5 COPY], want: %w[key] },
-          { command: ['MIGRATE', 'host', 'port', '', '0', '5', 'COPY', 'KEYS', 'key1'], want: %w[key1] },
-          { command: ['MIGRATE', 'host', 'port', '', '0', '5', 'COPY', 'KEYS', 'key1', 'key2'], want: %w[key1 key2] },
-          { command: %w[ZINTERSTORE out 2 zset1 zset2 WEIGHTS 2 3], want: %w[zset1 zset2] },
-          { command: %w[ZUNIONSTORE out 2 zset1 zset2 WEIGHTS 2 3], want: %w[zset1 zset2] },
-          { command: %w[OBJECT HELP], want: [] },
-          { command: %w[MEMORY HELP], want: [] },
-          { command: %w[MEMORY USAGE key], want: %w[key] },
-          { command: %w[XREAD COUNT 2 STREAMS mystream writers 0-0 0-0], want: %w[mystream writers] },
-          { command: %w[XREADGROUP GROUP group consumer STREAMS key id], want: %w[key] },
-          { command: %w[SET foo 1], want: %w[foo] },
-          { command: %w[set foo 1], want: %w[foo] },
-          { command: [['SET'], 'foo', 1], want: %w[foo] },
-          { command: %w[GET foo], want: %w[foo] },
-          { command: %w[MGET foo bar baz], want: %w[foo bar baz] },
-          { command: %w[MSET foo val bar val baz val], want: %w[foo bar baz] },
-          { command: %w[BLPOP foo bar 0], want: %w[foo bar] }
-        ].each_with_index do |c, idx|
-          msg = "Case: #{idx}"
-          got = cmd.send(:extract_all_keys, c[:command])
           assert_equal(c[:want], got, msg)
         end
       end
