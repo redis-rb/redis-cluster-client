@@ -1,3 +1,4 @@
 .bundle
 *.gem
+*.json
 Gemfile.lock

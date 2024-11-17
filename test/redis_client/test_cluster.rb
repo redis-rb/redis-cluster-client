@@ -92,8 +92,6 @@ class RedisClient
       end
 
       def test_scan
-        assert_raises(ArgumentError) { @client.scan }
-
         10.times { |i| @client.call('SET', "key#{i}", i) }
         wait_for_replication
         want = (0..9).map { |i| "key#{i}" }
@@ -117,9 +115,9 @@ class RedisClient
         10.times do |i|
           10.times { |j| @client.call('HSET', "key#{i}", "field#{j}", j) }
           wait_for_replication
-          want = (0..9).map { |j| "field#{j}" }
+          want = (0..9).map { |j| ["field#{j}", j.to_s] }
           got = []
-          @client.hscan("key#{i}", 'COUNT', '5') { |field| got << field }
+          @client.hscan("key#{i}", 'COUNT', '5') { |pair| got << pair }
           assert_equal(want, got.sort)
         end
       end
@@ -128,9 +126,9 @@ class RedisClient
         10.times do |i|
           10.times { |j| @client.call('ZADD', "key#{i}", j, "member#{j}") }
           wait_for_replication
-          want = (0..9).map { |j| "member#{j}" }
+          want = (0..9).map { |j| ["member#{j}", j.to_s] }
           got = []
-          @client.zscan("key#{i}", 'COUNT', '5') { |member| got << member }
+          @client.zscan("key#{i}", 'COUNT', '5') { |pair| got << pair }
           assert_equal(want, got.sort)
         end
       end

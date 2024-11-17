@@ -62,30 +62,37 @@ class RedisClient
     end
 
     def scan(*args, **kwargs, &block)
-      raise ArgumentError, 'block required' unless block
+      return to_enum(__callee__, *args, **kwargs) unless block_given?
 
+      command = @command_builder.generate(['SCAN', ZERO_CURSOR_FOR_SCAN] + args, kwargs)
       seed = Random.new_seed
-      cursor = ZERO_CURSOR_FOR_SCAN
       loop do
-        cursor, keys = router.scan('SCAN', cursor, *args, seed: seed, **kwargs)
+        cursor, keys = router.scan(command, seed: seed)
+        command[1] = cursor
         keys.each(&block)
         break if cursor == ZERO_CURSOR_FOR_SCAN
       end
     end
 
     def sscan(key, *args, **kwargs, &block)
-      node = router.assign_node(['SSCAN', key])
-      router.try_delegate(node, :sscan, key, *args, **kwargs, &block)
+      return to_enum(__callee__, key, *args, **kwargs) unless block_given?
+
+      command = @command_builder.generate(['SSCAN', key, ZERO_CURSOR_FOR_SCAN] + args, kwargs)
+      router.scan_single_key(command, arity: 1, &block)
     end
 
     def hscan(key, *args, **kwargs, &block)
-      node = router.assign_node(['HSCAN', key])
-      router.try_delegate(node, :hscan, key, *args, **kwargs, &block)
+      return to_enum(__callee__, key, *args, **kwargs) unless block_given?
+
+      command = @command_builder.generate(['HSCAN', key, ZERO_CURSOR_FOR_SCAN] + args, kwargs)
+      router.scan_single_key(command, arity: 2, &block)
     end
 
     def zscan(key, *args, **kwargs, &block)
-      node = router.assign_node(['ZSCAN', key])
-      router.try_delegate(node, :zscan, key, *args, **kwargs, &block)
+      return to_enum(__callee__, key, *args, **kwargs) unless block_given?
+
+      command = @command_builder.generate(['ZSCAN', key, ZERO_CURSOR_FOR_SCAN] + args, kwargs)
+      router.scan_single_key(command, arity: 2, &block)
     end
 
     def pipelined(exception: true)

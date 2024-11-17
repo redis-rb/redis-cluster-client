@@ -38,38 +38,38 @@ class RedisClient
         {
           config: ::RedisClient::ClusterConfig.new,
           want: {
-            '127.0.0.1:6379' => { host: '127.0.0.1', port: 6379 }
+            '127.0.0.1:6379' => { host: '127.0.0.1', port: 6379, command_builder: ::RedisClient::Cluster::NoopCommandBuilder }
           }
         },
         {
           config: ::RedisClient::ClusterConfig.new(replica: true),
           want: {
-            '127.0.0.1:6379' => { host: '127.0.0.1', port: 6379 }
+            '127.0.0.1:6379' => { host: '127.0.0.1', port: 6379, command_builder: ::RedisClient::Cluster::NoopCommandBuilder }
           }
         },
         {
           config: ::RedisClient::ClusterConfig.new(fixed_hostname: 'endpoint.example.com'),
           want: {
-            '127.0.0.1:6379' => { host: 'endpoint.example.com', port: 6379 }
+            '127.0.0.1:6379' => { host: 'endpoint.example.com', port: 6379, command_builder: ::RedisClient::Cluster::NoopCommandBuilder }
           }
         },
         {
           config: ::RedisClient::ClusterConfig.new(timeout: 1),
           want: {
-            '127.0.0.1:6379' => { host: '127.0.0.1', port: 6379, timeout: 1 }
+            '127.0.0.1:6379' => { host: '127.0.0.1', port: 6379, timeout: 1, command_builder: ::RedisClient::Cluster::NoopCommandBuilder }
           }
         },
         {
           config: ::RedisClient::ClusterConfig.new(nodes: ['redis://1.2.3.4:1234', 'rediss://5.6.7.8:5678']),
           want: {
-            '1.2.3.4:1234' => { host: '1.2.3.4', port: 1234 },
-            '5.6.7.8:5678' => { host: '5.6.7.8', port: 5678, ssl: true }
+            '1.2.3.4:1234' => { host: '1.2.3.4', port: 1234, command_builder: ::RedisClient::Cluster::NoopCommandBuilder },
+            '5.6.7.8:5678' => { host: '5.6.7.8', port: 5678, ssl: true, command_builder: ::RedisClient::Cluster::NoopCommandBuilder }
           }
         },
         {
           config: ::RedisClient::ClusterConfig.new(custom: { foo: 'bar' }),
           want: {
-            '127.0.0.1:6379' => { host: '127.0.0.1', port: 6379, custom: { foo: 'bar' } }
+            '127.0.0.1:6379' => { host: '127.0.0.1', port: 6379, custom: { foo: 'bar' }, command_builder: ::RedisClient::Cluster::NoopCommandBuilder }
           }
         }
       ].each_with_index do |c, idx|
@@ -182,13 +182,15 @@ class RedisClient
         nodes: ['redis://username:password@1.2.3.4:1234', 'rediss://5.6.7.8:5678'],
         custom: { foo: 'bar' }
       )
-      assert_equal({
-                     host: '9.9.9.9',
-                     port: 9999,
-                     username: 'username',
-                     password: 'password',
-                     custom: { foo: 'bar' }
-                   }, config.client_config_for_node('9.9.9.9:9999'))
+      want = {
+        host: '9.9.9.9',
+        port: 9999,
+        username: 'username',
+        password: 'password',
+        custom: { foo: 'bar' },
+        command_builder: ::RedisClient::Cluster::NoopCommandBuilder
+      }
+      assert_equal(want, config.client_config_for_node('9.9.9.9:9999'))
     end
 
     def test_client_config_id
