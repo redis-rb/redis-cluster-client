@@ -174,14 +174,11 @@ class RedisClient
 
       def scan_single_key(command, arity:, &block)
         node = assign_node(command)
-
-        handle_redirection(node, nil, retry_count: 3) do |on_node|
-          loop do
-            cursor, values = on_node.call_v(command)
-            command[2] = cursor
-            arity < 2 ? values.each(&block) : values.each_slice(arity, &block)
-            break if cursor == ZERO_CURSOR_FOR_SCAN
-          end
+        loop do
+          cursor, values = handle_redirection(node, nil, retry_count: 3) { |n| n.call_v(command) }
+          command[2] = cursor
+          arity < 2 ? values.each(&block) : values.each_slice(arity, &block)
+          break if cursor == ZERO_CURSOR_FOR_SCAN
         end
       end
 
