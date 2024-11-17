@@ -34,11 +34,14 @@ class RedisClient
     end
 
     class ErrorCollection < Error
+      EMPTY_HASH = {}.freeze
+
+      private_constant :EMPTY_HASH
       attr_reader :errors
 
       def self.with_errors(errors)
         if !errors.is_a?(Hash) || errors.empty?
-          new(errors.to_s).with_errors({})
+          new(errors.to_s).with_errors(EMPTY_HASH)
         else
           messages = errors.map { |node_key, error| "#{node_key}: (#{error.class}) #{error.message}" }
           new(messages.join(', ')).with_errors(errors)
