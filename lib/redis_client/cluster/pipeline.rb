@@ -2,6 +2,7 @@
 
 require 'redis_client'
 require 'redis_client/cluster/errors'
+require 'redis_client/cluster/noop_command_builder'
 require 'redis_client/connection_mixin'
 require 'redis_client/middlewares'
 require 'redis_client/pooled'
@@ -229,7 +230,7 @@ class RedisClient
 
       def append_pipeline(node_key)
         @pipelines ||= {}
-        @pipelines[node_key] ||= ::RedisClient::Cluster::Pipeline::Extended.new(@command_builder)
+        @pipelines[node_key] ||= ::RedisClient::Cluster::Pipeline::Extended.new(::RedisClient::Cluster::NoopCommandBuilder)
         @pipelines[node_key].add_outer_index(@size)
         @size += 1
         @pipelines[node_key]

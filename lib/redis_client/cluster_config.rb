@@ -5,6 +5,7 @@ require 'redis_client'
 require 'redis_client/cluster'
 require 'redis_client/cluster/errors'
 require 'redis_client/cluster/node_key'
+require 'redis_client/cluster/noop_command_builder'
 require 'redis_client/command_builder'
 
 class RedisClient
@@ -64,7 +65,7 @@ class RedisClient
     end
 
     def inspect
-      "#<#{self.class.name} #{startup_nodes.values}>"
+      "#<#{self.class.name} #{startup_nodes.values.map { |v| v.except(:command_builder) }}>"
     end
 
     def read_timeout
@@ -187,6 +188,7 @@ class RedisClient
     def augment_client_config(config)
       config = @client_config.merge(config)
       config = config.merge(host: @fixed_hostname) unless @fixed_hostname.empty?
+      config[:command_builder] = ::RedisClient::Cluster::NoopCommandBuilder # prevent twice call
       config
     end
   end

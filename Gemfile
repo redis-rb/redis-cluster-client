@@ -15,3 +15,4 @@ gem 'rubocop-minitest', require: false
 gem 'rubocop-performance', require: false
 gem 'rubocop-rake', require: false
 gem 'stackprof', platform: :mri
+gem 'vernier', platform: :mri

@@ -2,6 +2,7 @@
 
 require 'redis_client'
 require 'redis_client/cluster/errors'
+require 'redis_client/cluster/noop_command_builder'
 require 'redis_client/cluster/pipeline'
 
 class RedisClient
@@ -18,7 +19,7 @@ class RedisClient
         @router = router
         @command_builder = command_builder
         @retryable = true
-        @pipeline = ::RedisClient::Pipeline.new(@command_builder)
+        @pipeline = ::RedisClient::Pipeline.new(::RedisClient::Cluster::NoopCommandBuilder)
         @pending_commands = []
         @node = node
         prepare_tx unless @node.nil?
