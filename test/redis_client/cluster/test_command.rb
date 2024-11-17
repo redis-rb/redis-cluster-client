@@ -53,8 +53,8 @@ class RedisClient
               ['set', -3, Set['write', 'denyoom', 'movablekeys'], 1, -1, 2, Set['@write', '@string', '@slow'], Set[], Set[], Set[]]
             ],
             want: {
-              'get' => { first_key_position: 1, last_key_position: -1, key_step: 1, write?: false, readonly?: true },
-              'set' => { first_key_position: 1, last_key_position: -1, key_step: 2, write?: true, readonly?: false }
+              'get' => { first_key_position: 1, key_step: 1, write?: false, readonly?: true },
+              'set' => { first_key_position: 1, key_step: 2, write?: true, readonly?: false }
             }
           },
           {
@@ -62,7 +62,7 @@ class RedisClient
               ['GET', 2, Set['readonly', 'fast'], 1, -1, 1, Set['@read', '@string', '@fast'], Set[], Set[], Set[]]
             ],
             want: {
-              'get' => { first_key_position: 1, last_key_position: -1, key_step: 1, write?: false, readonly?: true }
+              'get' => { first_key_position: 1, key_step: 1, write?: false, readonly?: true }
             }
           },
           { rows: [[]], want: {} },

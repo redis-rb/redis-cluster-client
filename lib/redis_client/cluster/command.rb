@@ -17,7 +17,6 @@ class RedisClient
       Detail = Struct.new(
         'RedisCommand',
         :first_key_position,
-        :last_key_position,
         :key_step,
         :write?,
         :readonly?,
@@ -54,7 +53,6 @@ class RedisClient
 
             acc[row[0].downcase] = ::RedisClient::Cluster::Command::Detail.new(
               first_key_position: row[3],
-              last_key_position: row[4],
               key_step: row[5],
               write?: row[2].include?('write'),
               readonly?: row[2].include?('readonly')
