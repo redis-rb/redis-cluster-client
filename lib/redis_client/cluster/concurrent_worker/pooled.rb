@@ -11,6 +11,8 @@ class RedisClient
       # So it consumes memory 1 MB multiplied a number of workers.
       class Pooled
         def initialize(size:)
+          raise ArgumentError, "size must be positive: #{size}" unless size.positive?
+
           @size = size
           setup
         end

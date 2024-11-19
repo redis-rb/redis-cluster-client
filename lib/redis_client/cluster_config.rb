@@ -19,7 +19,7 @@ class RedisClient
     VALID_NODES_KEYS = %i[ssl username password host port db].freeze
     MERGE_CONFIG_KEYS = %i[ssl username password].freeze
     IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
-    MAX_WORKERS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', 5))
+    MAX_WORKERS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', -1)) # for backward compatibility
     # It's used with slow queries of fetching meta data like CLUSTER NODES, COMMAND and so on.
     SLOW_COMMAND_TIMEOUT = Float(ENV.fetch('REDIS_CLIENT_SLOW_COMMAND_TIMEOUT', -1))
     # It affects to strike a balance between load and stability in initialization or changed states.
@@ -110,12 +110,16 @@ class RedisClient
     private
 
     def merge_concurrency_option(option)
-      case option
-      when Hash
-        option = option.transform_keys(&:to_sym)
-        { size: MAX_WORKERS }.merge(option)
-      else { size: MAX_WORKERS }
+      opts = {}
+
+      if MAX_WORKERS.positive?
+        opts[:model] = :on_demand
+        opts[:size] = MAX_WORKERS
       end
+
+      opts.merge!(option.transform_keys(&:to_sym)) if option.is_a?(Hash)
+      opts[:model] = :none if opts.empty?
+      opts.freeze
     end
 
     def build_node_configs(addrs)
