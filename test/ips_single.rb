@@ -61,7 +61,7 @@ module IpsSingle
   def prepare(*clients)
     clients.each do |client|
       ATTEMPTS.times do |i|
-        client.call('SET', "key#{i}", "val#{i}")
+        client.call('set', "key#{i}", "val#{i}")
       end
     end
   end
@@ -74,7 +74,7 @@ module IpsSingle
       kwargs.each do |key, client|
         x.report("single: #{key}") do
           ATTEMPTS.times do |i|
-            client.call('GET', "key#{i}")
+            client.call('get', "key#{i}")
           end
         end
       end

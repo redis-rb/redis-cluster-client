@@ -93,24 +93,24 @@ class RedisClient
       end
 
       def prepare_tx
-        @pipeline.call('MULTI')
+        @pipeline.call('multi')
         @pending_commands.each(&:call)
         @pending_commands.clear
       end
 
       def commit
-        @pipeline.call('EXEC')
+        @pipeline.call('exec')
         settle
       end
 
       def cancel
-        @pipeline.call('DISCARD')
+        @pipeline.call('discard')
         settle
       end
 
       def settle
         # If we needed ASKING on the watch, we need ASKING on the multi as well.
-        @node.call('ASKING') if @asking
+        @node.call('asking') if @asking
         # Don't handle redirections at this level if we're in a watch (the watcher handles redirections
         # at the whole-transaction level.)
         send_transaction(@node, redirect: !!@watching_slot ? 0 : MAX_REDIRECTION)
@@ -189,7 +189,7 @@ class RedisClient
       end
 
       def try_asking(node)
-        node.call('ASKING') == 'OK'
+        node.call('asking') == 'OK'
       rescue StandardError
         false
       end

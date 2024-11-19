@@ -6,12 +6,12 @@ module BenchmarkMixin
 
   def setup
     @client = new_test_client
-    @client.call('FLUSHDB')
+    @client.call('flushdb')
     wait_for_replication
   end
 
   def teardown
-    @client&.call('FLUSHDB')
+    @client&.call('flushdb')
     wait_for_replication
     @client&.close
   end
@@ -19,7 +19,7 @@ module BenchmarkMixin
   def bench_single_echo
     assert_performance_linear(MIN_THRESHOLD) do |n|
       n.times do
-        @client.call('ECHO', 'Hello world')
+        @client.call('echo', 'Hello world')
       end
     end
   end
@@ -27,7 +27,7 @@ module BenchmarkMixin
   def bench_single_set
     assert_performance_linear(MIN_THRESHOLD) do |n|
       n.times do |i|
-        @client.call('SET', "key#{i}", i)
+        @client.call('set', "key#{i}", i)
       end
     end
   end
@@ -35,7 +35,7 @@ module BenchmarkMixin
   def bench_single_get
     assert_performance_linear(MIN_THRESHOLD) do |n|
       n.times do |i|
-        @client.call('GET', "key#{i}")
+        @client.call('get', "key#{i}")
       end
     end
   end
@@ -45,7 +45,7 @@ module BenchmarkMixin
       (1..n).each_slice(MAX_PIPELINE_SIZE) do |list|
         @client.pipelined do |pi|
           list.each do
-            pi.call('ECHO', 'Hello world')
+            pi.call('echo', 'Hello world')
           end
         end
       end
@@ -57,7 +57,7 @@ module BenchmarkMixin
       (1..n).each_slice(MAX_PIPELINE_SIZE) do |list|
         @client.pipelined do |pi|
           list.each do |i|
-            pi.call('SET', "key#{i}", i)
+            pi.call('set', "key#{i}", i)
           end
         end
       end
@@ -69,7 +69,7 @@ module BenchmarkMixin
       (1..n).each_slice(MAX_PIPELINE_SIZE) do |list|
         @client.pipelined do |pi|
           list.each do |i|
-            pi.call('GET', "key#{i}")
+            pi.call('get', "key#{i}")
           end
         end
       end
@@ -82,7 +82,7 @@ module BenchmarkMixin
     client_side_timeout = TEST_TIMEOUT_SEC + 1.0
     server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
     swap_timeout(@client, timeout: 0.1) do |client|
-      client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+      client&.blocking_call(client_side_timeout, 'wait', TEST_REPLICA_SIZE, server_side_timeout)
     end
   end
 end
@@ -91,12 +91,12 @@ module BenchmarkMixinForProxy
   def setup
     @client = new_test_client
     @cluster_client = new_cluster_client
-    @cluster_client.call('FLUSHDB')
+    @cluster_client.call('flushdb')
     wait_for_replication
   end
 
   def teardown
-    @cluster_client&.call('FLUSHDB')
+    @cluster_client&.call('flushdb')
     wait_for_replication
     @cluster_client&.close
     @client&.close
@@ -112,7 +112,7 @@ module BenchmarkMixinForProxy
     client_side_timeout = TEST_TIMEOUT_SEC + 1.0
     server_side_timeout = (TEST_TIMEOUT_SEC * 1000).to_i
     swap_timeout(@cluster_client, timeout: 0.1) do |cluster_client|
-      cluster_client&.blocking_call(client_side_timeout, 'WAIT', TEST_REPLICA_SIZE, server_side_timeout)
+      cluster_client&.blocking_call(client_side_timeout, 'wait', TEST_REPLICA_SIZE, server_side_timeout)
     end
   end
 end

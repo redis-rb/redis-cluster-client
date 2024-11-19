@@ -47,7 +47,7 @@ class RedisClient
               min = DUMMY_LATENCY_MSEC
               MEASURE_ATTEMPT_COUNT.times do
                 starting = obtain_current_time
-                cli.call_once('PING')
+                cli.call_once('ping')
                 duration = obtain_current_time - starting
                 min = duration if duration < min
               end

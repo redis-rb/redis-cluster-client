@@ -2,7 +2,6 @@
 
 require 'redis_client'
 require 'redis_client/cluster/errors'
-require 'redis_client/cluster/normalized_cmd_name'
 
 class RedisClient
   class Cluster
@@ -109,7 +108,7 @@ class RedisClient
       private
 
       def _call(command)
-        case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
+        case command.first
         when 'subscribe', 'psubscribe', 'ssubscribe' then call_to_single_state(command)
         when 'unsubscribe', 'punsubscribe' then call_to_all_states(command)
         when 'sunsubscribe' then call_for_sharded_states(command)

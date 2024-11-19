@@ -246,7 +246,7 @@ class RedisClient
       def test_transaction_with_empty_block_and_watch
         @captured_commands.clear
         assert_empty(@client.multi(watch: %w[key]) {})
-        assert_equal(%w[WATCH MULTI EXEC], @captured_commands.to_a.map(&:command).map(&:first))
+        assert_equal(%w[watch multi exec], @captured_commands.to_a.map(&:command).map(&:first))
       end
 
       def test_transaction_with_early_return_block
@@ -273,7 +273,7 @@ class RedisClient
         end
 
         assert_empty(got)
-        assert_equal(%w[WATCH MULTI EXEC], @captured_commands.to_a.map(&:command).map(&:first))
+        assert_equal(%w[watch multi exec], @captured_commands.to_a.map(&:command).map(&:first))
         assert_nil(@client.call('GET', 'key'))
       end
 
@@ -381,7 +381,7 @@ class RedisClient
           tx.call('SET', '{key}2', '2')
         end
 
-        assert_equal(%w[WATCH MULTI SET SET EXEC], @captured_commands.to_a.map(&:command).map(&:first))
+        assert_equal(%w[watch multi SET SET exec], @captured_commands.to_a.map(&:command).map(&:first))
 
         wait_for_replication
         assert_equal(%w[1 2], @client.call('MGET', '{key}1', '{key}2'))
@@ -397,7 +397,7 @@ class RedisClient
           end
         end
 
-        assert_equal(%w[WATCH UNWATCH], @captured_commands.to_a.map(&:command).map(&:first))
+        assert_equal(%w[watch unwatch], @captured_commands.to_a.map(&:command).map(&:first))
       end
 
       def test_transaction_does_not_unwatch_on_connection_error
@@ -410,8 +410,8 @@ class RedisClient
         end
 
         command_list = @captured_commands.to_a.map(&:command).map(&:first)
-        assert_includes(command_list, 'WATCH')
-        refute_includes(command_list, 'UNWATCH')
+        assert_includes(command_list, 'watch')
+        refute_includes(command_list, 'unwatch')
       end
 
       def test_transaction_does_not_retry_without_rewatching
@@ -853,15 +853,15 @@ class RedisClient
           ],
           custom: {
             redirect_fake: ::Middlewares::RedirectFake::Setting.new(
-              slot: slot, to: broken_primary_key, command: %w[SET testkey client2]
+              slot: slot, to: broken_primary_key, command: %w[set testkey client2]
             )
           }
         )
 
         assert_raises(RedisClient::CommandError) do
-          client1.call('SET', 'testkey', 'client1') do |got|
+          client1.call('set', 'testkey', 'client1') do |got|
             assert_equal('OK', got)
-            client2.call('SET', 'testkey', 'client2')
+            client2.call('set', 'testkey', 'client2')
           end
         end
 

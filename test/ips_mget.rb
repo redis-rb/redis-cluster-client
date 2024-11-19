@@ -12,8 +12,8 @@ module IpsMget
   def run
     cli = make_client
     prepare(cli)
-    print_letter('MGET')
-    bench('MGET', cli)
+    print_letter('mget')
+    bench('mget', cli)
   end
 
   def make_client
@@ -36,8 +36,8 @@ module IpsMget
 
   def prepare(client)
     ATTEMPTS.times do |i|
-      client.call('SET', "{key}#{i}", "val#{i}")
-      client.call('SET', "key#{i}", "val#{i}")
+      client.call('set', "{key}#{i}", "val#{i}")
+      client.call('set', "key#{i}", "val#{i}")
     end
   end
 

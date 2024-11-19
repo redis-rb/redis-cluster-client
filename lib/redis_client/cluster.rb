@@ -152,8 +152,9 @@ class RedisClient
     end
 
     def method_missing(name, *args, **kwargs, &block)
-      if router.command_exists?(name)
-        args.unshift(name)
+      cmd = name.respond_to?(:name) ? name.name : name.to_s
+      if router.command_exists?(cmd)
+        args.unshift(cmd)
         command = @command_builder.generate(args, kwargs)
         return router.send_command(:call_v, command, &block)
       end

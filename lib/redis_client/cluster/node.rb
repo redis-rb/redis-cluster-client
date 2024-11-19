@@ -90,7 +90,7 @@ class RedisClient
 
         def build_connection_prelude
           prelude = super.dup
-          prelude << ['READONLY'] if @scale_read
+          prelude << ['readonly'] if @scale_read
           prelude.freeze
         end
       end
@@ -309,7 +309,7 @@ class RedisClient
           work_group.push(i, raw_client) do |client|
             regular_timeout = client.read_timeout
             client.read_timeout = @config.slow_command_timeout > 0.0 ? @config.slow_command_timeout : regular_timeout
-            reply = client.call_once('CLUSTER', 'NODES')
+            reply = client.call_once('cluster', 'nodes')
             client.read_timeout = regular_timeout
             parse_cluster_node_reply(reply)
           rescue StandardError => e

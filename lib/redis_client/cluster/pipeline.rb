@@ -290,7 +290,7 @@ class RedisClient
       end
 
       def try_asking(node)
-        node.call('ASKING') == 'OK'
+        node.call('asking') == 'OK'
       rescue StandardError
         false
       end

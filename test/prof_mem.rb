@@ -10,34 +10,34 @@ module ProfMem
   ATTEMPT_COUNT = 1000
   MAX_PIPELINE_SIZE = 100
   SLICED_NUMBERS = (1..ATTEMPT_COUNT).each_slice(MAX_PIPELINE_SIZE).freeze
-  ORIGINAL_MGET = (%w[MGET] + Array.new(40) { |i| "{key}#{i}" }).freeze
-  EMULATED_MGET = (%w[MGET] + Array.new(40) { |i| "key#{i}" }).freeze
+  ORIGINAL_MGET = (%w[mget] + Array.new(40) { |i| "{key}#{i}" }).freeze
+  EMULATED_MGET = (%w[mget] + Array.new(40) { |i| "key#{i}" }).freeze
   CLI_TYPES = %w[primary_only scale_read_random scale_read_latency pooled].freeze
   MODES = {
     single: lambda do |client_builder_method|
       cli = send(client_builder_method)
-      ATTEMPT_COUNT.times { |i| cli.call('SET', i, i) }
-      ATTEMPT_COUNT.times { |i| cli.call('GET', i) }
+      ATTEMPT_COUNT.times { |i| cli.call('set', i, i) }
+      ATTEMPT_COUNT.times { |i| cli.call('get', i) }
     end,
     excessive_pipelining: lambda do |client_builder_method|
       cli = send(client_builder_method)
       cli.pipelined do |pi|
-        ATTEMPT_COUNT.times { |i| pi.call('SET', i, i) }
+        ATTEMPT_COUNT.times { |i| pi.call('set', i, i) }
       end
 
       cli.pipelined do |pi|
-        ATTEMPT_COUNT.times { |i| pi.call('GET', i) }
+        ATTEMPT_COUNT.times { |i| pi.call('get', i) }
       end
     end,
     pipelining_in_moderation: lambda do |client_builder_method|
       cli = send(client_builder_method)
       SLICED_NUMBERS.each do |numbers|
         cli.pipelined do |pi|
-          numbers.each { |i| pi.call('SET', i, i) }
+          numbers.each { |i| pi.call('set', i, i) }
         end
 
         cli.pipelined do |pi|
-          numbers.each { |i| pi.call('GET', i) }
+          numbers.each { |i| pi.call('get', i) }
         end
       end
     end,
@@ -63,9 +63,7 @@ module ProfMem
     end
   end
 
-  def prepare
-    ::RedisClient::Cluster::NormalizedCmdName.instance.clear
-  end
+  def prepare; end
 
   def print_letter(title, sub_titile)
     print "################################################################################\n"
