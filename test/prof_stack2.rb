@@ -17,7 +17,7 @@ module ProfStack2
     case mode = ENV.fetch('PROFILE_MODE', :single).to_sym
     when :single
       execute(client, mode) do |client|
-        ATTEMPTS.times { |i| client.call('GET', "key#{i}") }
+        ATTEMPTS.times { |i| client.call('get', "key#{i}") }
       end
     when :transaction
       execute(client, mode) do |client|
@@ -25,7 +25,7 @@ module ProfStack2
           client.multi do |tx|
             SIZE.times do |j|
               n = SIZE * i + j
-              tx.call('SET', "{group:#{i}}:key:#{n}", n)
+              tx.call('set', "{group:#{i}}:key:#{n}", n)
             end
           end
         end
@@ -36,7 +36,7 @@ module ProfStack2
           client.pipelined do |pi|
             SIZE.times do |j|
               n = SIZE * i + j
-              pi.call('GET', "key#{n}")
+              pi.call('get', "key#{n}")
             end
           end
         end
@@ -68,7 +68,7 @@ module ProfStack2
       client.pipelined do |pi|
         SIZE.times do |j|
           n = SIZE * i + j
-          pi.call('SET', "key#{n}", "val#{n}")
+          pi.call('set', "key#{n}", "val#{n}")
         end
       end
     end

@@ -9,7 +9,7 @@ class RedisClient
       class TestConfig < TestingWrapper
         def test_connection_prelude
           [
-            { params: { scale_read: true }, want: [%w[HELLO 3], %w[READONLY]] },
+            { params: { scale_read: true }, want: [%w[HELLO 3], %w[readonly]] },
             { params: { scale_read: false }, want: [%w[HELLO 3]] },
             { params: {}, want: [%w[HELLO 3]] }
           ].each_with_index do |c, idx|
@@ -603,7 +603,7 @@ class RedisClient
         test_node.reload!
 
         # It should have reloaded by calling CLUSTER NODES on three of the startup nodes
-        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[cluster nodes] }
         assert_equal MAX_STARTUP_SAMPLE, cluster_node_cmds.size
 
         # It should have connected to all of the clients.
@@ -634,7 +634,7 @@ class RedisClient
         capture_buffer.clear
         test_node.reload!
 
-        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[cluster nodes] }
         assert_equal 1, cluster_node_cmds.size
         assert_equal bootstrap_node, cluster_node_cmds.first.server_url
       end
@@ -647,7 +647,7 @@ class RedisClient
         test_node.reload!
 
         # It should have reloaded by calling CLUSTER NODES on one of the startup nodes
-        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[cluster nodes] }
         assert_equal 1, cluster_node_cmds.size
 
         # It should have connected to all of the clients.
@@ -680,7 +680,7 @@ class RedisClient
 
         # We should only have reloaded once, which is to say, we only called CLUSTER NODES command MAX_STARTUP_SAMPLE
         # times
-        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[CLUSTER NODES] }
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[cluster nodes] }
         assert_equal MAX_STARTUP_SAMPLE, cluster_node_cmds.size
       end
     end

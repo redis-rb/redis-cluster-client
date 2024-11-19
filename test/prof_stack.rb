@@ -9,8 +9,8 @@ require 'testing_constants'
 module ProfStack
   SIZE = 40
   ATTEMPTS = 1000
-  ORIGINAL_MGET = (%w[MGET] + Array.new(SIZE) { |i| "{key}#{i}" }).freeze
-  EMULATED_MGET = (%w[MGET] + Array.new(SIZE) { |i| "key#{i}" }).freeze
+  ORIGINAL_MGET = (%w[mget] + Array.new(SIZE) { |i| "{key}#{i}" }).freeze
+  EMULATED_MGET = (%w[mget] + Array.new(SIZE) { |i| "key#{i}" }).freeze
 
   module_function
 
@@ -37,8 +37,8 @@ module ProfStack
       client.pipelined do |pi|
         SIZE.times do |j|
           n = SIZE * i + j
-          pi.call('SET', "key#{n}", "val#{n}")
-          pi.call('SET', "{key}#{n}", "val#{n}")
+          pi.call('set', "key#{n}", "val#{n}")
+          pi.call('set', "{key}#{n}", "val#{n}")
         end
       end
     end
@@ -47,17 +47,17 @@ module ProfStack
   def execute(client, mode)
     case mode
     when :single
-      (ATTEMPTS * SIZE).times { |i| client.call('GET', "key#{i}") }
+      (ATTEMPTS * SIZE).times { |i| client.call('get', "key#{i}") }
     when :excessive_pipelining
       client.pipelined do |pi|
-        (ATTEMPTS * SIZE).times { |i| pi.call('GET', "key#{i}") }
+        (ATTEMPTS * SIZE).times { |i| pi.call('get', "key#{i}") }
       end
     when :pipelining_in_moderation
       ATTEMPTS.times do |i|
         client.pipelined do |pi|
           SIZE.times do |j|
             n = SIZE * i + j
-            pi.call('GET', "key#{n}")
+            pi.call('get', "key#{n}")
           end
         end
       end

@@ -18,15 +18,15 @@ class RedisClient
         handle_redirection(slot, retry_count: 1) do |nd|
           nd.with do |c|
             c.ensure_connected_cluster_scoped(retryable: false) do
-              c.call('ASKING') if @asking
-              c.call('WATCH', *keys)
+              c.call('asking') if @asking
+              c.call('watch', *keys)
               begin
                 yield(c, slot, @asking)
               rescue ::RedisClient::ConnectionError
                 # No need to unwatch on a connection error.
                 raise
               rescue StandardError
-                c.call('UNWATCH')
+                c.call('unwatch')
                 raise
               end
             rescue ::RedisClient::CommandError => e

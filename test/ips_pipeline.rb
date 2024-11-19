@@ -60,7 +60,7 @@ module IpsPipeline
     clients.each do |client|
       client.pipelined do |pi|
         ATTEMPTS.times do |i|
-          pi.call('SET', "key#{i}", "val#{i}")
+          pi.call('set', "key#{i}", "val#{i}")
         end
       end
     end
@@ -75,7 +75,7 @@ module IpsPipeline
         x.report("pipelined: #{key}") do
           client.pipelined do |pi|
             ATTEMPTS.times do |i|
-              pi.call('GET', "key#{i}")
+              pi.call('get', "key#{i}")
             end
           end
         end

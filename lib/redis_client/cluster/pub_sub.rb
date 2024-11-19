@@ -2,7 +2,6 @@
 
 require 'redis_client'
 require 'redis_client/cluster/errors'
-require 'redis_client/cluster/normalized_cmd_name'
 
 class RedisClient
   class Cluster
@@ -108,12 +107,21 @@ class RedisClient
 
       private
 
-      def _call(command)
-        case ::RedisClient::Cluster::NormalizedCmdName.instance.get_by_command(command)
-        when 'subscribe', 'psubscribe', 'ssubscribe' then call_to_single_state(command)
-        when 'unsubscribe', 'punsubscribe' then call_to_all_states(command)
-        when 'sunsubscribe' then call_for_sharded_states(command)
-        else call_to_single_state(command)
+      def _call(command) # rubocop:disable Metrics/AbcSize
+        if command.first.casecmp('subscribe').zero?
+          call_to_single_state(command)
+        elsif command.first.casecmp('psubscribe').zero?
+          call_to_single_state(command)
+        elsif command.first.casecmp('ssubscribe').zero?
+          call_to_single_state(command)
+        elsif command.first.casecmp('unsubscribe').zero?
+          call_to_all_states(command)
+        elsif command.first.casecmp('punsubscribe').zero?
+          call_to_all_states(command)
+        elsif command.first.casecmp('sunsubscribe').zero?
+          call_for_sharded_states(command)
+        else
+          call_to_single_state(command)
         end
       end
 
