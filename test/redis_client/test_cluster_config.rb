@@ -103,6 +103,18 @@ class RedisClient
       assert_equal(::RedisClient::CommandBuilder, ::RedisClient::ClusterConfig.new.command_builder)
     end
 
+    def test_concurrency
+      [
+        { value: nil, want: { model: :none } },
+        { value: { model: :none }, want: { model: :none } },
+        { value: { model: :on_demand, size: 3 }, want: { model: :on_demand, size: 3 } },
+        { value: { model: :pooled, size: 6 }, want: { model: :pooled, size: 6 } }
+      ].each do |c|
+        cfg = ::RedisClient::ClusterConfig.new(concurrency: c[:value])
+        assert_equal(c[:want], cfg.instance_variable_get(:@concurrency))
+      end
+    end
+
     def test_build_node_configs
       config = ::RedisClient::ClusterConfig.new
       [

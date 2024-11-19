@@ -5,6 +5,8 @@ class RedisClient
     module ConcurrentWorker
       class OnDemand
         def initialize(size:)
+          raise ArgumentError, "size must be positive: #{size}" unless size.positive?
+
           @q = SizedQueue.new(size)
         end
 

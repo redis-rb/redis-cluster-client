@@ -71,14 +71,12 @@ class RedisClient
 
       module_function
 
-      def create(model: :on_demand, size: 5)
-        size = size.positive? ? size : 5
-
+      def create(model: :none, size: 5)
         case model
-        when :on_demand, nil then ::RedisClient::Cluster::ConcurrentWorker::OnDemand.new(size: size)
-        when :pooled then ::RedisClient::Cluster::ConcurrentWorker::Pooled.new(size: size)
         when :none then ::RedisClient::Cluster::ConcurrentWorker::None.new
-        else raise ArgumentError, "Unknown model: #{model}"
+        when :on_demand then ::RedisClient::Cluster::ConcurrentWorker::OnDemand.new(size: size)
+        when :pooled then ::RedisClient::Cluster::ConcurrentWorker::Pooled.new(size: size)
+        else raise ArgumentError, "unknown model: #{model}"
         end
       end
     end
