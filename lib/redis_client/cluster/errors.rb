@@ -43,9 +43,14 @@ class RedisClient
         if !errors.is_a?(Hash) || errors.empty?
           new(errors.to_s).with_errors(EMPTY_HASH)
         else
-          messages = errors.map { |node_key, error| "#{node_key}: (#{error.class}) #{error.message}" }
+          messages = errors.map { |node_key, error| "#{node_key}: (#{error.class}) #{error.message}" }.freeze
           new(messages.join(', ')).with_errors(errors)
         end
+      end
+
+      def initialize(error_message = nil)
+        @errors = nil
+        super
       end
 
       def with_errors(errors)
@@ -61,7 +66,7 @@ class RedisClient
     end
 
     class NodeMightBeDown < Error
-      def initialize(_ = '')
+      def initialize(_error_message = nil)
         super(
           'The client is trying to fetch the latest cluster state ' \
           'because a subset of nodes might be down. ' \
