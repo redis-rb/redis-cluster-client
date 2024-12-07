@@ -53,7 +53,7 @@ class RedisClient
             pos = case row.first
                   when 'eval', 'evalsha', 'zinterstore', 'zunionstore' then 3
                   when 'object' then 2
-                  when 'migrate' then 0
+                  when 'migrate', 'xread', 'xreadgroup' then 0
                   else row[3]
                   end
 
@@ -101,14 +101,14 @@ class RedisClient
         return i if i > 0
 
         cmd_name = command.first
-        if cmd_name.casecmp('memory').zero?
-          command[1].to_s.casecmp('usage').zero? ? 2 : 0
-        elsif cmd_name.casecmp('migrate').zero?
-          command[3].empty? ? determine_optional_key_position(command, 'keys') : 3
-        elsif cmd_name.casecmp('xread').zero?
+        if cmd_name.casecmp('xread').zero?
           determine_optional_key_position(command, 'streams')
         elsif cmd_name.casecmp('xreadgroup').zero?
           determine_optional_key_position(command, 'streams')
+        elsif cmd_name.casecmp('migrate').zero?
+          command[3].empty? ? determine_optional_key_position(command, 'keys') : 3
+        elsif cmd_name.casecmp('memory').zero?
+          command[1].to_s.casecmp('usage').zero? ? 2 : 0
         else
           i
         end
