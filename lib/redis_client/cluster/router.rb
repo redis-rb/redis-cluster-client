@@ -38,6 +38,7 @@ class RedisClient
 
       def send_command(method, command, *args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
         cmd_name = command.first
+
         if cmd_name.casecmp('get').zero?
           node = assign_node(command)
           try_send(node, method, command, args, &block)

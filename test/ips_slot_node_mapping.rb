@@ -12,11 +12,19 @@ module IpsSlotNodeMapping
   def run
     ca = ::RedisClient::Cluster::Node::CharArray.new(SIZE, ELEMENTS)
     arr = Array.new(SIZE)
+    hs = {}
 
     print_letter('Mappings between slots and nodes')
     fullfill(ca)
     fullfill(arr)
-    bench({ ca.class.name.split('::').last => ca, arr.class.name => arr })
+    fullfill(hs)
+    bench(
+      {
+        ca.class.name.split('::').last => ca,
+        arr.class.name => arr,
+        hs.class.name => hs
+      }
+    )
   end
 
   def print_letter(title)

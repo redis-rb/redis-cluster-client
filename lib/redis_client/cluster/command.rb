@@ -90,36 +90,38 @@ class RedisClient
       end
 
       def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/AbcSize, Metrics/PerceivedComplexity
-        if command.first.casecmp('get').zero?
-          find_command_info(command.first)&.first_key_position.to_i
-        elsif command.first.casecmp('mget').zero?
-          find_command_info(command.first)&.first_key_position.to_i
-        elsif command.first.casecmp('set').zero?
-          find_command_info(command.first)&.first_key_position.to_i
-        elsif command.first.casecmp('mset').zero?
-          find_command_info(command.first)&.first_key_position.to_i
-        elsif command.first.casecmp('del').zero?
-          find_command_info(command.first)&.first_key_position.to_i
-        elsif command.first.casecmp('eval').zero?
+        cmd_name = command.first
+
+        if cmd_name.casecmp('get').zero?
+          find_command_info(cmd_name)&.first_key_position.to_i
+        elsif cmd_name.casecmp('mget').zero?
+          find_command_info(cmd_name)&.first_key_position.to_i
+        elsif cmd_name.casecmp('set').zero?
+          find_command_info(cmd_name)&.first_key_position.to_i
+        elsif cmd_name.casecmp('mset').zero?
+          find_command_info(cmd_name)&.first_key_position.to_i
+        elsif cmd_name.casecmp('del').zero?
+          find_command_info(cmd_name)&.first_key_position.to_i
+        elsif cmd_name.casecmp('eval').zero?
           3
-        elsif command.first.casecmp('evalsha').zero?
+        elsif cmd_name.casecmp('evalsha').zero?
           3
-        elsif command.first.casecmp('zinterstore').zero?
+        elsif cmd_name.casecmp('zinterstore').zero?
           3
-        elsif command.first.casecmp('zunionstore').zero?
+        elsif cmd_name.casecmp('zunionstore').zero?
           3
-        elsif command.first.casecmp('object').zero?
+        elsif cmd_name.casecmp('object').zero?
           2
-        elsif command.first.casecmp('memory').zero?
+        elsif cmd_name.casecmp('memory').zero?
           command[1].to_s.casecmp('usage').zero? ? 2 : 0
-        elsif command.first.casecmp('migrate').zero?
+        elsif cmd_name.casecmp('migrate').zero?
           command[3].empty? ? determine_optional_key_position(command, 'keys') : 3
-        elsif command.first.casecmp('xread').zero?
+        elsif cmd_name.casecmp('xread').zero?
           determine_optional_key_position(command, 'streams')
-        elsif command.first.casecmp('xreadgroup').zero?
+        elsif cmd_name.casecmp('xreadgroup').zero?
           determine_optional_key_position(command, 'streams')
         else
-          find_command_info(command.first)&.first_key_position.to_i
+          find_command_info(cmd_name)&.first_key_position.to_i
         end
       end
 
