@@ -24,8 +24,8 @@ class RedisClient
 
       Action = Struct.new(
         'RedisCommandRoutingAction',
-        :action_method_name,
-        :after_action_proc,
+        :method_name,
+        :reply_transformer,
         keyword_init: true
       )
 
@@ -48,10 +48,10 @@ class RedisClient
         return assign_node_and_send_command(method, command, args, &block) unless @dedicated_actions.key?(command.first)
 
         action = @dedicated_actions[command.first]
-        return send(action.action_method_name, method, command, args, &block) if action.after_action_proc.nil?
+        return send(action.method_name, method, command, args, &block) if action.reply_transformer.nil?
 
-        reply = send(action.action_method_name, method, command, args)
-        action.after_action_proc.call(reply).then(&TSF.call(block))
+        reply = send(action.method_name, method, command, args)
+        action.reply_transformer.call(reply).then(&TSF.call(block))
       rescue ::RedisClient::CircuitBreaker::OpenCircuitError
         raise
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
@@ -259,26 +259,26 @@ class RedisClient
 
       def build_dedicated_actions # rubocop:disable Metrics/AbcSize
         pick_first = ->(reply) { reply.first } # rubocop:disable Style/SymbolProc
-        multiple_key_action = Action.new(action_method_name: :send_multiple_keys_command)
-        all_node_first_action = Action.new(action_method_name: :send_command_to_all_nodes, after_action_proc: pick_first)
-        primary_first_action = Action.new(action_method_name: :send_command_to_primaries, after_action_proc: pick_first)
-        not_supported_action = Action.new(action_method_name: :fail_not_supported_command)
-        keyless_action = Action.new(action_method_name: :fail_keyless_command)
+        multiple_key_action = Action.new(method_name: :send_multiple_keys_command)
+        all_node_first_action = Action.new(method_name: :send_command_to_all_nodes, reply_transformer: pick_first)
+        primary_first_action = Action.new(method_name: :send_command_to_primaries, reply_transformer: pick_first)
+        not_supported_action = Action.new(method_name: :fail_not_supported_command)
+        keyless_action = Action.new(method_name: :fail_keyless_command)
         actions = {
-          'ping' => Action.new(action_method_name: :send_ping_command, after_action_proc: pick_first),
-          'wait' => Action.new(action_method_name: :send_wait_command),
-          'keys' => Action.new(action_method_name: :send_command_to_replicas, after_action_proc: ->(reply) { reply.flatten.sort_by(&:to_s) }),
-          'dbsize' => Action.new(action_method_name: :send_command_to_replicas, after_action_proc: ->(reply) { reply.select { |e| e.is_a?(Integer) }.sum }),
-          'scan' => Action.new(action_method_name: :send_scan_command),
-          'lastsave' => Action.new(action_method_name: :send_command_to_all_nodes, after_action_proc: ->(reply) { reply.sort_by(&:to_i) }),
-          'role' => Action.new(action_method_name: :send_command_to_all_nodes),
-          'config' => Action.new(action_method_name: :send_config_command),
-          'client' => Action.new(action_method_name: :send_client_command),
-          'cluster' => Action.new(action_method_name: :send_cluster_command),
-          'memory' => Action.new(action_method_name: :send_memory_command),
-          'script' => Action.new(action_method_name: :send_script_command),
-          'pubsub' => Action.new(action_method_name: :send_pubsub_command),
-          'watch' => Action.new(action_method_name: :send_watch_command),
+          'ping' => Action.new(method_name: :send_ping_command, reply_transformer: pick_first),
+          'wait' => Action.new(method_name: :send_wait_command),
+          'keys' => Action.new(method_name: :send_command_to_replicas, reply_transformer: ->(reply) { reply.flatten.sort_by(&:to_s) }),
+          'dbsize' => Action.new(method_name: :send_command_to_replicas, reply_transformer: ->(reply) { reply.select { |e| e.is_a?(Integer) }.sum }),
+          'scan' => Action.new(method_name: :send_scan_command),
+          'lastsave' => Action.new(method_name: :send_command_to_all_nodes, reply_transformer: ->(reply) { reply.sort_by(&:to_i) }),
+          'role' => Action.new(method_name: :send_command_to_all_nodes),
+          'config' => Action.new(method_name: :send_config_command),
+          'client' => Action.new(method_name: :send_client_command),
+          'cluster' => Action.new(method_name: :send_cluster_command),
+          'memory' => Action.new(method_name: :send_memory_command),
+          'script' => Action.new(method_name: :send_script_command),
+          'pubsub' => Action.new(method_name: :send_pubsub_command),
+          'watch' => Action.new(method_name: :send_watch_command),
           'mget' => multiple_key_action,
           'mset' => multiple_key_action,
           'del' => multiple_key_action,
