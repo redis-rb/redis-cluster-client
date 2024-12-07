@@ -283,9 +283,9 @@ class RedisClient
         args = timeout.nil? ? [] : [timeout]
 
         if block.nil?
-          @router.try_send(node, method, command, args)
+          @router.send_command_to_node(node, method, command, args)
         else
-          @router.try_send(node, method, command, args, &block)
+          @router.send_command_to_node(node, method, command, args, &block)
         end
       end
 
