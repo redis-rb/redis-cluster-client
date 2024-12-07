@@ -64,7 +64,7 @@ class RedisClient
     def scan(*args, **kwargs, &block)
       return to_enum(__callee__, *args, **kwargs) unless block_given?
 
-      command = @command_builder.generate(['SCAN', ZERO_CURSOR_FOR_SCAN] + args, kwargs)
+      command = @command_builder.generate(['scan', ZERO_CURSOR_FOR_SCAN] + args, kwargs)
       seed = Random.new_seed
       loop do
         cursor, keys = router.scan(command, seed: seed)
@@ -77,21 +77,21 @@ class RedisClient
     def sscan(key, *args, **kwargs, &block)
       return to_enum(__callee__, key, *args, **kwargs) unless block_given?
 
-      command = @command_builder.generate(['SSCAN', key, ZERO_CURSOR_FOR_SCAN] + args, kwargs)
+      command = @command_builder.generate(['sscan', key, ZERO_CURSOR_FOR_SCAN] + args, kwargs)
       router.scan_single_key(command, arity: 1, &block)
     end
 
     def hscan(key, *args, **kwargs, &block)
       return to_enum(__callee__, key, *args, **kwargs) unless block_given?
 
-      command = @command_builder.generate(['HSCAN', key, ZERO_CURSOR_FOR_SCAN] + args, kwargs)
+      command = @command_builder.generate(['hscan', key, ZERO_CURSOR_FOR_SCAN] + args, kwargs)
       router.scan_single_key(command, arity: 2, &block)
     end
 
     def zscan(key, *args, **kwargs, &block)
       return to_enum(__callee__, key, *args, **kwargs) unless block_given?
 
-      command = @command_builder.generate(['ZSCAN', key, ZERO_CURSOR_FOR_SCAN] + args, kwargs)
+      command = @command_builder.generate(['zscan', key, ZERO_CURSOR_FOR_SCAN] + args, kwargs)
       router.scan_single_key(command, arity: 2, &block)
     end
 

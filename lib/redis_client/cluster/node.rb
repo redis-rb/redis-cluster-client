@@ -7,6 +7,7 @@ require 'redis_client/cluster/node/primary_only'
 require 'redis_client/cluster/node/random_replica'
 require 'redis_client/cluster/node/random_replica_or_primary'
 require 'redis_client/cluster/node/latency_replica'
+require 'redis_client/cluster/node_key'
 
 class RedisClient
   class Cluster
@@ -42,6 +43,10 @@ class RedisClient
 
         def replica?
           role == 'slave'
+        end
+
+        def serialize(str)
+          str << id << node_key << role << primary_id << config_epoch
         end
       end
 
@@ -338,9 +343,7 @@ class RedisClient
 
         grouped = node_info_list.compact.group_by do |info_list|
           info_list.sort_by!(&:id)
-          info_list.each_with_object(String.new(capacity: 128 * info_list.size)) do |e, a|
-            a << e.id << e.node_key << e.role << e.primary_id << e.config_epoch
-          end
+          info_list.each_with_object(String.new(capacity: 128 * info_list.size)) { |e, a| e.serialize(a) }
         end
 
         grouped.max_by { |_, v| v.size }[1].first
@@ -373,6 +376,48 @@ class RedisClient
             slots: slots
           )
         end
+      end
+
+      def parse_cluster_slots_reply(reply) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        reply.group_by { |e| e[2][2] }.each_with_object([]) do |(primary_id, group), acc|
+          slots = group.map { |e| e[0, 2] }.freeze
+
+          group.first[2..].each do |arr|
+            ip = arr[0]
+            next if ip.nil? || ip.empty? || ip == '?'
+
+            id = arr[2]
+            role = id == primary_id ? 'master' : 'slave'
+            acc << ::RedisClient::Cluster::Node::Info.new(
+              id: id,
+              node_key: NodeKey.build_from_host_port(ip, arr[1]),
+              role: role,
+              primary_id: role == 'master' ? nil : primary_id,
+              slots: role == 'master' ? slots : EMPTY_ARRAY
+            )
+          end
+        end.freeze
+      end
+
+      def parse_cluster_shards_reply(reply) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        reply.each_with_object([]) do |shard, acc|
+          nodes = shard.fetch('nodes')
+          primary_id = nodes.find { |n| n.fetch('role') == 'master' }.fetch('id')
+
+          nodes.each do |node|
+            ip = node.fetch('ip')
+            next if node.fetch('health') != 'online' || ip.nil? || ip.empty? || ip == '?'
+
+            role = node.fetch('role')
+            acc << ::RedisClient::Cluster::Node::Info.new(
+              id: node.fetch('id'),
+              node_key: NodeKey.build_from_host_port(ip, node['port'] || node['tls-port']),
+              role: role == 'master' ? role : 'slave',
+              primary_id: role == 'master' ? nil : primary_id,
+              slots: role == 'master' ? shard.fetch('slots').each_slice(2).to_a.freeze : EMPTY_ARRAY
+            )
+          end
+        end.freeze
       end
 
       # As redirection node_key is dependent on `cluster-preferred-endpoint-type` config,
