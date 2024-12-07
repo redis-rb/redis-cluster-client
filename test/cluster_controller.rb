@@ -47,7 +47,6 @@ class ClusterController
                  replica_size: DEFAULT_REPLICA_SIZE,
                  state_check_attempts: DEFAULT_MAX_ATTEMPTS,
                  **kwargs)
-
     @shard_size = shard_size
     @replica_size = replica_size
     @number_of_replicas = @replica_size * @shard_size

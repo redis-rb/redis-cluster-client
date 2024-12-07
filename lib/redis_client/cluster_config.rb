@@ -47,7 +47,6 @@ class RedisClient
       max_startup_sample: MAX_STARTUP_SAMPLE,
       **client_config
     )
-
       @replica = true & replica
       @replica_affinity = replica_affinity.to_s.to_sym
       @fixed_hostname = fixed_hostname.to_s
