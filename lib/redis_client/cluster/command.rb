@@ -46,12 +46,19 @@ class RedisClient
 
         private
 
-        def parse_command_reply(rows)
+        def parse_command_reply(rows) # rubocop:disable Metrics/CyclomaticComplexity
           rows&.each_with_object({}) do |row, acc|
-            next if row[0].nil?
+            next if row.first.nil?
+
+            pos = case row.first
+                  when 'eval', 'evalsha', 'zinterstore', 'zunionstore' then 3
+                  when 'object' then 2
+                  when 'migrate', 'xread', 'xreadgroup' then 0
+                  else row[3]
+                  end
 
             acc[row.first] = ::RedisClient::Cluster::Command::Detail.new(
-              first_key_position: row[3],
+              first_key_position: pos,
               key_step: row[5],
               write?: row[2].include?('write'),
               readonly?: row[2].include?('readonly')
@@ -90,38 +97,20 @@ class RedisClient
       end
 
       def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/AbcSize, Metrics/PerceivedComplexity
-        cmd_name = command.first
+        i = find_command_info(command.first)&.first_key_position.to_i
+        return i if i > 0
 
-        if cmd_name.casecmp('get').zero?
-          find_command_info(cmd_name)&.first_key_position.to_i
-        elsif cmd_name.casecmp('mget').zero?
-          find_command_info(cmd_name)&.first_key_position.to_i
-        elsif cmd_name.casecmp('set').zero?
-          find_command_info(cmd_name)&.first_key_position.to_i
-        elsif cmd_name.casecmp('mset').zero?
-          find_command_info(cmd_name)&.first_key_position.to_i
-        elsif cmd_name.casecmp('del').zero?
-          find_command_info(cmd_name)&.first_key_position.to_i
-        elsif cmd_name.casecmp('eval').zero?
-          3
-        elsif cmd_name.casecmp('evalsha').zero?
-          3
-        elsif cmd_name.casecmp('zinterstore').zero?
-          3
-        elsif cmd_name.casecmp('zunionstore').zero?
-          3
-        elsif cmd_name.casecmp('object').zero?
-          2
-        elsif cmd_name.casecmp('memory').zero?
-          command[1].to_s.casecmp('usage').zero? ? 2 : 0
-        elsif cmd_name.casecmp('migrate').zero?
-          command[3].empty? ? determine_optional_key_position(command, 'keys') : 3
-        elsif cmd_name.casecmp('xread').zero?
+        cmd_name = command.first
+        if cmd_name.casecmp('xread').zero?
           determine_optional_key_position(command, 'streams')
         elsif cmd_name.casecmp('xreadgroup').zero?
           determine_optional_key_position(command, 'streams')
+        elsif cmd_name.casecmp('migrate').zero?
+          command[3].empty? ? determine_optional_key_position(command, 'keys') : 3
+        elsif cmd_name.casecmp('memory').zero?
+          command[1].to_s.casecmp('usage').zero? ? 2 : 0
         else
-          find_command_info(cmd_name)&.first_key_position.to_i
+          i
         end
       end
 
