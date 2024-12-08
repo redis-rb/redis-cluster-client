@@ -722,6 +722,8 @@ class RedisClient
         got = consumer.call('xread', 'streams', '{stream}1', '{stream}2', '0', '0')
         consumer.close
 
+        got = got.to_h if TEST_REDIS_MAJOR_VERSION < 6
+
         assert_equal('foo', got.fetch('{stream}1')[0][1][1])
         assert_equal('bar', got.fetch('{stream}1')[1][1][1])
         assert_equal('baz', got.fetch('{stream}2')[0][1][1])
@@ -740,6 +742,11 @@ class RedisClient
         got2 = consumer2.call('xreadgroup', 'group', 'worker', 'consumer2', 'count', '1', 'streams', '{stream}1', '>')
         consumer1.close
         consumer2.close
+
+        if TEST_REDIS_MAJOR_VERSION < 6
+          got1 = got1.to_h
+          got2 = got2.to_h
+        end
 
         assert_equal('data1', got1.fetch('{stream}1')[0][1][1])
         assert_equal('data2', got2.fetch('{stream}1')[0][1][1])
