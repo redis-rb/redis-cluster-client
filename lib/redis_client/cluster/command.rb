@@ -46,21 +46,28 @@ class RedisClient
 
         private
 
-        def parse_command_reply(rows) # rubocop:disable Metrics/CyclomaticComplexity
+        def parse_command_reply(rows) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
           rows&.each_with_object({}) do |row, acc|
             next if row.first.nil?
 
+            # TODO: in redis 7.0 or later, subcommand information included in the command reply
+
             pos = case row.first
                   when 'eval', 'evalsha', 'zinterstore', 'zunionstore' then 3
-                  when 'object' then 2
+                  when 'object', 'xgroup' then 2
                   when 'migrate', 'xread', 'xreadgroup' then 0
                   else row[3]
                   end
 
+            writable = case row.first
+                       when 'xgroup' then true
+                       else row[2].include?('write')
+                       end
+
             acc[row.first] = ::RedisClient::Cluster::Command::Detail.new(
               first_key_position: pos,
               key_step: row[5],
-              write?: row[2].include?('write'),
+              write?: writable,
               readonly?: row[2].include?('readonly')
             )
           end.freeze || EMPTY_HASH
@@ -115,8 +122,11 @@ class RedisClient
       end
 
       def determine_optional_key_position(command, option_name)
-        idx = command.map { |e| e.to_s.downcase(:ascii) }.index(option_name)
-        idx.nil? ? 0 : idx + 1
+        command.each_with_index do |e, i|
+          return i + 1 if e.to_s.downcase(:ascii) == option_name
+        end
+
+        0
       end
     end
   end

@@ -711,6 +711,47 @@ class RedisClient
         ps.close
       end
 
+      def test_stream_commands
+        @client.call('xadd', '{stream}1', '*', 'mesage', 'foo')
+        @client.call('xadd', '{stream}1', '*', 'mesage', 'bar')
+        @client.call('xadd', '{stream}2', '*', 'mesage', 'baz')
+        @client.call('xadd', '{stream}2', '*', 'mesage', 'zap')
+        wait_for_replication
+
+        consumer = new_test_client
+        got = consumer.call('xread', 'streams', '{stream}1', '{stream}2', '0', '0')
+        consumer.close
+
+        got = got.to_h if TEST_REDIS_MAJOR_VERSION < 6
+
+        assert_equal('foo', got.fetch('{stream}1')[0][1][1])
+        assert_equal('bar', got.fetch('{stream}1')[1][1][1])
+        assert_equal('baz', got.fetch('{stream}2')[0][1][1])
+        assert_equal('zap', got.fetch('{stream}2')[1][1][1])
+      end
+
+      def test_stream_group_commands
+        @client.call('xadd', '{stream}1', '*', 'task', 'data1')
+        @client.call('xadd', '{stream}1', '*', 'task', 'data2')
+        @client.call('xgroup', 'create', '{stream}1', 'worker', '0')
+        wait_for_replication
+
+        consumer1 = new_test_client
+        consumer2 = new_test_client
+        got1 = consumer1.call('xreadgroup', 'group', 'worker', 'consumer1', 'count', '1', 'streams', '{stream}1', '>')
+        got2 = consumer2.call('xreadgroup', 'group', 'worker', 'consumer2', 'count', '1', 'streams', '{stream}1', '>')
+        consumer1.close
+        consumer2.close
+
+        if TEST_REDIS_MAJOR_VERSION < 6
+          got1 = got1.to_h
+          got2 = got2.to_h
+        end
+
+        assert_equal('data1', got1.fetch('{stream}1')[0][1][1])
+        assert_equal('data2', got2.fetch('{stream}1')[0][1][1])
+      end
+
       def test_with_method
         assert_raises(NotImplementedError) { @client.with }
       end
