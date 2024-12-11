@@ -392,6 +392,7 @@ Also, it should handle errors.
 * https://github.com/valkey-io/valkey/issues/384
 * https://github.com/antirez/redis-rb-cluster
 * https://twitter.com/antirez
+* https://bsky.app/profile/antirez.bsky.social
 * http://antirez.com/latest/0
 * https://www.youtube.com/@antirez
 * https://www.twitch.tv/thetrueantirez/
