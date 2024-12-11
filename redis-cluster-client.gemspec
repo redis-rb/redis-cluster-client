@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name                              = 'redis-cluster-client'
-  s.summary                           = 'A Redis cluster client for Ruby'
+  s.summary                           = 'Redis cluster-aware client for Ruby'
   s.version                           = '0.13.1'
   s.license                           = 'MIT'
   s.homepage                          = 'https://github.com/redis-rb/redis-cluster-client'
