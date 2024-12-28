@@ -27,11 +27,11 @@ jobs:
       max-parallel: 10
       matrix:
         include:
-          - {redis: '7.2', ruby: '3.3'}
-          - {redis: '7.2', ruby: '3.3', compose: compose.ssl.yaml}
-          - {redis: '7.2', ruby: '3.3', driver: 'hiredis'}
-          - {redis: '7.2', ruby: '3.3', driver: 'hiredis', compose: compose.ssl.yaml}
-          - {redis: '7.2', ruby: '3.3', compose: compose.replica.yaml, replica: '2'}
+          - {redis: '7.2', ruby: '3.4'}
+          - {redis: '7.2', ruby: '3.4', compose: compose.ssl.yaml}
+          - {redis: '7.2', ruby: '3.4', driver: 'hiredis'}
+          - {redis: '7.2', ruby: '3.4', driver: 'hiredis', compose: compose.ssl.yaml}
+          - {redis: '7.2', ruby: '3.4', compose: compose.replica.yaml, replica: '2'}
           - {task: test_cluster_down}
           - {task: test_cluster_broken, restart: 'no', startup: '6'}
           - {redis: '8',   ruby: '3.3', compose: compose.valkey.yaml, replica: '2'}
@@ -64,7 +64,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby || '3.3' }}
+          ruby-version: ${{ matrix.ruby || '3.4' }}
           bundler-cache: true
       - name: Pull Docker images
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE pull
@@ -91,7 +91,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'
+          ruby-version: '3.4'
           bundler-cache: true
       - name: Get IP address of host
         run: |
@@ -146,7 +146,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'
+          ruby-version: '3.4'
           bundler-cache: true
       - name: Run rubocop
         run: bundle exec rubocop
@@ -166,7 +166,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'
+          ruby-version: '3.4'
           bundler-cache: true
       - name: Pull Docker images
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE pull
@@ -226,7 +226,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'
+          ruby-version: '3.4'
           bundler-cache: true
       - name: Pull Docker images
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE pull
@@ -264,7 +264,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'
+          ruby-version: '3.4'
           bundler-cache: true
       - name: Pull Docker images
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE pull
@@ -296,7 +296,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'
+          ruby-version: '3.4'
           bundler-cache: true
       - name: Print user limits
         run: ulimit -a
