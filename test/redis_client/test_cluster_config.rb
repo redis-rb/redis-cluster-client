@@ -6,7 +6,8 @@ require 'testing_helper'
 class RedisClient
   class TestClusterConfig < TestingWrapper
     def test_inspect
-      want = '#<RedisClient::ClusterConfig [{:host=>"127.0.0.1", :port=>6379}]>'
+      cfg = { host: '127.0.0.1', port: 6379 }
+      want = "#<RedisClient::ClusterConfig [#{cfg}]>"
       got = ::RedisClient::ClusterConfig.new.inspect
       assert_equal(want, got)
     end
