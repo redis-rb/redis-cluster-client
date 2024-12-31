@@ -123,7 +123,7 @@ class RedisClient
 
       def determine_optional_key_position(command, option_name)
         command.each_with_index do |e, i|
-          return i + 1 if e.to_s.downcase(:ascii) == option_name
+          return i + 1 if e.to_s.casecmp(option_name).zero?
         end
 
         0
