@@ -19,7 +19,6 @@ class RedisClient
       @config = config.nil? ? ClusterConfig.new(**kwargs) : config
       @concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create(**(concurrency || {}))
       @command_builder = @config.command_builder
-
       @pool = pool
       @kwargs = kwargs
       @router = nil
