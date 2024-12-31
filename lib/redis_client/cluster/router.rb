@@ -18,27 +18,28 @@ class RedisClient
       ZERO_CURSOR_FOR_SCAN = '0'
       TSF = ->(f, x) { f.nil? ? x : f.call(x) }.curry
       DEDICATED_ACTIONS = lambda do # rubocop:disable Metrics/BlockLength
+        action = Struct.new('RedisCommandRoutingAction', :method_name, :reply_transformer, keyword_init: true)
         pick_first = ->(reply) { reply.first } # rubocop:disable Style/SymbolProc
-        multiple_key_action = Action.new(method_name: :send_multiple_keys_command)
-        all_node_first_action = Action.new(method_name: :send_command_to_all_nodes, reply_transformer: pick_first)
-        primary_first_action = Action.new(method_name: :send_command_to_primaries, reply_transformer: pick_first)
-        not_supported_action = Action.new(method_name: :fail_not_supported_command)
-        keyless_action = Action.new(method_name: :fail_keyless_command)
+        multiple_key_action = action.new(method_name: :send_multiple_keys_command)
+        all_node_first_action = action.new(method_name: :send_command_to_all_nodes, reply_transformer: pick_first)
+        primary_first_action = action.new(method_name: :send_command_to_primaries, reply_transformer: pick_first)
+        not_supported_action = action.new(method_name: :fail_not_supported_command)
+        keyless_action = action.new(method_name: :fail_keyless_command)
         {
-          'ping' => Action.new(method_name: :send_ping_command, reply_transformer: pick_first),
-          'wait' => Action.new(method_name: :send_wait_command),
-          'keys' => Action.new(method_name: :send_command_to_replicas, reply_transformer: ->(reply) { reply.flatten.sort_by(&:to_s) }),
-          'dbsize' => Action.new(method_name: :send_command_to_replicas, reply_transformer: ->(reply) { reply.select { |e| e.is_a?(Integer) }.sum }),
-          'scan' => Action.new(method_name: :send_scan_command),
-          'lastsave' => Action.new(method_name: :send_command_to_all_nodes, reply_transformer: ->(reply) { reply.sort_by(&:to_i) }),
-          'role' => Action.new(method_name: :send_command_to_all_nodes),
-          'config' => Action.new(method_name: :send_config_command),
-          'client' => Action.new(method_name: :send_client_command),
-          'cluster' => Action.new(method_name: :send_cluster_command),
-          'memory' => Action.new(method_name: :send_memory_command),
-          'script' => Action.new(method_name: :send_script_command),
-          'pubsub' => Action.new(method_name: :send_pubsub_command),
-          'watch' => Action.new(method_name: :send_watch_command),
+          'ping' => action.new(method_name: :send_ping_command, reply_transformer: pick_first),
+          'wait' => action.new(method_name: :send_wait_command),
+          'keys' => action.new(method_name: :send_command_to_replicas, reply_transformer: ->(reply) { reply.flatten.sort_by(&:to_s) }),
+          'dbsize' => action.new(method_name: :send_command_to_replicas, reply_transformer: ->(reply) { reply.select { |e| e.is_a?(Integer) }.sum }),
+          'scan' => action.new(method_name: :send_scan_command),
+          'lastsave' => action.new(method_name: :send_command_to_all_nodes, reply_transformer: ->(reply) { reply.sort_by(&:to_i) }),
+          'role' => action.new(method_name: :send_command_to_all_nodes),
+          'config' => action.new(method_name: :send_config_command),
+          'client' => action.new(method_name: :send_client_command),
+          'cluster' => action.new(method_name: :send_cluster_command),
+          'memory' => action.new(method_name: :send_memory_command),
+          'script' => action.new(method_name: :send_script_command),
+          'pubsub' => action.new(method_name: :send_pubsub_command),
+          'watch' => action.new(method_name: :send_watch_command),
           'mget' => multiple_key_action,
           'mset' => multiple_key_action,
           'del' => multiple_key_action,
@@ -66,13 +67,6 @@ class RedisClient
       private_constant :ZERO_CURSOR_FOR_SCAN, :TSF, :DEDICATED_ACTIONS
 
       attr_reader :config
-
-      Action = Struct.new(
-        'RedisCommandRoutingAction',
-        :method_name,
-        :reply_transformer,
-        keyword_init: true
-      )
 
       def initialize(config, concurrent_worker, pool: nil, **kwargs)
         @config = config
