@@ -122,11 +122,8 @@ class RedisClient
       end
 
       def determine_optional_key_position(command, option_name)
-        command.each_with_index do |e, i|
-          return i + 1 if e.to_s.casecmp(option_name).zero?
-        end
-
-        0
+        i = command.index { |v| v.to_s.casecmp(option_name).zero? }
+        i.nil? ? 0 : i + 1
       end
     end
   end
