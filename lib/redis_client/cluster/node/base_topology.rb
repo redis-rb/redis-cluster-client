@@ -54,7 +54,7 @@ class RedisClient
         def connect_to_new_nodes(options)
           (options.keys - @clients.keys).each do |node_key|
             option = options[node_key].merge(@client_options)
-            config = ::RedisClient::Cluster::Node::Config.new(scale_read: !@primary_node_keys.include?(node_key), **option)
+            config = ::RedisClient::Cluster::Node::Config.new(scale_read: @replica_node_keys.include?(node_key), **option)
             client = @pool.nil? ? config.new_client : config.new_pool(**@pool)
             @clients[node_key] = client
           end
