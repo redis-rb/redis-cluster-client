@@ -13,5 +13,5 @@ Gem::Specification.new do |s|
   s.metadata['allowed_push_host']     = 'https://rubygems.org'
   s.files                             = Dir['lib/**/*.rb']
 
-  s.add_runtime_dependency 'redis-client', '~> 0.22'
+  s.add_runtime_dependency 'redis-client', '~> 0.24'
 end
