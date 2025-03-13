@@ -17,9 +17,19 @@ class RedisClient
     class Router
       ZERO_CURSOR_FOR_SCAN = '0'
       TSF = ->(f, x) { f.nil? ? x : f.call(x) }.curry
+      Ractor.make_shareable(TSF) if Object.const_defined?(:Ractor, false) && Ractor.respond_to?(:make_shareable)
       DEDICATED_ACTIONS = lambda do # rubocop:disable Metrics/BlockLength
         action = Struct.new('RedisCommandRoutingAction', :method_name, :reply_transformer, keyword_init: true)
         pick_first = ->(reply) { reply.first } # rubocop:disable Style/SymbolProc
+        flatten_strings = ->(reply) { reply.flatten.sort_by(&:to_s) }
+        sum_num = ->(reply) { reply.select { |e| e.is_a?(Integer) }.sum }
+        sort_numbers = ->(reply) { reply.sort_by(&:to_i) }
+        if Object.const_defined?(:Ractor, false) && Ractor.respond_to?(:make_shareable)
+          Ractor.make_shareable(pick_first)
+          Ractor.make_shareable(flatten_strings)
+          Ractor.make_shareable(sum_num)
+          Ractor.make_shareable(sort_numbers)
+        end
         multiple_key_action = action.new(method_name: :send_multiple_keys_command)
         all_node_first_action = action.new(method_name: :send_command_to_all_nodes, reply_transformer: pick_first)
         primary_first_action = action.new(method_name: :send_command_to_primaries, reply_transformer: pick_first)
@@ -28,10 +38,10 @@ class RedisClient
         {
           'ping' => action.new(method_name: :send_ping_command, reply_transformer: pick_first),
           'wait' => action.new(method_name: :send_wait_command),
-          'keys' => action.new(method_name: :send_command_to_replicas, reply_transformer: ->(reply) { reply.flatten.sort_by(&:to_s) }),
-          'dbsize' => action.new(method_name: :send_command_to_replicas, reply_transformer: ->(reply) { reply.select { |e| e.is_a?(Integer) }.sum }),
+          'keys' => action.new(method_name: :send_command_to_replicas, reply_transformer: flatten_strings),
+          'dbsize' => action.new(method_name: :send_command_to_replicas, reply_transformer: sum_num),
           'scan' => action.new(method_name: :send_scan_command),
-          'lastsave' => action.new(method_name: :send_command_to_all_nodes, reply_transformer: ->(reply) { reply.sort_by(&:to_i) }),
+          'lastsave' => action.new(method_name: :send_command_to_all_nodes, reply_transformer: sort_numbers),
           'role' => action.new(method_name: :send_command_to_all_nodes),
           'config' => action.new(method_name: :send_config_command),
           'client' => action.new(method_name: :send_client_command),
@@ -59,8 +69,8 @@ class RedisClient
           'multi' => keyless_action,
           'unwatch' => keyless_action
         }.each_with_object({}) do |(k, v), acc|
-          acc[k] = v
-          acc[k.upcase] = v
+          acc[k] = v.freeze
+          acc[k.upcase] = v.freeze
         end
       end.call.freeze
 

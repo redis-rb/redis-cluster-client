@@ -12,6 +12,7 @@ class RedisClient
     end
 
     ERR_ARG_NORMALIZATION = ->(arg) { Array[arg].flatten.reject { |e| e.nil? || (e.respond_to?(:empty?) && e.empty?) } }
+    Ractor.make_shareable(ERR_ARG_NORMALIZATION) if Object.const_defined?(:Ractor, false) && Ractor.respond_to?(:make_shareable)
 
     private_constant :ERR_ARG_NORMALIZATION
 
