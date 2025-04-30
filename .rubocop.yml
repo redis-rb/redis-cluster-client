@@ -1,5 +1,5 @@
 ---
-require:
+plugins:
   - rubocop-performance
   - rubocop-rake
   - rubocop-minitest

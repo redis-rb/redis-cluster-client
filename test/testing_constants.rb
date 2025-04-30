@@ -76,8 +76,6 @@ else
   raise NotImplementedError, TEST_REDIS_HOST
 end
 
-Ractor.make_shareable(TEST_NODE_URIS) if Object.const_defined?(:Ractor, false) && Ractor.respond_to?(:make_shareable)
-
 TEST_GENERIC_OPTIONS = (TEST_REDIS_SSL ? _base_opts.merge(_ssl_opts) : _base_opts).freeze
 
 _tmp_cli = _new_raw_cli.call(**TEST_GENERIC_OPTIONS)
@@ -87,5 +85,10 @@ _tmp_cli.close
 
 BENCH_ENVOY_OPTIONS = { port: 7000, protocol: 2 }.freeze
 BENCH_REDIS_CLUSTER_PROXY_OPTIONS = { port: 7001, protocol: 2 }.freeze
+
+if Object.const_defined?(:Ractor, false) && Ractor.respond_to?(:make_shareable)
+  Ractor.make_shareable(TEST_NODE_URIS)
+  Ractor.make_shareable(TEST_GENERIC_OPTIONS)
+end
 
 # rubocop:enable Lint/UnderscorePrefixedVariableName
