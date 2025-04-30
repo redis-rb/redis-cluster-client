@@ -132,6 +132,84 @@ class TestConcurrency < TestingWrapper
     assert_equal(WANT, @client.call('GET', '{key}1'))
   end
 
+  def test_ractor
+    skip('Ractor is not available') unless Object.const_defined?(:Ractor, false)
+    skip("#{RedisClient.default_driver} is not safe for Ractor") if RedisClient.default_driver != RedisClient::RubyConnection
+    skip('OpenSSL gem has non-shareable objects') if TEST_REDIS_SSL
+    skip('test case may get stuck') if RUBY_ENGINE == 'ruby' && RUBY_ENGINE_VERSION.split('.').take(2).join('.').to_f < 3.1
+
+    ractors = Array.new(MAX_THREADS) do |i|
+      Ractor.new(i) do |i|
+        c = ::RedisClient.cluster(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        ).new_client
+        c.call('get', "key#{i}")
+      rescue StandardError => e
+        e
+      ensure
+        c&.close
+      end
+    end
+
+    ractors.each { |r| assert_equal(WANT, r.take) }
+  end
+
+  def test_ractor_with_pipelining
+    skip('Ractor is not available') unless Object.const_defined?(:Ractor, false)
+    skip("#{RedisClient.default_driver} is not safe for Ractor") if RedisClient.default_driver != RedisClient::RubyConnection
+    skip('OpenSSL gem has non-shareable objects') if TEST_REDIS_SSL
+    skip('test case may get stuck') if RUBY_ENGINE == 'ruby' && RUBY_ENGINE_VERSION.split('.').take(2).join('.').to_f < 3.1
+
+    ractors = Array.new(MAX_THREADS) do |i|
+      Ractor.new(i) do |i|
+        c = ::RedisClient.cluster(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        ).new_client
+        c.pipelined do |pi|
+          pi.call('get', "key#{i}")
+          pi.call('echo', 'hi')
+        end
+      rescue StandardError => e
+        e
+      ensure
+        c&.close
+      end
+    end
+
+    ractors.each { |r| assert_equal([WANT, 'hi'], r.take) }
+  end
+
+  def test_ractor_with_transaction
+    skip('Ractor is not available') unless Object.const_defined?(:Ractor, false)
+    skip("#{RedisClient.default_driver} is not safe for Ractor") if RedisClient.default_driver != RedisClient::RubyConnection
+    skip('OpenSSL gem has non-shareable objects') if TEST_REDIS_SSL
+    skip('test case may get stuck') if RUBY_ENGINE == 'ruby' && RUBY_ENGINE_VERSION.split('.').take(2).join('.').to_f < 3.1
+
+    ractors = Array.new(MAX_THREADS) do |i|
+      Ractor.new(i) do |i|
+        c = ::RedisClient.cluster(
+          nodes: TEST_NODE_URIS,
+          fixed_hostname: TEST_FIXED_HOSTNAME,
+          **TEST_GENERIC_OPTIONS
+        ).new_client
+        c.multi(watch: ["key#{i}"]) do |tx|
+          tx.call('incr', "key#{i}")
+          tx.call('incr', "key#{i}")
+        end
+      rescue StandardError => e
+        e
+      ensure
+        c&.close
+      end
+    end
+
+    ractors.each { |r| assert_equal([2, 3], r.take) }
+  end
+
   private
 
   def new_test_client
