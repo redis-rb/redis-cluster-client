@@ -134,6 +134,7 @@ class TestConcurrency < TestingWrapper
 
   def test_ractor
     skip('Ractor is not available') unless Object.const_defined?(:Ractor, false)
+    skip('hiredis driver is not safe for Ractor') if ::RedisClient.default_driver == :hiredis
 
     ractors = Array.new(MAX_THREADS) do |i|
       Ractor.new(i) do |i|
@@ -155,6 +156,7 @@ class TestConcurrency < TestingWrapper
 
   def test_ractor_with_pipelining
     skip('Ractor is not available') unless Object.const_defined?(:Ractor, false)
+    skip('hiredis driver is not safe for Ractor') if ::RedisClient.default_driver == :hiredis
 
     ractors = Array.new(MAX_THREADS) do |i|
       Ractor.new(i) do |i|
@@ -179,6 +181,7 @@ class TestConcurrency < TestingWrapper
 
   def test_ractor_with_transaction
     skip('Ractor is not available') unless Object.const_defined?(:Ractor, false)
+    skip('hiredis driver is not safe for Ractor') if ::RedisClient.default_driver == :hiredis
 
     ractors = Array.new(MAX_THREADS) do |i|
       Ractor.new(i) do |i|
