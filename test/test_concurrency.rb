@@ -167,7 +167,7 @@ class TestConcurrency < TestingWrapper
         ).new_client
         c.pipelined do |pi|
           pi.call('get', "key#{i}")
-          pi.call('get', "key#{i}")
+          pi.call('echo', 'hi')
         end
       rescue StandardError => e
         e
@@ -176,7 +176,7 @@ class TestConcurrency < TestingWrapper
       end
     end
 
-    ractors.each { |r| assert_equal([WANT, WANT], r.take) }
+    ractors.each { |r| assert_equal([WANT, 'hi'], r.take) }
   end
 
   def test_ractor_with_transaction
