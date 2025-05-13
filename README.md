@@ -1,4 +1,5 @@
 [![Gem Version](https://badge.fury.io/rb/redis-cluster-client.svg)](https://badge.fury.io/rb/redis-cluster-client)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/redis-rb/redis-cluster-client)
 ![Test status](https://github.com/redis-rb/redis-cluster-client/actions/workflows/test.yaml/badge.svg?branch=master)
 ![Release status](https://github.com/redis-rb/redis-cluster-client/actions/workflows/release.yaml/badge.svg)
 
