@@ -46,7 +46,7 @@ class RedisClient
                 prev_err = e
               end
             end
-          rescue IOError => e
+          rescue IOError
             # stream closed in another thread
           end
         end
