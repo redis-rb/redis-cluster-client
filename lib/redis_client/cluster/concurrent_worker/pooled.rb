@@ -10,6 +10,10 @@ class RedisClient
       # It is a fixed size but we can modify the size with some environment variables.
       # So it consumes memory 1 MB multiplied a number of workers.
       class Pooled
+        IO_ERROR_NEVER = { IOError => :never }.freeze
+        IO_ERROR_ON_BLOCKING = { IOError => :on_blocking }.freeze
+        private_constant :IO_ERROR_NEVER, :IO_ERROR_ON_BLOCKING
+
         def initialize(size:)
           raise ArgumentError, "size must be positive: #{size}" unless size.positive?
 
@@ -65,7 +69,15 @@ class RedisClient
 
         def spawn_worker
           Thread.new(@q) do |q|
-            loop { q.pop.exec }
+            Thread.handle_interrupt(IO_ERROR_NEVER) do
+              loop do
+                Thread.handle_interrupt(IO_ERROR_ON_BLOCKING) do
+                  q.pop.exec
+                end
+              end
+            end
+          rescue IOError
+            # stream closed in another thread
           end
         end
       end
