@@ -316,9 +316,7 @@ Please make sure the following tools are installed on your machine.
 | Tool | Version | URL |
 | --- | --- | --- |
 | Docker | latest stable | https://docs.docker.com/engine/install/ |
-| Docker Compose | V2 | https://docs.docker.com/compose/reference/ |
 | Ruby | latest stable | https://www.ruby-lang.org/en/ |
-| Bundler | latest satble | https://bundler.io/ |
 
 Please fork this repository and check out the codes.
 
@@ -329,30 +327,23 @@ $ git remote add upstream https://github.com/redis-rb/redis-cluster-client.git
 $ git fetch -p upstream
 ```
 
-Please install libraries.
+Please do the following steps.
 
-```
-$ bundle install --path=.bundle --jobs=4
-```
-
-Please run Redis cluster with Docker.
+* Build a Redis cluster with Docker
+* Install gems
+* Run basic test cases
 
 ```
 ## If you use Docker server and your OS is Linux:
+$ bundle config set path '.bundle'
+$ bundle install --jobs=$(grep process /proc/cpuinfo | wc -l)
 $ docker compose up
+$ bundle exec rake test
 
 ## else:
-$ HOST_ADDR=192.168.xxx.xxx docker compose -f compose.nat.yaml up
-$ DEBUG=1 bundle exec rake 'build_cluster[192.168.xxx.xxx]'
-
-### When the above rake task is not working:
-$ docker compose -f compose.nat.yaml exec node1 bash -c "yes yes | redis-cli --cluster create --cluster-replicas 1 $(seq 6379 6384 | xargs -I {} echo 192.168.xxx.xxx:{} | xargs echo)"
-```
-
-Please run basic test cases.
-
-```
-$ bundle exec rake test
+$ docker compose --profile ruby up
+$ docker compose --profile ruby exec ruby bundle install
+$ docker compose --profile ruby exec ruby bundle exec rake test
 ```
 
 You can see more information in the YAML file for GItHub actions.
