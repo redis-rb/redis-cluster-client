@@ -22,6 +22,7 @@ defaults:
 jobs:
   main:
     name: Main
+    if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
     timeout-minutes: 15
     runs-on: ubuntu-latest
     strategy:
@@ -82,6 +83,7 @@ jobs:
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   nat-ted-env:
     name: NAT-ted Environments
+    if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
     timeout-minutes: 5
     runs-on: ubuntu-latest
     env:
@@ -140,6 +142,7 @@ jobs:
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   lint:
     name: Lint
+    if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
     timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
@@ -154,6 +157,7 @@ jobs:
         run: bundle exec rubocop
   benchmark:
     name: Benchmark
+    if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
@@ -214,6 +218,7 @@ jobs:
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   ips:
     name: IPS
+    if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
@@ -246,6 +251,7 @@ jobs:
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   profiling:
     name: Profiling
+    if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
     timeout-minutes: 5
     runs-on: ubuntu-latest
     strategy:
@@ -284,6 +290,7 @@ jobs:
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   massive:
     name: Massive Cluster
+    if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
