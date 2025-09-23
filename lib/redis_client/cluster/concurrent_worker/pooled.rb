@@ -37,7 +37,9 @@ class RedisClient
 
         def close
           @q.clear
-          @workers.each { |t| t&.exit }
+          workers = @workers.compact
+          workers.each(&:exit)
+          workers.each(&:join)
           @workers.clear
           @q.close
           @pid = nil
