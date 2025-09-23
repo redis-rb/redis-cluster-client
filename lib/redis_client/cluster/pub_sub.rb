@@ -8,8 +8,8 @@ class RedisClient
     class PubSub
       class State
         IO_ERROR_NEVER = { IOError => :never }.freeze
-        IO_ERROR_ON_BLOCKING = { IOError => :on_blocking }.freeze
-        private_constant :IO_ERROR_NEVER, :IO_ERROR_ON_BLOCKING
+        IO_ERROR_IMMEDIATE = { IOError => :immediate }.freeze
+        private_constant :IO_ERROR_NEVER, :IO_ERROR_IMMEDIATE
 
         def initialize(client, queue)
           @client = client
@@ -45,12 +45,12 @@ class RedisClient
           Thread.new(client, queue, nil) do |pubsub, q, prev_err|
             Thread.handle_interrupt(IO_ERROR_NEVER) do
               loop do
-                Thread.handle_interrupt(IO_ERROR_ON_BLOCKING) { q << pubsub.next_event }
+                Thread.handle_interrupt(IO_ERROR_IMMEDIATE) { q << pubsub.next_event }
                 prev_err = nil
               rescue StandardError => e
                 next sleep 0.005 if e.instance_of?(prev_err.class) && e.message == prev_err&.message
 
-                Thread.handle_interrupt(IO_ERROR_ON_BLOCKING) { q << e }
+                Thread.handle_interrupt(IO_ERROR_IMMEDIATE) { q << e }
                 prev_err = e
               end
             end
