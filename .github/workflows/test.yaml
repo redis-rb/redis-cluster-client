@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 10
+      max-parallel: 8
       matrix:
         include:
           - {redis: '7.2', ruby: '3.4'}
@@ -35,20 +35,20 @@ jobs:
           - {redis: '7.2', ruby: '3.4', driver: 'hiredis'}
           - {redis: '7.2', ruby: '3.4', driver: 'hiredis', compose: compose.ssl.yaml}
           - {redis: '7.2', ruby: '3.4', compose: compose.replica.yaml, replica: '2'}
-          - {task: test_cluster_down}
-          - {task: test_cluster_broken, restart: 'no', startup: '6'}
           - {redis: '8',   ruby: '3.3', compose: compose.valkey.yaml, replica: '2'}
           - {redis: '7.2', ruby: '3.2', compose: compose.auth.yaml}
           - {redis: '7.0', ruby: '3.1'}
           - {redis: '6.2', ruby: '3.0'}
           - {redis: '5.0', ruby: '2.7'}
+          - {ruby: 'jruby'}
+          - {ruby: 'truffleruby'}
+          - {task: test_cluster_down}
+          - {task: test_cluster_broken, restart: 'no', startup: '6'}
           - {task: test_cluster_state, pattern: 'PrimaryOnly', compose: compose.valkey.yaml, redis: '8', replica: '2', startup: '9'}
           - {task: test_cluster_state, pattern: 'Pooled', compose: compose.valkey.yaml, redis: '8', replica: '2', startup: '9'}
           - {task: test_cluster_state, pattern: 'ScaleReadRandom', compose: compose.valkey.yaml, redis: '8', replica: '2', startup: '9'}
           - {task: test_cluster_state, pattern: 'ScaleReadRandomWithPrimary', compose: compose.valkey.yaml, redis: '8', replica: '2', startup: '9'}
           - {task: test_cluster_state, pattern: 'ScaleReadLatency', compose: compose.valkey.yaml, redis: '8', replica: '2', startup: '9'}
-          - {ruby: 'jruby'}
-          - {ruby: 'truffleruby'}
           - {task: test_cluster_scale, pattern: 'Single', compose: compose.scale.yaml, startup: '8'}
           - {task: test_cluster_scale, pattern: 'Pipeline', compose: compose.scale.yaml, startup: '8'}
           - {task: test_cluster_scale, pattern: 'Transaction', compose: compose.scale.yaml, startup: '8'}
@@ -81,9 +81,24 @@ jobs:
         run: bundle exec rake ${{ matrix.task || 'test' }}
       - name: Stop containers
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
-  nat-ted-env:
-    name: NAT-ted Environments
+  lint:
+    name: Lint
     if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+      - name: Run rubocop
+        run: bundle exec rubocop
+  nat-ted-env:
+    if: github.event_name == 'schedule' && github.repository == 'redis-rb/redis-cluster-client'
+    name: NAT-ted Environments
     timeout-minutes: 5
     runs-on: ubuntu-latest
     env:
@@ -140,24 +155,9 @@ jobs:
         run: bundle exec rake test
       - name: Stop containers
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
-  lint:
-    name: Lint
-    if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
-    timeout-minutes: 5
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.4'
-          bundler-cache: true
-      - name: Run rubocop
-        run: bundle exec rubocop
   benchmark:
+    if: github.event_name == 'schedule' && github.repository == 'redis-rb/redis-cluster-client'
     name: Benchmark
-    if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
@@ -217,8 +217,8 @@ jobs:
       - name: Stop containers
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   ips:
+    if: github.event_name == 'schedule' && github.repository == 'redis-rb/redis-cluster-client'
     name: IPS
-    if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
@@ -250,8 +250,8 @@ jobs:
       - name: Stop containers
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   profiling:
+    if: github.event_name == 'schedule' && github.repository == 'redis-rb/redis-cluster-client'
     name: Profiling
-    if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
     timeout-minutes: 5
     runs-on: ubuntu-latest
     strategy:
@@ -289,8 +289,8 @@ jobs:
       - name: Stop containers
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   massive:
-    name: Massive Cluster
     if: github.event_name == 'schedule' && github.repository == 'redis-rb/redis-cluster-client'
+    name: Massive Cluster
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
