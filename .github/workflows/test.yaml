@@ -290,7 +290,7 @@ jobs:
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   massive:
     name: Massive Cluster
-    if: github.event_name != 'schedule' || github.repository == 'redis-rb/redis-cluster-client'
+    if: github.event_name == 'schedule' && github.repository == 'redis-rb/redis-cluster-client'
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
