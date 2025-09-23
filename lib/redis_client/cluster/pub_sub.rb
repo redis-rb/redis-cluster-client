@@ -26,7 +26,11 @@ class RedisClient
         end
 
         def close
-          @worker.exit if @worker&.alive?
+          if @worker&.alive?
+            @worker.exit
+            @worker.join
+          end
+
           @client.close
         rescue ::RedisClient::ConnectionError
           # ignore
