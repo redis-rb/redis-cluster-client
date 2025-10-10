@@ -102,7 +102,7 @@ services:
       node9:
         condition: service_healthy
   envoy:
-    image: envoyproxy/envoy:v1.23.1
+    image: envoyproxy/envoy:v1.35.3
     restart: "${RESTART_POLICY:-always}"
     ports:
       - "3000:10000"
