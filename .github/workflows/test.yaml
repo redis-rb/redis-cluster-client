@@ -119,31 +119,9 @@ jobs:
       - name: Pull Docker images
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE pull
       - name: Run containers
-        run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE up -d
+        run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE up --wait --wait-timeout 30
         env:
           HOST_ADDR: ${{ env.HOST_IP_ADDR }}
-      - name: Wait for nodes to be ready
-        run: |
-          node_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps --format json | jq -s 'length')
-          i=0
-          while :
-          do
-            if [[ $i -gt $MAX_ATTEMPTS ]]
-            then
-              echo "Max attempts exceeded: $i times"
-              exit 1
-            fi
-            healthy_cnt=$(docker compose -f $DOCKER_COMPOSE_FILE ps --format json | jq -s 'map(select(.Health == "healthy")) | length')
-            if [[ $healthy_cnt -eq $node_cnt ]]
-            then
-              break
-            fi
-            echo 'Waiting for nodes to be ready...'
-            sleep 3
-            : $((++i))
-          done
-        env:
-          MAX_ATTEMPTS: "10"
       - name: Print containers
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Build cluster
