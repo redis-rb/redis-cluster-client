@@ -9,6 +9,7 @@ class RedisClient
   class Cluster
     class Transaction
       ConsistencyError = Class.new(::RedisClient::Cluster::Error)
+      attr_reader :node_key, :pipeline
 
       MAX_REDIRECTION = 2
       EMPTY_ARRAY = [].freeze
@@ -84,10 +85,10 @@ class RedisClient
       def prepare(command)
         return true unless @node.nil?
 
-        node_key = @router.find_primary_node_key(command)
-        return false if node_key.nil?
+        @node_key = @router.find_primary_node_key(command)
+        return false if @node_key.nil?
 
-        @node = @router.find_node(node_key)
+        @node = @router.find_node(@node_key)
         prepare_tx
         true
       end

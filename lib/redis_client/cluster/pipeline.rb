@@ -165,6 +165,17 @@ class RedisClient
         append_pipeline(node_key).blocking_call_v(timeout, command, &block)
       end
 
+      def multi
+        transaction = ::RedisClient::Cluster::Transaction.new(@router, @command_builder)
+        yield transaction
+        raise ConsistencyError.new('unable to determine slot').with_config(@router.config) if transaction.node_key.nil?
+
+        transaction.pipeline._commands.zip(transaction.pipeline._blocks || []).each do |command, block|
+          append_pipeline_noreply(transaction.node_key).call_once_v(command, &block)
+        end
+        append_pipeline(transaction.node_key).call_once('EXEC')
+      end
+
       def empty?
         @size.zero?
       end
@@ -233,6 +244,16 @@ class RedisClient
         @pipelines[node_key] ||= ::RedisClient::Cluster::Pipeline::Extended.new(::RedisClient::Cluster::NoopCommandBuilder)
         @pipelines[node_key].add_outer_index(@size)
         @size += 1
+        @pipelines[node_key]
+      end
+
+      # don't increment the size so that the next command
+      # will override the reply (for pipelined multis to
+      # remove all the "OK" and "QUEUED responses")
+      def append_pipeline_noreply(node_key)
+        @pipelines ||= {}
+        @pipelines[node_key] ||= ::RedisClient::Cluster::Pipeline::Extended.new(::RedisClient::Cluster::NoopCommandBuilder)
+        @pipelines[node_key].add_outer_index(@size)
         @pipelines[node_key]
       end
 

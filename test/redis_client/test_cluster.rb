@@ -221,6 +221,18 @@ class RedisClient
         assert_equal('2', @client.call('GET', 'counter'))
       end
 
+      def test_pipelined_transactions
+        got = @client.pipelined do |pipeline|
+          10.times do |i|
+            pipeline.multi do |multi|
+              multi.call('INCR', "string#{i}")
+              multi.call('INCRBY', "string#{i}", 2)
+            end
+          end
+        end
+        assert_equal(Array.new(10) { [1, 3] }, got)
+      end
+
       def test_transaction_with_multiple_key
         assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
           @client.multi do |t|
