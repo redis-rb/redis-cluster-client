@@ -31,7 +31,7 @@ SLUGGISH_TEST_TYPES.each do |type|
   end
 end
 
-%i[bench ips prof].each do |k|
+%i[ips prof].each do |k|
   Rake::TestTask.new(k) do |t|
     t.libs << :lib
     t.libs << :test
@@ -69,12 +69,4 @@ task :build_cluster, %i[addr1 addr2] do |_, args|
     replica_size: replica_size,
     timeout: 30.0
   ).rebuild
-end
-
-desc 'Build cluster for benchmark'
-task :build_cluster_for_bench do
-  $LOAD_PATH.unshift(File.expand_path('test', __dir__))
-  require 'cluster_controller'
-  nodes = (6379..6387).map { |port| "redis://127.0.0.1:#{port}" }
-  ::ClusterController.new(nodes, shard_size: 3, replica_size: 2, timeout: 30.0).rebuild
 end
