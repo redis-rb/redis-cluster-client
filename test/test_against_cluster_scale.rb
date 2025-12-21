@@ -127,7 +127,7 @@ module TestAgainstClusterScale
     class Single < TestingWrapper
       include Mixin
 
-      def self.test_order
+      def self.run_order
         :alpha
       end
 
@@ -150,7 +150,7 @@ module TestAgainstClusterScale
     class Pipeline < TestingWrapper
       include Mixin
 
-      def self.test_order
+      def self.run_order
         :alpha
       end
 
@@ -182,7 +182,7 @@ module TestAgainstClusterScale
     class Transaction < TestingWrapper
       include Mixin
 
-      def self.test_order
+      def self.run_order
         :alpha
       end
 
@@ -218,7 +218,7 @@ module TestAgainstClusterScale
     class PubSub < TestingWrapper
       include Mixin
 
-      def self.test_order
+      def self.run_order
         :alpha
       end
 
