@@ -1,9 +1,9 @@
 ---
 services:
   node1: &node
-    image: "redis:${REDIS_VERSION:-8}"
+    image: "valkey/valkey:${REDIS_VERSION:-9}"
     command: >
-      redis-server
+      valkey-server
       --maxmemory            64mb
       --maxmemory-policy     allkeys-lru
       --appendonly           yes
@@ -12,7 +12,7 @@ services:
       --cluster-node-timeout 5000
     restart: "${RESTART_POLICY:-always}"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: "7s"
       timeout: "5s"
       retries: 10
@@ -47,12 +47,12 @@ services:
     ports:
       - "6386:6379"
   clustering:
-    image: "redis:${REDIS_VERSION:-8}"
+    image: "valkey/valkey:${REDIS_VERSION:-9}"
     command: >
       bash -c "apt-get update > /dev/null
       && apt-get install --no-install-recommends --no-install-suggests -y dnsutils > /dev/null
       && rm -rf /var/lib/apt/lists/*
-      && yes yes | redis-cli --cluster create
+      && yes yes | valkey-cli --cluster create
       $$(dig node1 +short):6379
       $$(dig node2 +short):6379
       $$(dig node3 +short):6379
