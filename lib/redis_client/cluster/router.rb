@@ -17,7 +17,6 @@ class RedisClient
     class Router
       ZERO_CURSOR_FOR_SCAN = '0'
       TSF = ->(f, x) { f.nil? ? x : f.call(x) }.curry
-      Ractor.make_shareable(TSF) if Object.const_defined?(:Ractor, false) && Ractor.respond_to?(:make_shareable)
       DEDICATED_ACTIONS = lambda do # rubocop:disable Metrics/BlockLength
         action = Struct.new('RedisCommandRoutingAction', :method_name, :reply_transformer, keyword_init: true)
         pick_first = ->(reply) { reply.first } # rubocop:disable Style/SymbolProc

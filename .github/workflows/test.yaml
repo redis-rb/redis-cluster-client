@@ -30,16 +30,16 @@ jobs:
       max-parallel: 8
       matrix:
         include:
-          - {redis: '8', ruby: '3.4'}
-          - {redis: '8', ruby: '3.4', compose: compose.ssl.yaml}
-          - {redis: '8', ruby: '3.4', driver: 'hiredis'}
-          - {redis: '8', ruby: '3.4', driver: 'hiredis', compose: compose.ssl.yaml}
-          - {redis: '8', ruby: '3.4', compose: compose.auth.yaml}
-          - {redis: '8', ruby: '3.4', compose: compose.replica.yaml, replica: '2'}
-          - {redis: '8', ruby: '3.4', compose: compose.valkey.yaml, replica: '2'}
-          - {redis: '9', ruby: '3.4', compose: compose.valkey.yaml, replica: '2'}
-          - {redis: '7', ruby: '3.3'}
-          - {redis: '6', ruby: '3.2'}
+          - {redis: '8', ruby: '4.0'}
+          - {redis: '8', ruby: '4.0', compose: compose.ssl.yaml}
+          - {redis: '8', ruby: '4.0', driver: 'hiredis'}
+          - {redis: '8', ruby: '4.0', driver: 'hiredis', compose: compose.ssl.yaml}
+          - {redis: '8', ruby: '4.0', compose: compose.auth.yaml}
+          - {redis: '8', ruby: '4.0', compose: compose.replica.yaml, replica: '2'}
+          - {redis: '9', ruby: '4.0', compose: compose.valkey.yaml, replica: '2'}
+          - {redis: '8', ruby: '4.0', compose: compose.valkey.yaml, replica: '2'}
+          - {redis: '7', ruby: '3.4'}
+          - {redis: '6', ruby: '3.3'}
           - {redis: '5', ruby: '2.7'}
           - {ruby: 'jruby'}
           - {ruby: 'truffleruby'}
@@ -68,7 +68,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby || '3.4' }}
+          ruby-version: ${{ matrix.ruby || '4.0' }}
           bundler-cache: true
       - name: Pull Docker images
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE pull
@@ -93,7 +93,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.4'
+          ruby-version: '4.0'
           bundler-cache: true
       - name: Run rubocop
         run: bundle exec rubocop
@@ -111,7 +111,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.4'
+          ruby-version: '4.0'
           bundler-cache: true
       - name: Get IP address of host
         run: |
@@ -151,7 +151,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.4'
+          ruby-version: '4.0'
           bundler-cache: true
       - name: Pull Docker images
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE pull
@@ -190,7 +190,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.4'
+          ruby-version: '4.0'
           bundler-cache: true
       - name: Pull Docker images
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE pull
@@ -223,7 +223,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.4'
+          ruby-version: '4.0'
           bundler-cache: true
       - name: Print user limits
         run: ulimit -a

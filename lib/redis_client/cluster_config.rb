@@ -15,7 +15,6 @@ class RedisClient
     DEFAULT_SCHEME = 'redis'
     SECURE_SCHEME = 'rediss'
     DEFAULT_NODE = "#{DEFAULT_SCHEME}://#{DEFAULT_HOST}:#{DEFAULT_PORT}"
-    Ractor.make_shareable(DEFAULT_NODE) if Object.const_defined?(:Ractor, false) && Ractor.respond_to?(:make_shareable)
     DEFAULT_NODES = [DEFAULT_NODE].freeze
     VALID_SCHEMES = [DEFAULT_SCHEME, SECURE_SCHEME].freeze
     VALID_NODES_KEYS = %i[ssl username password host port db].freeze
