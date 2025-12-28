@@ -29,7 +29,7 @@ gem 'redis-cluster-client'
 | `:replica_affinity` | Symbol or String | `:random` | scale reading strategy, `:random`, `random_with_primary` or `:latency` are valid |
 | `:fixed_hostname` | String | `nil` | required if client should connect to single endpoint with SSL |
 | `:slow_command_timeout` | Integer | `-1` | timeout used for "slow" queries that fetch metdata e.g. CLUSTER NODES, COMMAND |
-| `:concurrency` | Hash | `{ model: :none }` | concurrency settings, `:on_demand`, `:pooled`, `:none`, and `actor`  are valid models, size is a max number of workers, `:none` model is no concurrency, Please choose the one suited your environment if needed. |
+| `:concurrency` | Hash | `{ model: :none }` | concurrency settings, `:on_demand`, `:pooled` and `:none` are valid models, size is a max number of workers, `:none` model is no concurrency, Please choose the one suited your environment if needed. |
 | `:connect_with_original_config` | Boolean | `false` | `true` if client should retry the connection using the original endpoint that was passed in |
 | `:max_startup_sample` | Integer | `3` | maximum number of nodes to fetch `CLUSTER NODES` information for startup |
 
@@ -105,7 +105,6 @@ RedisClient.cluster(slow_command_timeout: 4).new_client
 RedisClient.cluster(concurrency: { model: :on_demand, size: 6 }).new_client
 RedisClient.cluster(concurrency: { model: :pooled, size: 3 }).new_client
 RedisClient.cluster(concurrency: { model: :none }).new_client
-RedisClient.cluster(concurrency: { model: :actor }).new_client
 
 # The above settings are used by sending commands to multiple nodes like pipelining.
 # Please choose the one suited your workloads.
