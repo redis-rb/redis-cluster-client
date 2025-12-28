@@ -31,6 +31,18 @@ class RedisClient
           assert_equal(want, got.sort)
         end
 
+        def test_work_group_with_error
+          group = @worker.new_group(size: 5)
+
+          5.times do |i|
+            group.push(i) { raise NotImplementedError, 'should be handled' }
+          end
+
+          group.each { |id, v| assert_instance_of(NotImplementedError, v, id) }
+
+          group.close
+        end
+
         def test_too_many_tasks
           group = @worker.new_group(size: 5)
           5.times { |i| group.push(i, i) { |n| n } }

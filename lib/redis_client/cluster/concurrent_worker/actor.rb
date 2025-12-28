@@ -5,10 +5,10 @@ class RedisClient
     module ConcurrentWorker
       class Actor
         class Group
-          Message = Struct.new('RactorMessage', :id, :result, keyword_init: true)
+          Task = Struct.new('RedisClusterClientRactorTask', :id, :ractor, keyword_init: true)
 
           def initialize(size:)
-            @ractors = Array.new(size)
+            @tasks = Array.new(size)
             @size = size
             @count = 0
           end
@@ -16,16 +16,10 @@ class RedisClient
           def push(id, *args, **kwargs, &block)
             raise InvalidNumberOfTasks, "max size reached: #{@count}" if @count == @size
 
-            blk = Ractor.shareable_proc { block }
-            @ractors[@count] = Ractor.new(id, blk, *args, **kwargs) do |r_id, r_block, *r_args, **r_kwargs|
-              result = begin
-                r_block&.call(*r_args, **r_kwargs) # FIXME: nil returned
-              rescue StandardError => e
-                e
-              end
-
-              Message.new(id: r_id, result: result)
-            end
+            @tasks[@count] = ::RedisClient::Cluster::ConcurrentWorker::Actor::Group::Task.new(
+              id: id,
+              ractor: Ractor.new(*args, **kwargs, &block) # FIXME: How to disable report_on_exception?
+            )
 
             @count += 1
             nil
@@ -34,16 +28,21 @@ class RedisClient
           def each
             raise InvalidNumberOfTasks, "expected: #{@size}, actual: #{@count}" if @count != @size
 
-            @ractors.each do |ractor|
-              message = ractor.value
-              yield(message.id, message.result)
+            @tasks.each do |task|
+              result = begin
+                task.ractor.value
+              rescue Ractor::Error => e
+                e.cause
+              end
+
+              yield(task.id, result)
             end
 
             nil
           end
 
           def close
-            @ractors.clear
+            @tasks.clear
             @count = 0
             nil
           end
