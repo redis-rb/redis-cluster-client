@@ -26,9 +26,24 @@ class RedisClient
             got << v
           end
 
-          group.close
-
           assert_equal(want, got.sort)
+        ensure
+          group&.close
+        end
+
+        def test_work_group_with_error
+          group = @worker.new_group(size: 5)
+
+          5.times do |i|
+            group.push(i) { raise StandardError, 'should be handled' }
+          end
+
+          group.each do |id, v|
+            assert_instance_of(StandardError, v, id)
+            assert_equal('should be handled', v.message)
+          end
+        ensure
+          group&.close
         end
 
         def test_too_many_tasks
@@ -38,7 +53,8 @@ class RedisClient
           sum = 0
           group.each { |_, v| sum += v } # rubocop:disable Style/HashEachMethods
           assert_equal(10, sum)
-          group.close
+        ensure
+          group&.close
         end
 
         def test_fewer_tasks
@@ -49,7 +65,8 @@ class RedisClient
           group.push(4, 4) { |n| n }
           group.each { |_, v| sum += v } # rubocop:disable Style/HashEachMethods
           assert_equal(10, sum)
-          group.close
+        ensure
+          group&.close
         end
 
         def teardown
