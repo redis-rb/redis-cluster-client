@@ -159,8 +159,8 @@ class TestConcurrency < TestingWrapper
     skip('unstable ractor') if RUBY_ENGINE == 'ruby' && RUBY_ENGINE_VERSION.split('.').take(2).join('.').to_f < 4.0
 
     ractors = Array.new(MAX_THREADS) do |i|
-      Ractor.new(i) do |i|
-        c = ::RedisClient.cluster(nodes: TEST_NODE_URIS, fixed_hostname: TEST_FIXED_HOSTNAME, **TEST_GENERIC_OPTIONS).new_client
+      c = ::RedisClient.cluster(nodes: TEST_NODE_URIS, fixed_hostname: TEST_FIXED_HOSTNAME, **TEST_GENERIC_OPTIONS).new_client
+      Ractor.new(i, c) do |i, c|
         c.call('get', "key#{i}")
       rescue StandardError => e
         e
@@ -179,8 +179,8 @@ class TestConcurrency < TestingWrapper
     skip('unstable ractor') if RUBY_ENGINE == 'ruby' && RUBY_ENGINE_VERSION.split('.').take(2).join('.').to_f < 4.0
 
     ractors = Array.new(MAX_THREADS) do |i|
-      Ractor.new(i) do |i|
-        c = ::RedisClient.cluster(nodes: TEST_NODE_URIS, fixed_hostname: TEST_FIXED_HOSTNAME, **TEST_GENERIC_OPTIONS).new_client
+      c = ::RedisClient.cluster(nodes: TEST_NODE_URIS, fixed_hostname: TEST_FIXED_HOSTNAME, **TEST_GENERIC_OPTIONS).new_client
+      Ractor.new(i, c) do |i, c|
         c.pipelined do |pi|
           pi.call('get', "key#{i}")
           pi.call('echo', 'hi')
@@ -202,8 +202,8 @@ class TestConcurrency < TestingWrapper
     skip('unstable ractor') if RUBY_ENGINE == 'ruby' && RUBY_ENGINE_VERSION.split('.').take(2).join('.').to_f < 4.0
 
     ractors = Array.new(MAX_THREADS) do |i|
-      Ractor.new(i) do |i|
-        c = ::RedisClient.cluster(nodes: TEST_NODE_URIS, fixed_hostname: TEST_FIXED_HOSTNAME, **TEST_GENERIC_OPTIONS).new_client
+      c = ::RedisClient.cluster(nodes: TEST_NODE_URIS, fixed_hostname: TEST_FIXED_HOSTNAME, **TEST_GENERIC_OPTIONS).new_client
+      Ractor.new(i, c) do |i, c|
         c.multi(watch: ["key#{i}"]) do |tx|
           tx.call('incr', "key#{i}")
           tx.call('incr', "key#{i}")
