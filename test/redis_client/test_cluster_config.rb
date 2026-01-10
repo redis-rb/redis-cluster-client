@@ -61,10 +61,16 @@ class RedisClient
           }
         },
         {
-          config: ::RedisClient::ClusterConfig.new(nodes: ['redis://1.2.3.4:1234', 'rediss://5.6.7.8:5678']),
+          config: ::RedisClient::ClusterConfig.new(db: 1),
           want: {
-            '1.2.3.4:1234' => { host: '1.2.3.4', port: 1234, command_builder: ::RedisClient::Cluster::NoopCommandBuilder },
-            '5.6.7.8:5678' => { host: '5.6.7.8', port: 5678, ssl: true, command_builder: ::RedisClient::Cluster::NoopCommandBuilder }
+            '127.0.0.1:6379' => { host: '127.0.0.1', port: 6379, db: 1, command_builder: ::RedisClient::Cluster::NoopCommandBuilder }
+          }
+        },
+        {
+          config: ::RedisClient::ClusterConfig.new(nodes: ['redis://1.2.3.4:1234/0', 'rediss://5.6.7.8:5678/1']),
+          want: {
+            '1.2.3.4:1234' => { host: '1.2.3.4', port: 1234, db: 0, command_builder: ::RedisClient::Cluster::NoopCommandBuilder },
+            '5.6.7.8:5678' => { host: '5.6.7.8', port: 5678, db: 1, ssl: true, command_builder: ::RedisClient::Cluster::NoopCommandBuilder }
           }
         },
         {
@@ -182,6 +188,13 @@ class RedisClient
           },
           want: { ssl: true, timeout: 1 }
         },
+        {
+          params: {
+            client_config: { db: 1 },
+            node_configs: [{ db: 2 }]
+          },
+          want: { db: 2 }
+        },
         { params: { client_config: {}, node_configs: [], keys: [] }, want: {} }
       ].each_with_index do |c, idx|
         msg = "Case: #{idx}"
@@ -192,7 +205,7 @@ class RedisClient
 
     def test_client_config_for_node
       config = ::RedisClient::ClusterConfig.new(
-        nodes: ['redis://username:password@1.2.3.4:1234', 'rediss://5.6.7.8:5678'],
+        nodes: ['rediss://username:password@1.2.3.4:1234/0', 'redis://5.6.7.8:5678/1'],
         custom: { foo: 'bar' }
       )
       want = {
@@ -200,6 +213,8 @@ class RedisClient
         port: 9999,
         username: 'username',
         password: 'password',
+        ssl: true,
+        db: 0,
         custom: { foo: 'bar' },
         command_builder: ::RedisClient::Cluster::NoopCommandBuilder
       }

@@ -18,7 +18,7 @@ class RedisClient
     DEFAULT_NODES = [DEFAULT_NODE].freeze
     VALID_SCHEMES = [DEFAULT_SCHEME, SECURE_SCHEME].freeze
     VALID_NODES_KEYS = %i[ssl username password host port db].freeze
-    MERGE_CONFIG_KEYS = %i[ssl username password].freeze
+    MERGE_CONFIG_KEYS = %i[ssl username password db].freeze
     IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
     MAX_WORKERS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', -1)) # for backward compatibility
     # It's used with slow queries of fetching meta data like CLUSTER NODES, COMMAND and so on.
