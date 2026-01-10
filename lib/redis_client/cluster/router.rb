@@ -58,6 +58,7 @@ class RedisClient
           'bgsave' => all_node_first_action,
           'quit' => all_node_first_action,
           'save' => all_node_first_action,
+          'select' => all_node_first_action,
           'flushall' => primary_first_action,
           'flushdb' => primary_first_action,
           'readonly' => not_supported_action,
@@ -381,35 +382,23 @@ class RedisClient
       end
 
       def send_cluster_command(method, command, args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        if command[1].casecmp('addslots').zero?
-          fail_not_supported_command(method, command, args, &block)
-        elsif command[1].casecmp('delslots').zero?
-          fail_not_supported_command(method, command, args, &block)
-        elsif command[1].casecmp('failover').zero?
-          fail_not_supported_command(method, command, args, &block)
-        elsif command[1].casecmp('forget').zero?
-          fail_not_supported_command(method, command, args, &block)
-        elsif command[1].casecmp('meet').zero?
-          fail_not_supported_command(method, command, args, &block)
-        elsif command[1].casecmp('replicate').zero?
-          fail_not_supported_command(method, command, args, &block)
-        elsif command[1].casecmp('reset').zero?
-          fail_not_supported_command(method, command, args, &block)
-        elsif command[1].casecmp('set-config-epoch').zero?
-          fail_not_supported_command(method, command, args, &block)
-        elsif command[1].casecmp('setslot').zero?
-          fail_not_supported_command(method, command, args, &block)
+        if command[1].casecmp('keyslot').zero? ||
+           command[1].casecmp('info').zero? ||
+           command[1].casecmp('nodes').zero? ||
+           command[1].casecmp('slots').zero? ||
+           command[1].casecmp('shards').zero? ||
+           command[1].casecmp('count-failure-reports').zero? ||
+           command[1].casecmp('slaves').zero?
+          assign_node(command).public_send(method, *args, command, &block)
         elsif command[1].casecmp('saveconfig').zero?
           @node.call_all(method, command, args).first.then(&TSF.call(block))
-        elsif command[1].casecmp('getkeysinslot').zero?
-          raise ArgumentError, command.join(' ') if command.size != 4
-
+        elsif command[1].casecmp('countkeysinslot').zero? || command[1].casecmp('getkeysinslot').zero?
           handle_node_reload_error do
             node_key = @node.find_node_key_of_replica(command[2])
             @node.find_by(node_key).public_send(method, *args, command, &block)
           end
         else
-          assign_node(command).public_send(method, *args, command, &block)
+          fail_not_supported_command(method, command, args, &block)
         end
       end
 
