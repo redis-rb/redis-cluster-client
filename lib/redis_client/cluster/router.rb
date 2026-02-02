@@ -394,7 +394,7 @@ class RedisClient
           @node.call_all(method, command, args).first.then(&TSF.call(block))
         elsif command[1].casecmp('countkeysinslot').zero? || command[1].casecmp('getkeysinslot').zero?
           handle_node_reload_error do
-            node_key = @node.find_node_key_of_replica(command[2])
+            node_key = @node.find_node_key_of_replica(command[2]) || @node.any_replica_node_key
             @node.find_by(node_key).public_send(method, *args, command, &block)
           end
         else
