@@ -46,6 +46,9 @@ Metrics/ParameterLists:
 Layout/LineLength:
   Max: 200
 
+Layout/MultilineMethodCallIndentation:
+  Enabled: false
+
 Style/NumericPredicate:
   Enabled: false
 
