@@ -193,7 +193,7 @@ module TestAgainstClusterScale
             keys.each { |key| tx.call('INCR', key) }
           end
 
-          want = numbers.map { |i| (i + 1) }
+          want = numbers.map { |i| i + 1 }
           assert_equal(want, got, 'Case: INCR')
         end
       end
@@ -207,7 +207,7 @@ module TestAgainstClusterScale
             end
           end
 
-          want = numbers.map { |i| (i + 2) }
+          want = numbers.map { |i| i + 2 }
           assert_equal(want, got, 'Case: INCR')
         end
       end
