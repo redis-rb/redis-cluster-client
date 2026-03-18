@@ -750,10 +750,6 @@ class RedisClient
         assert_equal('data2', got2.fetch('{stream}1')[0][1][1])
       end
 
-      def test_with_method
-        assert_raises(NotImplementedError) { @client.with }
-      end
-
       def test_dedicated_multiple_keys_command
         [
           { command: %w[MSET key1 val1], want: 'OK', wait: true },
@@ -843,6 +839,20 @@ class RedisClient
         wait_for_replication
         assert_equal('100', @client.get('foo'))
         assert_raises(NoMethodError) { @client.densaugeo('1m') }
+      end
+
+      def test_compatibility_with_ring
+        assert_equal([@client], @client.nodes)
+        assert_equal(@client, @client.node_for('key'))
+        assert_equal({ @client => %w[a b c] }, @client.nodes_for('a', 'b', ['c']))
+      end
+
+      def test_compatibility_with_pooled
+        count = 0
+        @client.with { count += 1 }
+        @client.with(timeout: 2) { count += 1 }
+        @client.then { count += 1 }
+        assert_equal 3, count
       end
 
       def test_circuit_breakers

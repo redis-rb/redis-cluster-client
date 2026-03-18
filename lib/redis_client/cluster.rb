@@ -130,8 +130,26 @@ class RedisClient
       ::RedisClient::Cluster::PubSub.new(router, @command_builder)
     end
 
-    def with(...)
-      raise NotImplementedError, 'No way to use'
+    # Compatibility layer for RedisClient::Pooled
+    def with(_options = nil)
+      yield self
+    end
+    alias then with
+
+    # Compatibility layer for RedisClient::HashRing
+    def node_for(_key)
+      self
+    end
+
+    # Compatibility layer for RedisClient::HashRing
+    def nodes_for(*keys)
+      keys.flatten!
+      { self => keys }
+    end
+
+    # Compatibility layer for RedisClient::HashRing
+    def nodes
+      [self].freeze
     end
 
     def close
