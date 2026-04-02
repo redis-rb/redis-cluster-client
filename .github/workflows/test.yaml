@@ -7,6 +7,8 @@
 #
 # @see https://github.community/t/how-to-trigger-an-action-on-push-or-pull-request-but-not-both/16662
 name: Test
+permissions:
+  contents: read
 on:
   push:
     branches:
