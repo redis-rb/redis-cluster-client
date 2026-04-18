@@ -70,7 +70,7 @@ class RedisClient
         e = key.index(RIGHT_BRACKET, s + 1)
         return EMPTY_STRING if e.nil?
 
-        key[s + 1..e - 1]
+        s + 1 < e ? key[s + 1, e - s - 1] : EMPTY_STRING
       end
 
       def hash_tag_included?(key)
