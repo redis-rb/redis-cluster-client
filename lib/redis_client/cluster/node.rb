@@ -193,14 +193,14 @@ class RedisClient
       end
 
       def update_slot(slot, node_key)
-        return if @mutex.locked?
+        return unless @mutex.try_lock
 
-        @mutex.synchronize do
-          @slots[slot] = node_key
-        rescue RangeError
-          @slots = Array.new(SLOT_SIZE) { |i| @slots[i] }
-          @slots[slot] = node_key
-        end
+        @slots[slot] = node_key
+      rescue RangeError
+        @slots = Array.new(SLOT_SIZE) { |i| @slots[i] }
+        @slots[slot] = node_key
+      ensure
+        @mutex.unlock if @mutex.owned?
       end
 
       def reload!
