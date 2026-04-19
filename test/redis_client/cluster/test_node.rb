@@ -27,8 +27,8 @@ class RedisClient
       MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
 
       def setup
-        @test_node = make_node.tap(&:reload!)
-        @test_node_with_scale_read = make_node(replica: true).tap(&:reload!)
+        @test_node = make_node.tap(&:try_reload!)
+        @test_node_with_scale_read = make_node(replica: true).tap(&:try_reload!)
         @test_node_info_list = @test_node.instance_variable_get(:@node_info)
       end
 
@@ -735,7 +735,7 @@ class RedisClient
         test_node = make_node(replica: true, capture_buffer: capture_buffer)
 
         capture_buffer.clear
-        test_node.reload!
+        test_node.try_reload!
 
         # It should have reloaded by calling CLUSTER NODES on three of the startup nodes
         cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[cluster nodes] }
@@ -746,7 +746,7 @@ class RedisClient
 
         # If we reload again, it should NOT change the redis client instances we have.
         original_client_ids = test_node.to_a.map(&:object_id).to_set
-        test_node.reload!
+        test_node.try_reload!
         new_client_ids = test_node.to_a.map(&:object_id).to_set
         assert_equal original_client_ids, new_client_ids
       end
@@ -761,13 +761,13 @@ class RedisClient
           capture_buffer: capture_buffer
         )
 
-        test_node.reload!
+        test_node.try_reload!
         # After reloading the first time, our Node object knows about all hosts, despite only starting with one:
         assert_equal TEST_NUMBER_OF_NODES, test_node.to_a.size
 
         # When we reload, it will only call CLUSTER NODES against a single node, the bootstrap node.
         capture_buffer.clear
-        test_node.reload!
+        test_node.send(:bypass_reload!)
 
         cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[cluster nodes] }
         assert_equal 1, cluster_node_cmds.size
@@ -779,7 +779,7 @@ class RedisClient
         test_node = make_node(replica: true, capture_buffer: capture_buffer, max_startup_sample: 1)
 
         capture_buffer.clear
-        test_node.reload!
+        test_node.try_reload!
 
         # It should have reloaded by calling CLUSTER NODES on one of the startup nodes
         cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[cluster nodes] }
@@ -790,7 +790,7 @@ class RedisClient
 
         # If we reload again, it should NOT change the redis client instances we have.
         original_client_ids = test_node.to_a.map(&:object_id).to_set
-        test_node.reload!
+        test_node.try_reload!
         new_client_ids = test_node.to_a.map(&:object_id).to_set
         assert_equal original_client_ids, new_client_ids
       end
@@ -809,8 +809,8 @@ class RedisClient
         end)
 
         capture_buffer.clear
-        t1 = Thread.new { test_node.reload! }
-        t2 = Thread.new { test_node.reload! }
+        t1 = Thread.new { test_node.try_reload! }
+        t2 = Thread.new { test_node.try_reload! }
         [t1, t2].each(&:join)
 
         # We should only have reloaded once, which is to say, we only called CLUSTER NODES command MAX_STARTUP_SAMPLE
