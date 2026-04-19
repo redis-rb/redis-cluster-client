@@ -93,9 +93,8 @@ class RedisClient
       end
 
       def send_command(method, command, *args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        return assign_node_and_send_command(method, command, args, &block) unless DEDICATED_ACTIONS.key?(command.first)
-
         action = DEDICATED_ACTIONS[command.first]
+        return assign_node_and_send_command(method, command, args, &block) if action.nil?
         return send(action.method_name, method, command, args, &block) if action.reply_transformer.nil?
 
         reply = send(action.method_name, method, command, args)
