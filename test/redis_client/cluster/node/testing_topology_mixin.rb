@@ -13,7 +13,7 @@ class RedisClient
           }.merge(kwargs))
           concurrent_worker = ::RedisClient::Cluster::ConcurrentWorker.create
           ::RedisClient::Cluster::Node.new(concurrent_worker, pool: pool, config: config).tap do |node|
-            node.reload!
+            node.try_reload!
             @test_nodes ||= []
             @test_nodes << node
           end
