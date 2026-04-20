@@ -294,7 +294,7 @@ class RedisClient
       def renew_cluster_state
         @node.try_reload!
       rescue ::RedisClient::Cluster::InitialSetupError
-        false
+        # ignore
       end
 
       def close
