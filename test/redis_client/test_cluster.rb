@@ -864,7 +864,9 @@ class RedisClient
           connect_with_original_config: true,
           **TEST_GENERIC_OPTIONS.merge(
             circuit_breaker: {
-              error_threshold: 1,
+              # Also important - the retry_count on resharding errors is set to 3, so we have to allow at lest
+              # that many errors to avoid tripping the breaker in the first call.
+              error_threshold: 4,
               error_timeout: 60,
               success_threshold: 10
             }
