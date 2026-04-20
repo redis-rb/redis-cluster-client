@@ -158,14 +158,15 @@ class RedisClient
             retry
           end
         elsif e.message.start_with?('CLUSTERDOWN')
-          retry if renew_cluster_state && retry_count >= 0
+          renew_cluster_state
+          retry if retry_count >= 0
         end
 
         raise
       rescue ::RedisClient::ConnectionError => e
         raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
-        raise unless renew_cluster_state
 
+        renew_cluster_state
         retry_count -= 1
 
         if retry_count >= 0
@@ -330,14 +331,14 @@ class RedisClient
         raise ::RedisClient::Cluster::AmbiguousNodeError.from_command(command.first).with_config(@config)
       end
 
-      def send_wait_command(method, command, args, retry_count: 1, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+      def send_wait_command(method, command, args, retry_count: 1, &block) # rubocop:disable Metrics/AbcSize
         @node.call_primaries(method, command, args).select { |r| r.is_a?(Integer) }.sum.then(&TSF.call(block))
       rescue ::RedisClient::Cluster::ErrorCollection => e
         raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
         raise if retry_count <= 0
         raise if e.errors.values.none? { |err| err.message.include?('WAIT cannot be used with replica instances') }
-        raise unless renew_cluster_state
 
+        renew_cluster_state
         retry_count -= 1
         retry
       end
@@ -497,8 +498,9 @@ class RedisClient
       def handle_node_reload_error(retry_count: 1)
         yield
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
-        raise ::RedisClient::Cluster::NodeMightBeDown.new.with_config(@config) if retry_count <= 0 || !renew_cluster_state
+        raise ::RedisClient::Cluster::NodeMightBeDown.new.with_config(@config) if retry_count <= 0
 
+        renew_cluster_state
         retry_count -= 1
         retry
       end
