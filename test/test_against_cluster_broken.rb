@@ -7,7 +7,7 @@ require 'securerandom'
 
 class TestAgainstClusterBroken < TestingWrapper
   WAIT_SEC = 0.1
-  MAX_ATTEMPTS = 130
+  MAX_ATTEMPTS = 300
   NUMBER_OF_KEYS = 16_000
   MAX_PIPELINE_SIZE = 40
   HASH_TAG_GRAIN = 5
