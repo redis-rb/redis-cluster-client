@@ -269,7 +269,7 @@ but because you may have written non-idempotent code inside your block, the bloc
 it is operating on moves to a different node.
 
 ## ACL
-The cluster client internally calls [COMMAND](https://redis.io/commands/command/) and [CLUSTER SHARDS](https://redis.io/commands/cluster-shards/) commands to operate correctly.
+The cluster client internally calls [COMMAND](https://redis.io/commands/command) and [CLUSTER SHARDS](https://redis.io/commands/cluster-shards) commands to operate correctly.
 So please permit it like the followings.
 
 ```ruby
