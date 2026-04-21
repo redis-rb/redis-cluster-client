@@ -28,7 +28,7 @@ class TestAgainstClusterDown < TestingWrapper
     @threads&.each(&:exit)
     @clients&.each(&:close)
     print "#{@redirect_count.get}, "\
-      "ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')}, "\
+      "ClusterShardsCall: #{@captured_commands.count('cluster', 'shards')}, "\
       "ClusterDownError: #{@cluster_down_counter.get} = "
   end
 
@@ -50,7 +50,7 @@ class TestAgainstClusterDown < TestingWrapper
     wait_for_jobs_to_be_stable
 
     refute(@cluster_down_counter.get.zero?, 'Case: cluster down count')
-    refute(@captured_commands.count('cluster', 'nodes').zero?, 'Case: cluster nodes calls')
+    refute(@captured_commands.count('cluster', 'shards').zero?, 'Case: cluster shards calls')
 
     @values_a = @recorders.map { |r| r.get.to_i }
     wait_for_jobs_to_be_stable

@@ -304,15 +304,15 @@ class RedisClient
         ]
 
         want = [
-          { id: '00c0d00f2a5eda22b2c8a8929ba27b454c4400fb', node_key: '10.10.1.6:6379', role: 'master', primary_id: nil,
+          { id: '00c0d00f2a5eda22b2c8a8929ba27b454c4400fb', node_key: '10.10.1.6:6379', role: 'master', primary_id: '',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [[0, 5460]] },
           { id: 'b60c0672f257c01d76f27eacded14b6e6f4f990e', node_key: '10.10.1.5:6379', role: 'slave', primary_id: '00c0d00f2a5eda22b2c8a8929ba27b454c4400fb',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [] },
-          { id: '712b9a6656b38a5e002244903853fccb4d1eef4b', node_key: '10.10.1.4:6379', role: 'master', primary_id: nil,
+          { id: '712b9a6656b38a5e002244903853fccb4d1eef4b', node_key: '10.10.1.4:6379', role: 'master', primary_id: '',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [[5461, 10_922]] },
           { id: '7038691c545e7caa9147030ecfb4acf1eaad0552', node_key: '10.10.1.7:6379', role: 'slave', primary_id: '712b9a6656b38a5e002244903853fccb4d1eef4b',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [] },
-          { id: 'ba85d0807043bb40f72bb4e1e8352b029c6e0082', node_key: '10.10.1.8:6379', role: 'master', primary_id: nil,
+          { id: 'ba85d0807043bb40f72bb4e1e8352b029c6e0082', node_key: '10.10.1.8:6379', role: 'master', primary_id: '',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [[10_923, 16_383]] },
           { id: 'f2f36b472b187c577ccd93dd296e9045f473ae7a', node_key: '10.10.1.3:6379', role: 'slave', primary_id: 'ba85d0807043bb40f72bb4e1e8352b029c6e0082',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [] }
@@ -397,15 +397,15 @@ class RedisClient
         ]
 
         want = [
-          { id: '00c0d00f2a5eda22b2c8a8929ba27b454c4400fb', node_key: '10.10.1.6:6379', role: 'master', primary_id: nil,
+          { id: '00c0d00f2a5eda22b2c8a8929ba27b454c4400fb', node_key: '10.10.1.6:6379', role: 'master', primary_id: '',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [[0, 5460]] },
           { id: 'b60c0672f257c01d76f27eacded14b6e6f4f990e', node_key: '10.10.1.5:6379', role: 'slave', primary_id: '00c0d00f2a5eda22b2c8a8929ba27b454c4400fb',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [] },
-          { id: '712b9a6656b38a5e002244903853fccb4d1eef4b', node_key: '10.10.1.4:6379', role: 'master', primary_id: nil,
+          { id: '712b9a6656b38a5e002244903853fccb4d1eef4b', node_key: '10.10.1.4:6379', role: 'master', primary_id: '',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [[5461, 10_922]] },
           { id: '7038691c545e7caa9147030ecfb4acf1eaad0552', node_key: '10.10.1.7:6379', role: 'slave', primary_id: '712b9a6656b38a5e002244903853fccb4d1eef4b',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [] },
-          { id: 'ba85d0807043bb40f72bb4e1e8352b029c6e0082', node_key: '10.10.1.8:6379', role: 'master', primary_id: nil,
+          { id: 'ba85d0807043bb40f72bb4e1e8352b029c6e0082', node_key: '10.10.1.8:6379', role: 'master', primary_id: '',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [[10_923, 16_383]] },
           { id: 'f2f36b472b187c577ccd93dd296e9045f473ae7a', node_key: '10.10.1.3:6379', role: 'slave', primary_id: 'ba85d0807043bb40f72bb4e1e8352b029c6e0082',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [] }
@@ -738,7 +738,8 @@ class RedisClient
         test_node.try_reload!
 
         # It should have reloaded by calling CLUSTER NODES on three of the startup nodes
-        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[cluster nodes] }
+        subcmd = TEST_REDIS_MAJOR_VERSION >= 7 ? 'shards' : 'nodes'
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == ['cluster', subcmd] }
         assert_equal MAX_STARTUP_SAMPLE, cluster_node_cmds.size
 
         # It should have connected to all of the clients.
@@ -769,7 +770,8 @@ class RedisClient
         capture_buffer.clear
         test_node.send(:bypass_reload!)
 
-        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[cluster nodes] }
+        subcmd = TEST_REDIS_MAJOR_VERSION >= 7 ? 'shards' : 'nodes'
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == ['cluster', subcmd] }
         assert_equal 1, cluster_node_cmds.size
         assert_equal bootstrap_node, cluster_node_cmds.first.server_url
       end
@@ -782,7 +784,8 @@ class RedisClient
         test_node.try_reload!
 
         # It should have reloaded by calling CLUSTER NODES on one of the startup nodes
-        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[cluster nodes] }
+        subcmd = TEST_REDIS_MAJOR_VERSION >= 7 ? 'shards' : 'nodes'
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == ['cluster', subcmd] }
         assert_equal 1, cluster_node_cmds.size
 
         # It should have connected to all of the clients.
@@ -815,7 +818,8 @@ class RedisClient
 
         # We should only have reloaded once, which is to say, we only called CLUSTER NODES command MAX_STARTUP_SAMPLE
         # times
-        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == %w[cluster nodes] }
+        subcmd = TEST_REDIS_MAJOR_VERSION >= 7 ? 'shards' : 'nodes'
+        cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == ['cluster', subcmd] }
         assert_equal MAX_STARTUP_SAMPLE, cluster_node_cmds.size
       end
     end
