@@ -7,7 +7,7 @@ require 'redis_cluster_client'
 
 logger = Logger.new($stdout)
 
-pids = Array.new(10) do
+pids = Array.new(Integer(ENV.fetch('N', '10'))) do
   Process.fork do
     Signal.trap(:INT, 'IGNORE')
     nodes = (6379..6384).map { |port| "redis://127.0.0.1:#{port}" }.freeze
@@ -17,12 +17,14 @@ pids = Array.new(10) do
       Process.exit
     end
 
+    logger.info("#{Process.pid}: child process started")
+
     loop do
-      logger.info("#{Process.pid}: reloaded") if client.send(:router).renew_cluster_state
+      client.send(:router).renew_cluster_state
+      sleep 0.03
     rescue StandardError => e
       logger.error("#{Process.pid}: #{e.message}")
-    ensure
-      sleep 0.01
+      sleep 1.0
     end
   end
 end

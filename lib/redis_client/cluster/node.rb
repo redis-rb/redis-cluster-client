@@ -24,7 +24,7 @@ class RedisClient
       ROLE_FLAGS = %w[master slave].freeze
       EMPTY_ARRAY = [].freeze
       EMPTY_HASH = {}.freeze
-      JITTER_RANGE = (3_000_000..13_000_000).freeze # micro seconds
+      JITTER_WINDOW = (3_000_000...10_000_000).freeze # micro seconds
 
       private_constant :USE_CHAR_ARRAY_SLOT, :SLOT_SIZE, :MIN_SLOT, :MAX_SLOT,
                        :DEAD_FLAGS, :ROLE_FLAGS, :EMPTY_ARRAY, :EMPTY_HASH
@@ -435,7 +435,6 @@ class RedisClient
         @slots = build_slot_node_mappings(@node_info)
         @replications = build_replication_mappings(@node_info)
         @topology.process_topology_update!(@replications, @node_configs)
-        true
       end
 
       def with_startup_clients(count) # rubocop:disable Metrics/AbcSize
@@ -464,11 +463,11 @@ class RedisClient
       end
 
       def with_reload_jitter
-        return false unless @next_reload_time.nil? || obtain_current_time >= @next_reload_time
+        return unless @next_reload_time.nil? || obtain_current_time >= @next_reload_time
 
-        result = yield
-        @next_reload_time = obtain_current_time + @random.rand(JITTER_RANGE)
-        result
+        yield
+
+        @next_reload_time = obtain_current_time + @random.rand(JITTER_WINDOW)
       end
 
       def with_reload_lock
@@ -479,7 +478,7 @@ class RedisClient
         # they throw an error.
         # Probably in the future we should add a circuit breaker to #try_reload! itself, and stop trying if the cluster is
         # obviously not working.
-        return false unless @mutex.try_lock
+        return unless @mutex.try_lock
 
         yield
       ensure
