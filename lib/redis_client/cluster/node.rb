@@ -46,7 +46,7 @@ class RedisClient
         end
 
         def serialize(str)
-          str << id << node_key << role << primary_id << config_epoch
+          str << id << node_key << role << primary_id
         end
       end
 
@@ -307,12 +307,11 @@ class RedisClient
           work_group.push(i, raw_client) do |client|
             regular_timeout = client.read_timeout
             client.read_timeout = @config.slow_command_timeout > 0.0 ? @config.slow_command_timeout : regular_timeout
-            reply = client.call_once('cluster', 'nodes')
-            client.read_timeout = regular_timeout
-            parse_cluster_node_reply(reply)
+            fetch_cluster_state(client)
           rescue StandardError => e
             e
           ensure
+            client.read_timeout = regular_timeout
             client&.close
           end
         end
@@ -340,6 +339,16 @@ class RedisClient
         end
 
         grouped.max_by { |_, v| v.size }[1].first
+      end
+
+      def fetch_cluster_state(client)
+        reply = client.call_once('cluster', 'shards')
+        parse_cluster_shards_reply(reply)
+      rescue ::RedisClient::CommandError => e
+        raise unless e.message.start_with?('ERR unknown subcommand')
+
+        reply = client.call_once('cluster', 'nodes')
+        parse_cluster_node_reply(reply)
       end
 
       def parse_cluster_node_reply(reply) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
@@ -385,11 +394,11 @@ class RedisClient
               id: id,
               node_key: NodeKey.build_from_host_port(ip, arr[1]),
               role: role,
-              primary_id: role == 'master' ? nil : primary_id,
+              primary_id: role == 'master' ? '' : primary_id,
               slots: role == 'master' ? slots : EMPTY_ARRAY
             )
           end
-        end.freeze
+        end
       end
 
       def parse_cluster_shards_reply(reply) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
@@ -406,11 +415,11 @@ class RedisClient
               id: node.fetch('id'),
               node_key: NodeKey.build_from_host_port(ip, node['port'] || node['tls-port']),
               role: role == 'master' ? role : 'slave',
-              primary_id: role == 'master' ? nil : primary_id,
+              primary_id: role == 'master' ? '' : primary_id,
               slots: role == 'master' ? shard.fetch('slots').each_slice(2).to_a.freeze : EMPTY_ARRAY
             )
           end
-        end.freeze
+        end
       end
 
       # As redirection node_key is dependent on `cluster-preferred-endpoint-type` config,
