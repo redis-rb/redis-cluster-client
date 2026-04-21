@@ -28,10 +28,10 @@ gem 'redis-cluster-client'
 | `:replica` | Boolean | `false` | `true` if client should use scale read feature |
 | `:replica_affinity` | Symbol or String | `:random` | scale reading strategy, `:random`, `random_with_primary` or `:latency` are valid |
 | `:fixed_hostname` | String | `nil` | required if client should connect to single endpoint with SSL |
-| `:slow_command_timeout` | Integer | `-1` | timeout used for "slow" queries that fetch metdata e.g. CLUSTER NODES, COMMAND |
+| `:slow_command_timeout` | Integer | `-1` | timeout used for "slow" queries that fetch metdata e.g. CLUSTER SHARDS, COMMAND |
 | `:concurrency` | Hash | `{ model: :none }` | concurrency settings, `:on_demand`, `:pooled` and `:none` are valid models, size is a max number of workers, `:none` model is no concurrency, Please choose the one suited your environment if needed. |
 | `:connect_with_original_config` | Boolean | `false` | `true` if client should retry the connection using the original endpoint that was passed in |
-| `:max_startup_sample` | Integer | `3` | maximum number of nodes to fetch `CLUSTER NODES` information for startup |
+| `:max_startup_sample` | Integer | `3` | maximum number of nodes to fetch `CLUSTER SHARDS` information for startup |
 
 Also, [the other generic options](https://github.com/redis-rb/redis-client#configuration) can be passed.
 But `:url`, `:host`, `:port` and `:path` are ignored because they conflict with the `:nodes` option.
@@ -96,7 +96,7 @@ RedisClient.cluster(nodes: 'rediss://endpoint.example.com:6379', fixed_hostname:
 ```
 
 ```ruby
-# To specify a timeout for "slow" commands (CLUSTER NODES, COMMAND)
+# To specify a timeout for "slow" commands (CLUSTER SHARDS, COMMAND)
 RedisClient.cluster(slow_command_timeout: 4).new_client
 ```
 
@@ -269,7 +269,7 @@ but because you may have written non-idempotent code inside your block, the bloc
 it is operating on moves to a different node.
 
 ## ACL
-The cluster client internally calls [COMMAND](https://redis.io/commands/command/) and [CLUSTER NODES](https://redis.io/commands/cluster-nodes/) commands to operate correctly.
+The cluster client internally calls [COMMAND](https://redis.io/commands/command) and [CLUSTER SHARDS](https://redis.io/commands/cluster-shards) commands to operate correctly.
 So please permit it like the followings.
 
 ```ruby
@@ -278,7 +278,7 @@ cli1 = RedisClient.cluster.new_client
 
 # To create a user with permissions
 # Typically, user settings are configured in the config file for the server beforehand.
-cli1.call('ACL', 'SETUSER', 'foo', 'ON', '+COMMAND', '+CLUSTER|NODES', '+PING', '>mysecret')
+cli1.call('ACL', 'SETUSER', 'foo', 'ON', '+COMMAND', '+CLUSTER|SHARDS', '+PING', '>mysecret')
 
 # To initialize client with the user
 cli2 = RedisClient.cluster(username: 'foo', password: 'mysecret').new_client
