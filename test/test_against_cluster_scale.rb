@@ -34,7 +34,7 @@ module TestAgainstClusterScale
       @client&.close
       @controller&.close
       print "#{@redirect_count.get}, "\
-        "ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')}, "\
+        "ClusterShardsCall: #{@captured_commands.count('cluster', 'shards')}, "\
         "ClusterDownError: #{@cluster_down_error_count} = "
     end
 
@@ -64,7 +64,7 @@ module TestAgainstClusterScale
                    .size
       assert_equal(want, got, 'Case: number of nodes')
 
-      refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
+      refute(@captured_commands.count('cluster', 'shards').zero?, @captured_commands.to_a.map(&:command))
     end
 
     def test_02_scale_in
@@ -81,7 +81,7 @@ module TestAgainstClusterScale
                    .size
       assert_equal(want, got, 'Case: number of nodes')
 
-      refute(@captured_commands.count('cluster', 'nodes').zero?, @captured_commands.to_a.map(&:command))
+      refute(@captured_commands.count('cluster', 'shards').zero?, @captured_commands.to_a.map(&:command))
     end
 
     private

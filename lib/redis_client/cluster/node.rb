@@ -28,7 +28,8 @@ class RedisClient
       JITTER_WINDOW = (3_000_000...10_000_000).freeze # micro seconds
 
       private_constant :USE_CHAR_ARRAY_SLOT, :SLOT_SIZE, :MIN_SLOT, :MAX_SLOT,
-                       :DEAD_FLAGS, :ROLE_FLAGS, :EMPTY_ARRAY, :EMPTY_HASH, :EMPTY_STRING
+                       :DEAD_FLAGS, :ROLE_FLAGS, :EMPTY_ARRAY, :EMPTY_HASH, :EMPTY_STRING,
+                       :JITTER_WINDOW
 
       ReloadNeeded = Class.new(::RedisClient::Cluster::Error)
 

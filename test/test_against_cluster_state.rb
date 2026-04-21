@@ -26,7 +26,7 @@ module TestAgainstClusterState
       @controller&.close
       @client&.close
       print "#{@redirect_count.get}, "\
-        "ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')} = "
+        "ClusterShardsCall: #{@captured_commands.count('cluster', 'shards')} = "
     end
 
     def test_the_state_of_cluster_resharding

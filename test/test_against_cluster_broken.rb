@@ -231,7 +231,7 @@ class TestAgainstClusterBroken < TestingWrapper
 
   def log_metrics
     print "#{@redirect_count.get}, "\
-      "ClusterNodesCall: #{@captured_commands.count('cluster', 'nodes')}, "\
+      "ClusterShardsCall: #{@captured_commands.count('cluster', 'shards')}, "\
       "ClusterDownError: #{@cluster_down_error_count}\n"
   end
 
