@@ -21,9 +21,9 @@ class RedisClient
     MERGE_CONFIG_KEYS = %i[ssl username password db].freeze
     IGNORE_GENERIC_CONFIG_KEYS = %i[url host port path].freeze
     MAX_WORKERS = Integer(ENV.fetch('REDIS_CLIENT_MAX_THREADS', -1)) # for backward compatibility
-    # It's used with slow queries of fetching meta data like CLUSTER NODES, COMMAND and so on.
+    # Used for slow commands that fetch metadata, e.g. CLUSTER NODES, COMMAND.
     SLOW_COMMAND_TIMEOUT = Float(ENV.fetch('REDIS_CLIENT_SLOW_COMMAND_TIMEOUT', -1))
-    # It affects to strike a balance between load and stability in initialization or changed states.
+    # Controls the balance between startup load and stability during initialization or cluster state changes.
     MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
 
     private_constant :DEFAULT_HOST, :DEFAULT_PORT, :DEFAULT_SCHEME, :SECURE_SCHEME, :DEFAULT_NODES,

@@ -10,11 +10,11 @@ It depends on [redis-client](https://github.com/redis-rb/redis-client).
 So it would be better to read `redis-client` documents first.
 
 ## Background
-This gem is underlying in the official gem which is named as [redis-clustering](https://rubygems.org/gems/redis-clustering).
-The redis-clustering gem was decoupled from [the redis gem](https://rubygems.org/gems/redis) since `v5` or later.
+This gem underlies the official gem [redis-clustering](https://rubygems.org/gems/redis-clustering).
+The redis-clustering gem was decoupled from [the redis gem](https://rubygems.org/gems/redis) as of `v5`.
 Both are maintained by [the repository](https://github.com/redis/redis-rb) in the official organization.
 The redis gem supported cluster mode since [the pull request](https://github.com/redis/redis-rb/pull/716) was merged until `v4`.
-You can see more details and reasons in [the issue](https://github.com/redis/redis-rb/issues/1070) if you have interest.
+You can see more details and reasons in [the issue](https://github.com/redis/redis-rb/issues/1070) if you are interested.
 
 ## Installation
 ```ruby
@@ -28,8 +28,8 @@ gem 'redis-cluster-client'
 | `:replica` | Boolean | `false` | `true` if client should use scale read feature |
 | `:replica_affinity` | Symbol or String | `:random` | scale reading strategy, `:random`, `random_with_primary` or `:latency` are valid |
 | `:fixed_hostname` | String | `nil` | required if client should connect to single endpoint with SSL |
-| `:slow_command_timeout` | Integer | `-1` | timeout used for "slow" queries that fetch metdata e.g. CLUSTER SHARDS, COMMAND |
-| `:concurrency` | Hash | `{ model: :none }` | concurrency settings, `:on_demand`, `:pooled` and `:none` are valid models, size is a max number of workers, `:none` model is no concurrency, Please choose the one suited your environment if needed. |
+| `:slow_command_timeout` | Integer | `-1` | timeout used for slow commands that fetch metadata, e.g. CLUSTER SHARDS, COMMAND |
+| `:concurrency` | Hash | `{ model: :none }` | concurrency settings, `:on_demand`, `:pooled` and `:none` are valid models, size is a max number of workers, `:none` model is no concurrency, Please choose the one suited to your environment if needed. |
 | `:connect_with_original_config` | Boolean | `false` | `true` if client should retry the connection using the original endpoint that was passed in |
 | `:max_startup_sample` | Integer | `3` | maximum number of nodes to fetch `CLUSTER SHARDS` information for startup |
 
@@ -176,7 +176,7 @@ $ redis-cli -c cluster keyslot {key}3
 (integer) 12539
 ```
 
-In addition, this gem works multiple keys without a hash tag in MGET, MSET and DEL commands
+In addition, this gem handles multiple keys without a hash tag in MGET, MSET and DEL commands
 using pipelining internally automatically.
 If the first key includes a hash tag, this gem sends the command to the node as is.
 If the first key doesn't have a hash tag, this gem converts the command into single-key commands
@@ -193,11 +193,11 @@ r.call('mget', '{key}1', '{key}2', '{key}3')
 #=> [nil, nil, nil]
 ```
 
-This behavior is for upper libraries to be able to keep a compatibility with a standalone client.
+This behavior is for higher-level libraries to maintain compatibility with a standalone client.
 You can exploit this behavior for migrating from a standalone server to a cluster.
-Although multiple-time queries with single-key commands are slower than pipelining,
-that pipelined queries are slower than a single-slot query with multiple keys.
-Hence, we recommend to use a hash tag in this use case for the better performance.
+Although repeated single-key queries are slower than pipelining,
+pipelined queries are still slower than a single-slot query with multiple keys.
+Hence, we recommend using a hash tag in this use case for better performance.
 
 ## Transactions
 This gem supports [Redis transactions](https://redis.io/topics/transactions), including atomicity with `MULTI`/`EXEC`,
@@ -213,11 +213,11 @@ end
 
 More commonly, however, you will want to perform transactions across multiple keys. To do this,
 you need to ensure that all keys used in the transaction hash to the same slot;
-Redis a mechanism called [hashtags](https://redis.io/docs/reference/cluster-spec/#hash-tags) to achieve this.
-If a key contains a hashag (e.g. in the key `{foo}bar`, the hashtag is `foo`),
-then it is guaranted to hash to the same slot (and thus always live on the same node) as other keys which contain the same hashtag.
+Redis provides a mechanism called [hashtags](https://redis.io/docs/reference/cluster-spec/#hash-tags) to achieve this.
+If a key contains a hashtag (e.g. in the key `{foo}bar`, the hashtag is `foo`),
+then it is guaranteed to hash to the same slot (and thus always live on the same node) as other keys which contain the same hashtag.
 
-So, whilst it's not possible in Redis cluster to perform a transction on the keys `foo` and `bar`,
+So, whilst it's not possible in Redis cluster to perform a transaction on the keys `foo` and `bar`,
 it _is_ possible to perform a transaction on the keys `{tag}foo` and `{tag}bar`.
 To perform such transactions on this gem, use the hashtag:
 
@@ -270,7 +270,7 @@ it is operating on moves to a different node.
 
 ## ACL
 The cluster client internally calls [COMMAND](https://redis.io/commands/command) and [CLUSTER SHARDS](https://redis.io/commands/cluster-shards) commands to operate correctly.
-So please permit it like the followings.
+Please grant the following permissions.
 
 ```ruby
 # The default user is administrator.
@@ -318,7 +318,7 @@ Please make sure the following tools are installed on your machine.
 | Docker | latest stable | https://docs.docker.com/engine/install/ |
 | Ruby | latest stable | https://www.ruby-lang.org/en/ |
 
-Please fork this repository and check out the codes.
+Please fork this repository and check out the code.
 
 ```
 $ git clone git@github.com:your-account-name/redis-cluster-client.git
@@ -346,7 +346,7 @@ $ docker compose --profile ruby exec ruby bundle install
 $ docker compose --profile ruby exec ruby bundle exec rake test
 ```
 
-You can see more information in the YAML file for GItHub actions.
+You can see more information in the YAML file for GitHub Actions.
 
 ## Migration
 This library might help you if you want to migrate your Redis from a standalone server to a cluster.
@@ -374,7 +374,7 @@ src.scan do |key|
 end
 ```
 
-It needs more enhancement to be enough performance in the production environment that has tons of keys.
+Further optimization is needed to perform well in production environments with large numbers of keys.
 Also, it should handle errors.
 
 ## See also
