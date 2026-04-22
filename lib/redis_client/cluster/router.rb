@@ -450,7 +450,7 @@ class RedisClient
       end
 
       def send_multiple_keys_command(method, command, args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        # This implementation is prioritized performance rather than readability or so.
+        # This implementation prioritizes performance over readability.
         cmd = command.first
         if cmd.casecmp('mget').zero?
           single_key_cmd = 'get'
