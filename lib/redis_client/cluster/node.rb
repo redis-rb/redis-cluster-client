@@ -405,7 +405,10 @@ class RedisClient
 
       def parse_cluster_shards_reply(reply) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         reply.each_with_object([]) do |shard, acc|
+          resp2 = shard.is_a?(Array)
+          shard = shard.each_slice(2).to_h if resp2
           nodes = shard.fetch('nodes')
+          nodes = nodes.map { |n| n.each_slice(2).to_h } if resp2
           primary_id = nodes.find { |n| n.fetch('role') == 'master' }.fetch('id')
 
           nodes.each do |node|
