@@ -7,8 +7,9 @@ sequenceDiagram
     participant Server Shard 2
     participant Server Shard 3
     Note over Client,Server Shard 3: RedisClient.cluster(nodes: %w[redis://node1:6379]).new_client
-    Client->>+Server Shard 1: CLUSTER NODES
+    Client->>+Server Shard 1: CLUSTER SHARDS
     Server Shard 1-->>-Client: nodes and slots data
+    Note over Client,Server Shard 3: Falls back to CLUSTER NODES for older Redis versions
     Client->>+Server Shard 1: GET key1
     Server Shard 1-->>-Client: value1
     Client->>+Server Shard 2: GET key2
