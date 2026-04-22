@@ -9,10 +9,22 @@ classDiagram
     +self.default_driver=()
     +self.config()
     +self.sentinel()
+    +self.ring()
     +self.new()
     +self.register(middleware)
+    +self.now()
+    +self.now_ms()
     +initialize()
+    +inspect()
     +size()
+    +server_url()
+    +db()
+    +host()
+    +port()
+    +path()
+    +username()
+    +password()
+    +idle_timeout()
     +with()
     +timeout=()
     +read_timeout=()
@@ -30,6 +42,8 @@ classDiagram
     +zscan()
     +connected?()
     +close()
+    +disable_reconnection()
+    +measure_round_trip_delay()
     +pipelined()
     +multi()
   }
@@ -37,6 +51,7 @@ classDiagram
   class module_RedisClient_Common {
     +config()
     +id()
+    +nodes()
     +connect_timeout()
     +connect_timeout=()
     +read_timeout()
@@ -44,6 +59,8 @@ classDiagram
     +write_timeout()
     +write_timeout=()
     +timeout=()
+    +node_for()
+    +nodes_for()
   }
 
   class RedisClient_PubSub {
@@ -134,14 +151,24 @@ classDiagram
     +connect_timeout()
     +read_timeout()
     +write_timeout()
+    +idle_timeout()
     +driver()
+    +protocol()
+    +circuit_breaker()
+    +custom()
+    +inherit_socket()
+    +driver_info()
+    +middlewares_stack()
     +connection_prelude()
     +initialize()
     +sentinel?()
+    +resolved?()
     +new_pool()
     +new_client()
     +retry_connecting?()
     +ssl_context()
+    +server_url()
+    +build_lib_name()
   }
 
   class RedisClient_SentinelConfig {
@@ -153,6 +180,7 @@ classDiagram
     +path()
     +retry_connecting?()
     +sentinel?()
+    +resolved?()
     +check_role!()
   }
 
@@ -171,6 +199,7 @@ classDiagram
     +write()
     +write_multi()
     +read()
+    +measure_round_trip_delay()
   }
 
   class module_RedisClient_Decorator {
@@ -180,8 +209,11 @@ classDiagram
   class module_RedisClient_Decorator_CommandsMixin {
     +initialize()
     +call()
+    +call_v()
     +call_once()
+    +call_once_v()
     +blocking_call()
+    +blocking_call_v()
   }
 
   class RedisClient_Decorator_Pipeline {
