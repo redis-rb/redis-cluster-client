@@ -323,7 +323,7 @@ class RedisClient
         assert_equal(want.sort_by { |e| e.fetch(:id) }, got.sort_by(&:id).map(&:to_h))
       end
 
-      def test_parse_cluster_shards_reply
+      def test_parse_cluster_shards_reply_on_resp3
         reply = [
           {
             'slots' => [5461, 10_922],
@@ -408,6 +408,99 @@ class RedisClient
           { id: 'ba85d0807043bb40f72bb4e1e8352b029c6e0082', node_key: '10.10.1.8:6379', role: 'master', primary_id: '',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [[10_923, 16_383]] },
           { id: 'f2f36b472b187c577ccd93dd296e9045f473ae7a', node_key: '10.10.1.3:6379', role: 'slave', primary_id: 'ba85d0807043bb40f72bb4e1e8352b029c6e0082',
+            ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [] }
+        ]
+
+        got = @test_node.send(:parse_cluster_shards_reply, reply)
+
+        assert_equal(want.sort_by { |e| e.fetch(:id) }, got.sort_by(&:id).map(&:to_h))
+      end
+
+      def test_parse_cluster_shards_reply_on_resp2
+        reply = [
+          [
+            'slots', [10_923, 16_383],
+            'nodes', [
+              [
+                'id', '90e1b98ef2ef598fa5a19966b345d4dfe7fe719d',
+                'port', 16_382,
+                'ip', '127.0.0.1',
+                'endpoint', '127.0.0.1',
+                'role', 'master',
+                'replication-offset', 642_515,
+                'health', 'online'
+              ],
+              [
+                'id', '845d5784e64ab4576da6e7b35dc02b64b6c10af5',
+                'port', 16_385,
+                'ip', '127.0.0.1',
+                'endpoint', '127.0.0.1',
+                'role', 'replica',
+                'replication-offset', 642_515,
+                'health', 'online'
+              ]
+            ]
+          ],
+          [
+            'slots', [5461, 10_922],
+            'nodes', [
+              [
+                'id', 'd7d3328d5205a477337f1fdfaadcd2dacd8aecda',
+                'port', 16_381,
+                'ip', '127.0.0.1',
+                'endpoint', '127.0.0.1',
+                'role', 'master',
+                'replication-offset', 642_515,
+                'health', 'online'
+              ],
+              [
+                'id', 'beeb7f1c33cde531e290c32c830f2401ab1b8dea',
+                'port', 16_384,
+                'ip', '127.0.0.1',
+                'endpoint', '127.0.0.1',
+                'role', 'replica',
+                'replication-offset', 642_515,
+                'health', 'online'
+              ]
+            ]
+          ],
+          [
+            'slots', [0, 5460],
+            'nodes', [
+              [
+                'id', 'ea3e0173888ef6d7d7bc488f5ceccc2a146bd898',
+                'port', 16_380,
+                'ip', '127.0.0.1',
+                'endpoint', '127.0.0.1',
+                'role', 'master',
+                'replication-offset', 642_515,
+                'health', 'online'
+              ],
+              [
+                'id', '57b349e52d741ebebb12933fc081c45cbe1ea85a',
+                'port', 16_383,
+                'ip', '127.0.0.1',
+                'endpoint', '127.0.0.1',
+                'role', 'replica',
+                'replication-offset', 642_515,
+                'health', 'online'
+              ]
+            ]
+          ]
+        ]
+
+        want = [
+          { id: 'ea3e0173888ef6d7d7bc488f5ceccc2a146bd898', node_key: '127.0.0.1:16380', role: 'master', primary_id: '',
+            ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [[0, 5460]] },
+          { id: '57b349e52d741ebebb12933fc081c45cbe1ea85a', node_key: '127.0.0.1:16383', role: 'slave', primary_id: 'ea3e0173888ef6d7d7bc488f5ceccc2a146bd898',
+            ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [] },
+          { id: 'd7d3328d5205a477337f1fdfaadcd2dacd8aecda', node_key: '127.0.0.1:16381', role: 'master', primary_id: '',
+            ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [[5461, 10_922]] },
+          { id: 'beeb7f1c33cde531e290c32c830f2401ab1b8dea', node_key: '127.0.0.1:16384', role: 'slave', primary_id: 'd7d3328d5205a477337f1fdfaadcd2dacd8aecda',
+            ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [] },
+          { id: '90e1b98ef2ef598fa5a19966b345d4dfe7fe719d', node_key: '127.0.0.1:16382', role: 'master', primary_id: '',
+            ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [[10_923, 16_383]] },
+          { id: '845d5784e64ab4576da6e7b35dc02b64b6c10af5', node_key: '127.0.0.1:16385', role: 'slave', primary_id: '90e1b98ef2ef598fa5a19966b345d4dfe7fe719d',
             ping_sent: nil, pong_recv: nil, config_epoch: nil, link_state: nil, slots: [] }
         ]
 
