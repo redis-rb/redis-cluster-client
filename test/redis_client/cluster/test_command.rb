@@ -45,6 +45,27 @@ class RedisClient
         assert_equal(TEST_TIMEOUT_SEC, nodes.first.read_timeout)
       end
 
+      def test_load_restores_read_timeout_when_call_raises
+        fake_node_class = Struct.new(:read_timeout, :timeout_writes) do
+          def call(*)
+            raise ::RedisClient::ConnectionError, 'boom'
+          end
+        end
+
+        fake_node = fake_node_class.new(1.0, [])
+        fake_node.define_singleton_method(:read_timeout=) do |value|
+          timeout_writes << value
+          super(value)
+        end
+
+        assert_raises(::RedisClient::Cluster::InitialSetupError) do
+          ::RedisClient::Cluster::Command.load([fake_node], slow_command_timeout: 5.0)
+        end
+
+        assert_equal([5.0, 1.0], fake_node.timeout_writes)
+        assert_in_delta(1.0, fake_node.read_timeout)
+      end
+
       def test_parse_command_reply
         [
           {
