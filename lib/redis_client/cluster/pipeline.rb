@@ -207,26 +207,47 @@ class RedisClient
         @router.renew_cluster_state if cluster_state_errors
         raise ::RedisClient::Cluster::ErrorCollection.with_errors(errors).with_config(@router.config) unless errors.nil?
 
-        required_redirections&.each do |node_key, v|
-          raise v.first_exception if v.first_exception
+        finalize_redirected_replies(required_redirections, cluster_state_errors, all_replies)
+      end
 
-          all_replies ||= Array.new(@size)
-          pipeline = @pipelines[node_key]
-          v.indices.each { |i| v.replies[i] = handle_redirection(v.replies[i], pipeline, i) }
-          pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
-        end
+      private
 
-        cluster_state_errors&.each do |node_key, v|
-          raise v.first_exception if v.first_exception
-
-          all_replies ||= Array.new(@size)
-          @pipelines[node_key].outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
-        end
+      # Process every redirection and stale-cluster-state batch before raising.
+      # Returns the merged replies, or raises the first encountered exception
+      # only after all batches have had a chance to run their bookkeeping.
+      def finalize_redirected_replies(required_redirections, cluster_state_errors, all_replies)
+        deferred_exception = nil
+        all_replies, deferred_exception = process_batches(required_redirections, all_replies, deferred_exception, :process_redirection_batch)
+        all_replies, deferred_exception = process_batches(cluster_state_errors, all_replies, deferred_exception, :process_cluster_state_batch)
+        raise deferred_exception if deferred_exception
 
         all_replies
       end
 
-      private
+      def process_batches(batches, all_replies, deferred_exception, processor)
+        batches&.each do |node_key, batch|
+          if batch.first_exception
+            deferred_exception ||= batch.first_exception
+            next
+          end
+
+          all_replies ||= Array.new(@size)
+          send(processor, node_key, batch, all_replies)
+        end
+        [all_replies, deferred_exception]
+      end
+
+      def process_redirection_batch(node_key, batch, all_replies)
+        pipeline = @pipelines[node_key]
+        batch.indices.each { |i| batch.replies[i] = handle_redirection(batch.replies[i], pipeline, i) }
+        pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = batch.replies[inner] }
+        all_replies
+      end
+
+      def process_cluster_state_batch(node_key, batch, all_replies)
+        @pipelines[node_key].outer_indices.each_with_index { |outer, inner| all_replies[outer] = batch.replies[inner] }
+        all_replies
+      end
 
       def append_pipeline(node_key)
         @pipelines ||= {}
