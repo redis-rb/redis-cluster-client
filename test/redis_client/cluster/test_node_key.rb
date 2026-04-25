@@ -10,6 +10,8 @@ class RedisClient
         [
           { node_key: '127.0.0.1:6379', want: { host: '127.0.0.1', port: '6379' } },
           { node_key: '::1:6379', want: { host: '::1', port: '6379' } },
+          { node_key: '[::1]:6379', want: { host: '::1', port: '6379' } },
+          { node_key: '[2001:db8::1]:6379', want: { host: '2001:db8::1', port: '6379' } },
           { node_key: 'foobar', want: { host: 'foobar', port: nil } },
           { node_key: '', want: { host: '', port: nil } },
           { node_key: nil, want: { host: nil, port: nil } }
@@ -23,6 +25,9 @@ class RedisClient
         [
           { node_key: '127.0.0.1:6379', want: ['127.0.0.1', '6379'] },
           { node_key: '::1:6379', want: ['::1', '6379'] },
+          { node_key: '[::1]:6379', want: ['::1', '6379'] },
+          { node_key: '[2001:db8::1]:6379', want: ['2001:db8::1', '6379'] },
+          { node_key: '[::1]', want: ['::1', nil] },
           { node_key: 'foobar', want: ['foobar', nil] },
           { node_key: '', want: ['', nil] },
           { node_key: nil, want: [nil, nil] }
