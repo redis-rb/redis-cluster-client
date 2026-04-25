@@ -12,6 +12,24 @@ class RedisClient
       assert_equal(want, got)
     end
 
+    def test_inspect_redacts_credentials
+      url_config = ::RedisClient::ClusterConfig.new(nodes: ['redis://alice:s3cret@127.0.0.1:6379'])
+      url_inspect = url_config.inspect
+      refute_includes(url_inspect, 'alice', 'username from URL must not appear in inspect')
+      refute_includes(url_inspect, 's3cret', 'password from URL must not appear in inspect')
+      assert_includes(url_inspect, '[FILTERED]', 'inspect must contain redaction placeholder')
+      assert_equal(2, url_inspect.scan('[FILTERED]').size, 'both username and password must be redacted')
+
+      hash_config = ::RedisClient::ClusterConfig.new(
+        nodes: [{ host: 'h', port: 6379, username: 'u', password: 'p' }]
+      )
+      hash_inspect = hash_config.inspect
+      refute_match(/(?<![A-Za-z])u(?![A-Za-z])/, hash_inspect, 'username from hash must not appear in inspect')
+      refute_match(/(?<![A-Za-z])p(?![A-Za-z])/, hash_inspect, 'password from hash must not appear in inspect')
+      assert_includes(hash_inspect, '[FILTERED]', 'inspect must contain redaction placeholder')
+      assert_equal(2, hash_inspect.scan('[FILTERED]').size, 'both username and password must be redacted')
+    end
+
     def test_new_pool
       assert_instance_of(
         ::RedisClient::Cluster,

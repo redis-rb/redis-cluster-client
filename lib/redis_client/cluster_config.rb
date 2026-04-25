@@ -32,6 +32,12 @@ class RedisClient
 
     InvalidClientConfigError = Class.new(::RedisClient::Cluster::Error)
 
+    SENSITIVE_INSPECT_KEYS = %i[username password].freeze
+    INSPECT_REDACTED_KEYS = %i[command_builder].freeze
+    INSPECT_PLACEHOLDER = '[FILTERED]'
+
+    private_constant :SENSITIVE_INSPECT_KEYS, :INSPECT_REDACTED_KEYS, :INSPECT_PLACEHOLDER
+
     attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout,
                 :connect_with_original_config, :startup_nodes, :max_startup_sample, :id
 
@@ -65,7 +71,7 @@ class RedisClient
     end
 
     def inspect
-      "#<#{self.class.name} #{startup_nodes.values.map { |v| v.reject { |k| k == :command_builder } }}>"
+      "#<#{self.class.name} #{startup_nodes.values.map { |v| redact_for_inspect(v) }}>"
     end
 
     def connect_timeout
@@ -116,6 +122,14 @@ class RedisClient
     end
 
     private
+
+    def redact_for_inspect(node_config)
+      node_config.each_with_object({}) do |(key, value), redacted|
+        next if INSPECT_REDACTED_KEYS.include?(key)
+
+        redacted[key] = SENSITIVE_INSPECT_KEYS.include?(key) ? INSPECT_PLACEHOLDER : value
+      end
+    end
 
     def merge_concurrency_option(option)
       opts = {}
