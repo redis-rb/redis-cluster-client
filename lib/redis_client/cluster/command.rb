@@ -30,13 +30,14 @@ class RedisClient
             regular_timeout = node.read_timeout
             node.read_timeout = slow_command_timeout > 0.0 ? slow_command_timeout : regular_timeout
             reply = node.call('command')
-            node.read_timeout = regular_timeout
             commands = parse_command_reply(reply)
             cmd = ::RedisClient::Cluster::Command.new(commands)
             break
           rescue ::RedisClient::Error => e
             errors ||= []
             errors << e
+          ensure
+            node.read_timeout = regular_timeout
           end
 
           return cmd unless cmd.nil?
