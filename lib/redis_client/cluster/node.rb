@@ -479,9 +479,11 @@ class RedisClient
       def with_reload_jitter
         return unless @next_reload_time.nil? || obtain_current_time >= @next_reload_time
 
-        yield
-
-        @next_reload_time = obtain_current_time + @random.rand(JITTER_WINDOW)
+        begin
+          yield
+        ensure
+          @next_reload_time = obtain_current_time + @random.rand(JITTER_WINDOW)
+        end
       end
 
       def with_reload_lock

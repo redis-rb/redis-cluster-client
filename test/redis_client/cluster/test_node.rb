@@ -915,6 +915,23 @@ class RedisClient
         cluster_node_cmds = capture_buffer.to_a.select { |c| c.command == ['cluster', subcmd] }
         assert_equal MAX_STARTUP_SAMPLE, cluster_node_cmds.size
       end
+
+      def test_with_reload_jitter_throttles_after_failure
+        @test_node.instance_variable_set(:@next_reload_time, nil)
+
+        assert_raises(StandardError) do
+          @test_node.send(:with_reload_jitter) { raise StandardError, 'fail' }
+        end
+
+        next_reload_time = @test_node.instance_variable_get(:@next_reload_time)
+        refute_nil(next_reload_time, 'next_reload_time should be set after a failed yield')
+        assert_operator(next_reload_time, :>, @test_node.send(:obtain_current_time),
+                        'next_reload_time should be in the future')
+
+        yielded = false
+        @test_node.send(:with_reload_jitter) { yielded = true }
+        refute(yielded, 'block should not be yielded while throttled after a failure')
+      end
     end
     # rubocop:enable Metrics/ClassLength
   end
