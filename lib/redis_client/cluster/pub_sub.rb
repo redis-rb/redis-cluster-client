@@ -189,9 +189,9 @@ class RedisClient
           @state_dict.clear
           @commands.each { |command| _call(command) }
           break
-        rescue ::RedisClient::ConnectionError, ::RedisClient::Cluster::NodeMightBeDown => e
+        rescue ::RedisClient::ConnectionError, ::RedisClient::Cluster::NodeMightBeDown
           attempt += 1
-          raise e if attempt >= RECOVERY_MAX_ATTEMPTS
+          raise if attempt >= RECOVERY_MAX_ATTEMPTS
 
           sleep recovery_interval(attempt)
         end
