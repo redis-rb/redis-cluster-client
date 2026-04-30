@@ -61,7 +61,10 @@ class RedisClient
       end
 
       BUF_SIZE = Integer(ENV.fetch('REDIS_CLIENT_PUBSUB_BUF_SIZE', 1024))
-      private_constant :BUF_SIZE
+      RECOVERY_BASE_INTERVAL = Float(ENV.fetch('REDIS_CLIENT_PUBSUB_RECOVERY_INTERVAL_SEC', 1.0))
+      RECOVERY_MAX_INTERVAL = Float(ENV.fetch('REDIS_CLIENT_PUBSUB_RECOVERY_MAX_INTERVAL_SEC', 30.0))
+      RECOVERY_MAX_ATTEMPTS = Integer(ENV.fetch('REDIS_CLIENT_PUBSUB_RECOVERY_MAX_ATTEMPTS', 10))
+      private_constant :BUF_SIZE, :RECOVERY_BASE_INTERVAL, :RECOVERY_MAX_INTERVAL, :RECOVERY_MAX_ATTEMPTS
 
       def initialize(router, command_builder)
         @router = router
@@ -179,6 +182,7 @@ class RedisClient
       end
 
       def start_over
+        attempt = 0
         loop do
           @router.renew_cluster_state
           @state_dict.each_value(&:close)
@@ -186,8 +190,15 @@ class RedisClient
           @commands.each { |command| _call(command) }
           break
         rescue ::RedisClient::ConnectionError, ::RedisClient::Cluster::NodeMightBeDown
-          sleep 1.0
+          attempt += 1
+          raise if attempt >= RECOVERY_MAX_ATTEMPTS
+
+          sleep recovery_interval(attempt)
         end
+      end
+
+      def recovery_interval(attempt)
+        [RECOVERY_BASE_INTERVAL * (2**(attempt - 1)), RECOVERY_MAX_INTERVAL].min
       end
     end
   end
