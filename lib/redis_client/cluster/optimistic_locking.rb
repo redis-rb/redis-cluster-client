@@ -54,7 +54,7 @@ class RedisClient
       rescue ::RedisClient::ConnectionError
         # Deduct the number of retries that happened _inside_ router#handle_redirection from our remaining
         # _external_ retries. Always deduct at least one in case handle_redirection raises without trying the block.
-        retry_count -= [times_block_executed, 1].min
+        retry_count -= times_block_executed == 0 ? 1 : [times_block_executed, 1].min
         raise if retry_count < 0
 
         retry
