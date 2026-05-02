@@ -60,6 +60,7 @@ class TestAgainstClusterBroken < TestingWrapper
     # Find a key which lives on the sacrifice node
     test_key = generate_key_for_node(sacrifice)
     @clients[0].call('SET', test_key, 'foobar1')
+    wait_for_reload_jitter_elapsed(@clients[0])
 
     # Shut the node down.
     kill_a_node_and_wait_for_failover(sacrifice)
@@ -74,6 +75,7 @@ class TestAgainstClusterBroken < TestingWrapper
     # Find a key which lives on the sacrifice node
     test_key = generate_key_for_node(sacrifice)
     @clients[0].call('SET', test_key, 'foobar1')
+    wait_for_reload_jitter_elapsed(@clients[0])
 
     call_count = 0
     # Begin a transaction, but shut the node down after the WATCH is issued
@@ -273,6 +275,22 @@ class TestAgainstClusterBroken < TestingWrapper
 
       sleep 1
       failover_checks += 1
+    end
+  end
+
+  def wait_for_reload_jitter_elapsed(client)
+    node = client.send(:router).instance_variable_get(:@node)
+    count = 0
+
+    loop do
+      count += 1
+      break if count > 30
+
+      current_time = node.send(:obtain_current_time)
+      next_time = node.instance_variable_get(:@next_reload_time)
+      break if next_time.nil? || current_time >= next_time
+
+      sleep 1.0
     end
   end
 
