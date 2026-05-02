@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 # This is a pure unit test for Cluster::Pipeline that does NOT require a
-# running Redis. It exercises the deferred-raise behavior of
+# running Redis. It exercises per-command block application on both redirected
+# and non-redirected replies, and the deferred-raise behavior of
 # `finalize_redirected_replies` (the path Pipeline#execute takes after
 # work_group.each has classified each node-batch).
 require 'minitest/autorun'
@@ -12,13 +13,195 @@ class RedisClient
     class TestPipeline < ::Minitest::Test
       DummyError = Class.new(::RedisClient::Error)
 
+      # A minimal stub that satisfies the parts of Cluster::Router used by
+      # Cluster::Pipeline#execute and its private helpers.
+      class StubRouter
+        attr_accessor :send_command_to_node_results
+
+        def initialize(node_keys_for_commands:)
+          @node_keys_for_commands = node_keys_for_commands
+          @nodes_by_key = {}
+          @send_command_to_node_calls = 0
+          @send_command_to_node_results = []
+        end
+
+        def stub_node(node_key, node)
+          @nodes_by_key[node_key] = node
+        end
+
+        def find_node_key(command, seed: nil) # rubocop:disable Lint/UnusedMethodArgument
+          @node_keys_for_commands.fetch(command)
+        end
+
+        def find_node(node_key)
+          @nodes_by_key.fetch(node_key)
+        end
+
+        def assign_redirection_node(_err_msg)
+          :redirected_node
+        end
+
+        def assign_asking_node(_err_msg)
+          :asking_node
+        end
+
+        def renew_cluster_state; end
+
+        def config
+          nil
+        end
+
+        def send_command_to_node(_node, _method, _command, _args)
+          raise 'no more stubbed redirect responses' if @send_command_to_node_calls >= @send_command_to_node_results.size
+
+          v = @send_command_to_node_results[@send_command_to_node_calls]
+          @send_command_to_node_calls += 1
+          v
+        end
+      end
+
       def setup
+        @worker = ::RedisClient::Cluster::ConcurrentWorker.create(model: :none)
         @pipeline = ::RedisClient::Cluster::Pipeline.new(
           nil, # router
           ::RedisClient::Cluster::NoopCommandBuilder,
           nil, # concurrent_worker
           exception: true
         )
+      end
+
+      def teardown
+        @worker&.close
+      end
+
+      def test_blocks_applied_to_non_redirected_replies_when_redirection_occurs
+        # Two commands routed to the same node. The first reply is normal; the
+        # second triggers MOVED. Only the redirected one used to receive the
+        # block; both should now.
+        get_cmd = %w[GET k1]
+        set_cmd = %w[SET movedkey x]
+        node_key = 'node-a'
+
+        router = StubRouter.new(
+          node_keys_for_commands: {
+            get_cmd => node_key,
+            set_cmd => node_key
+          }
+        )
+        router.stub_node(node_key, :stub_client)
+        # The redirected command's value after redirection.
+        router.send_command_to_node_results = ['OK']
+
+        pipeline = ::RedisClient::Cluster::Pipeline.new(
+          router,
+          ::RedisClient::Cluster::NoopCommandBuilder,
+          @worker,
+          exception: true
+        )
+        pipeline.call_v(get_cmd) { |v| "block(#{v})" }
+        pipeline.call_v(set_cmd) { |v| "block(#{v})" }
+
+        # Stub do_pipelining to simulate the connection raising RedirectionNeeded
+        # before _coerce! runs in send_pipeline.
+        pipeline.define_singleton_method(:do_pipelining) do |_cli, pl|
+          err = ::RedisClient::Cluster::Pipeline::RedirectionNeeded.new
+          # First reply is the GET reply (raw), second is the MOVED error.
+          err.replies = [
+            'v1',
+            ::RedisClient::CommandError.new('MOVED 1234 node-b:6379').tap { |e| e._set_command(pl._commands[1]) }
+          ]
+          err.indices = [1]
+          err.first_exception = nil
+          raise err
+        end
+
+        result = pipeline.execute
+
+        assert_equal(2, result.size, 'should return one entry per outer command')
+        assert_equal('block(v1)', result[0], 'block must be applied to non-redirected reply')
+        assert_equal('block(OK)', result[1], 'block must be applied to redirected reply')
+      end
+
+      def test_blocks_applied_to_replies_on_stale_cluster_state
+        get_cmd_a = %w[GET k1]
+        get_cmd_b = %w[GET k2]
+        node_key = 'node-a'
+
+        router = StubRouter.new(
+          node_keys_for_commands: {
+            get_cmd_a => node_key,
+            get_cmd_b => node_key
+          }
+        )
+        router.stub_node(node_key, :stub_client)
+
+        pipeline = ::RedisClient::Cluster::Pipeline.new(
+          router,
+          ::RedisClient::Cluster::NoopCommandBuilder,
+          @worker,
+          exception: false
+        )
+        pipeline.call_v(get_cmd_a) { |v| "block(#{v})" }
+        pipeline.call_v(get_cmd_b) { |v| "block(#{v})" }
+
+        pipeline.define_singleton_method(:do_pipelining) do |_cli, _pl|
+          err = ::RedisClient::Cluster::Pipeline::StaleClusterState.new
+          err.replies = %w[v1 v2]
+          err.first_exception = nil
+          raise err
+        end
+
+        result = pipeline.execute
+
+        assert_equal(['block(v1)', 'block(v2)'], result, 'blocks must run on stale-cluster-state replies')
+      end
+
+      def test_no_double_block_application_for_redirected_replies
+        # Verify that blocks are not invoked twice on the redirected reply
+        # (regression guard for the redirect_command change).
+        get_cmd = %w[GET k1]
+        set_cmd = %w[SET movedkey x]
+        node_key = 'node-a'
+
+        router = StubRouter.new(
+          node_keys_for_commands: {
+            get_cmd => node_key,
+            set_cmd => node_key
+          }
+        )
+        router.stub_node(node_key, :stub_client)
+        router.send_command_to_node_results = ['OK']
+
+        pipeline = ::RedisClient::Cluster::Pipeline.new(
+          router,
+          ::RedisClient::Cluster::NoopCommandBuilder,
+          @worker,
+          exception: true
+        )
+
+        invocations = []
+        block = lambda do |v|
+          invocations << v
+          "block(#{v})"
+        end
+
+        pipeline.call_v(get_cmd, &block)
+        pipeline.call_v(set_cmd, &block)
+
+        pipeline.define_singleton_method(:do_pipelining) do |_cli, pl|
+          err = ::RedisClient::Cluster::Pipeline::RedirectionNeeded.new
+          err.replies = [
+            'v1',
+            ::RedisClient::CommandError.new('MOVED 1234 node-b:6379').tap { |e| e._set_command(pl._commands[1]) }
+          ]
+          err.indices = [1]
+          err.first_exception = nil
+          raise err
+        end
+
+        pipeline.execute
+
+        assert_equal(%w[v1 OK], invocations, 'block must be applied exactly once per command')
       end
 
       def test_finalize_redirected_replies_processes_all_batches_when_one_node_errors

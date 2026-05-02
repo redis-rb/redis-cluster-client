@@ -240,12 +240,15 @@ class RedisClient
       def process_redirection_batch(node_key, batch, all_replies)
         pipeline = @pipelines[node_key]
         batch.indices.each { |i| batch.replies[i] = handle_redirection(batch.replies[i], pipeline, i) }
+        pipeline._coerce!(batch.replies)
         pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = batch.replies[inner] }
         all_replies
       end
 
       def process_cluster_state_batch(node_key, batch, all_replies)
-        @pipelines[node_key].outer_indices.each_with_index { |outer, inner| all_replies[outer] = batch.replies[inner] }
+        pipeline = @pipelines[node_key]
+        pipeline._coerce!(batch.replies)
+        pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = batch.replies[inner] }
         all_replies
       end
 
@@ -300,14 +303,14 @@ class RedisClient
         method = pipeline.get_callee_method(inner_index)
         command = pipeline.get_command(inner_index)
         timeout = pipeline.get_timeout(inner_index)
-        block = pipeline.get_block(inner_index)
         args = timeout.nil? ? [] : [timeout]
 
-        if block.nil?
-          @router.send_command_to_node(node, method, command, args)
-        else
-          @router.send_command_to_node(node, method, command, args, &block)
-        end
+        # NOTE: The per-command block is intentionally not passed here.
+        #       Blocks are uniformly applied later via Pipeline#_coerce!
+        #       in Cluster::Pipeline#execute, so the redirected and the
+        #       non-redirected commands within the same node-batch share
+        #       a single block-application step.
+        @router.send_command_to_node(node, method, command, args)
       end
 
       def try_asking(node)
