@@ -3,6 +3,8 @@
 require 'benchmark/ips'
 require 'redis_cluster_client'
 require 'testing_constants'
+require 'async/redis/cluster_client'
+require 'valkey'
 
 module IpsPipeline
   module_function
@@ -10,20 +12,18 @@ module IpsPipeline
   ATTEMPTS = 100
 
   def run
-    on_demand = make_client(:on_demand)
-    pooled = make_client(:pooled)
-    none = make_client(:none)
-    envoy = make_client_for_envoy
-    cluster_proxy = make_client_for_cluster_proxy
-    prepare(on_demand, pooled, none, envoy, cluster_proxy)
     print_letter('pipelined')
+    cli = make_client(:none)
+    prepare(cli)
     bench(
-      ondemand: on_demand,
-      pooled: pooled,
-      none: none,
-      envoy: envoy,
-      cproxy: cluster_proxy
+      none: cli,
+      pooled: make_client(:pooled),
+      ondemand: make_client(:on_demand),
+      envoy: make_client_for_envoy,
+      cproxy: make_client_for_cluster_proxy
     )
+    # async_bench(make_async_client)
+    valkey_bench(make_valkey_client)
   end
 
   def make_client(model)
@@ -49,6 +49,20 @@ module IpsPipeline
     ).new_client
   end
 
+  def make_async_client
+    endpoints = TEST_NODE_URIS.map { |e| ::Async::Redis::Endpoint.parse(e) }
+    ::Async::Redis::ClusterClient.new(endpoints)
+  end
+
+  def make_valkey_client
+    ::Valkey.new(
+      nodes: [{ host: TEST_REDIS_HOST, port: TEST_REDIS_PORT }],
+      timeout: TEST_TIMEOUT_SEC,
+      cluster_mode: true,
+      protocol: 3
+    )
+  end
+
   def print_letter(title)
     print "################################################################################\n"
     print "# #{title}\n"
@@ -56,12 +70,10 @@ module IpsPipeline
     print "\n"
   end
 
-  def prepare(*clients)
-    clients.each do |client|
-      client.pipelined do |pi|
-        ATTEMPTS.times do |i|
-          pi.call('set', "key#{i}", "val#{i}")
-        end
+  def prepare(client)
+    client.pipelined do |pi|
+      ATTEMPTS.times do |i|
+        pi.call('set', "key#{i}", "val#{i}")
       end
     end
   end
@@ -77,6 +89,43 @@ module IpsPipeline
             ATTEMPTS.times do |i|
               pi.call('get', "key#{i}")
             end
+          end
+        end
+      end
+
+      x.compare!
+    end
+  end
+
+  def async_bench(client)
+    Async do
+      Benchmark.ips do |x|
+        x.time = 5
+        x.warmup = 1
+
+        x.report('pipelined: async') do
+          # FIXME: supported or not?
+          client.pipeline do |pi|
+            ATTEMPTS.times do |i|
+              pi.call('get', "key#{i}")
+            end
+          end
+        end
+
+        x.compare!
+      end
+    end
+  end
+
+  def valkey_bench(client)
+    Benchmark.ips do |x|
+      x.time = 5
+      x.warmup = 1
+
+      x.report('pipelined: valkey') do
+        client.pipelined do |pi|
+          ATTEMPTS.times do |i|
+            pi.get("key#{i}")
           end
         end
       end

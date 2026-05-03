@@ -17,4 +17,5 @@ gem 'rubocop-minitest', require: false
 gem 'rubocop-performance', require: false
 gem 'rubocop-rake', require: false
 gem 'stackprof', platform: :mri
+gem 'valkey-rb'
 gem 'vernier', platform: :mri if RUBY_ENGINE == 'ruby' && Integer(RUBY_VERSION.split('.').first) > 2
