@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
-require 'async/redis/cluster_client'
 require 'benchmark/ips'
 require 'redis_cluster_client'
 require 'testing_constants'
+require 'async/redis/cluster_client'
+require 'valkey'
 
 module IpsSingle
   module_function
@@ -11,17 +12,16 @@ module IpsSingle
   ATTEMPTS = 10
 
   def run
-    cli = make_client
-    envoy = make_client_for_envoy
-    cluster_proxy = make_client_for_cluster_proxy
-    prepare(cli, envoy, cluster_proxy)
     print_letter('single')
+    cli = make_client
+    prepare(cli)
     bench(
       cli: cli,
-      envoy: envoy,
-      cproxy: cluster_proxy
+      envoy: make_client_for_envoy,
+      cproxy: make_client_for_cluster_proxy
     )
     async_bench(make_async_client)
+    valkey_bench(make_valkey_client)
   end
 
   def make_client
@@ -51,6 +51,15 @@ module IpsSingle
     ::Async::Redis::ClusterClient.new(endpoints)
   end
 
+  def make_valkey_client
+    ::Valkey.new(
+      nodes: [{ host: TEST_REDIS_HOST, port: TEST_REDIS_PORT }],
+      timeout: TEST_TIMEOUT_SEC,
+      cluster_mode: true,
+      protocol: 3
+    )
+  end
+
   def print_letter(title)
     print "################################################################################\n"
     print "# #{title}\n"
@@ -58,11 +67,9 @@ module IpsSingle
     print "\n"
   end
 
-  def prepare(*clients)
-    clients.each do |client|
-      ATTEMPTS.times do |i|
-        client.call('set', "key#{i}", "val#{i}")
-      end
+  def prepare(client)
+    ATTEMPTS.times do |i|
+      client.call('set', "key#{i}", "val#{i}")
     end
   end
 
@@ -84,18 +91,33 @@ module IpsSingle
   end
 
   def async_bench(cluster)
-    Benchmark.ips do |x|
-      x.time = 5
-      x.warmup = 1
+    Async do
+      Benchmark.ips do |x|
+        x.time = 5
+        x.warmup = 1
 
-      x.report('single: async') do
-        Async do
+        x.report('single: async') do
           ATTEMPTS.times do |i|
             key = "key#{i}"
             slot = cluster.slot_for(key)
             client = cluster.client_for(slot)
             client.get(key)
           end
+        end
+
+        x.compare!
+      end
+    end
+  end
+
+  def valkey_bench(client)
+    Benchmark.ips do |x|
+      x.time = 5
+      x.warmup = 1
+
+      x.report('single: valkey') do
+        ATTEMPTS.times do |i|
+          client.get("key#{i}")
         end
       end
 
