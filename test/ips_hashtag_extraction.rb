@@ -3,7 +3,7 @@
 require 'benchmark/ips'
 require 'redis_cluster_client'
 
-module HashtagExtraction
+module IpsHashtagExtraction
   module_function
 
   def run
@@ -27,4 +27,4 @@ module HashtagExtraction
   end
 end
 
-HashtagExtraction.run
+IpsHashtagExtraction.run
