@@ -15,7 +15,7 @@ module IpsConcurrentWorker
     none = make_worker(:none)
 
     [0.0, 0.001, 0.003].each do |duration|
-      print_letter('concurrent worker', "sleep: #{duration}")
+      print_letter('Concurrent Worker', "sleep: #{duration}")
       bench(duration, ondemand: on_demand, pooled: pooled, none: none)
     end
   end
