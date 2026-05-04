@@ -467,8 +467,13 @@ class RedisClient
 
         return assign_node_and_send_command(method, command, args, &block) if command.size <= keys_step + 1 || ::RedisClient::Cluster::KeySlotConverter.hash_tag_included?(command[1])
 
-        seed = @config.use_replica? && @config.replica_affinity == :random ? nil : Random.new_seed
-        pipeline = ::RedisClient::Cluster::Pipeline.new(self, @command_builder, @concurrent_worker, exception: true, seed: seed)
+        pipeline = ::RedisClient::Cluster::Pipeline.new(
+          self,
+          @command_builder,
+          @concurrent_worker,
+          exception: true,
+          seed: Random.new_seed
+        )
 
         single_command = Array.new(keys_step + 1)
         single_command[0] = single_key_cmd
