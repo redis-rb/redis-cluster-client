@@ -25,7 +25,7 @@ static_resources:
             op_timeout: 5s
             enable_hashtagging: true
             enable_redirection: true
-            read_policy: PREFER_REPLICA
+            read_policy: MASTER
             dns_cache_config:
               name: redis
           prefix_routes:
