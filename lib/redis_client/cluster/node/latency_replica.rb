@@ -20,8 +20,7 @@ class RedisClient
         end
 
         def any_replica_node_key(seed: nil)
-          random = seed.nil? ? Random : Random.new(seed)
-          @existed_replicas.sample(random: random)&.first || any_primary_node_key(seed: seed)
+          @existed_replicas.sample(random: make_random(seed))&.first || any_primary_node_key(seed: seed)
         end
 
         def process_topology_update!(replications, options)

@@ -25,8 +25,7 @@ class RedisClient
         end
 
         def any_primary_node_key(seed: nil)
-          random = seed.nil? ? Random : Random.new(seed)
-          @primary_node_keys.sample(random: random)
+          @primary_node_keys.sample(random: make_random(seed))
         end
 
         def process_topology_update!(replications, options) # rubocop:disable Metrics/AbcSize
@@ -58,6 +57,11 @@ class RedisClient
             client = @pool.nil? ? config.new_client : config.new_pool(**@pool)
             @clients[node_key] = client
           end
+        end
+
+        def make_random(seed)
+          # OPTIMIZE: Figure out the most elegant way to pin a node during a pipeline or scan.
+          seed.nil? ? Random : Random.new(seed)
         end
       end
     end

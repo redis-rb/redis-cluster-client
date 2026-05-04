@@ -18,8 +18,7 @@ class RedisClient
         end
 
         def any_primary_node_key(seed: nil)
-          random = seed.nil? ? Random : Random.new(seed)
-          @primary_node_keys.sample(random: random)
+          @primary_node_keys.sample(random: make_random(seed))
         end
 
         alias any_replica_node_key any_primary_node_key
