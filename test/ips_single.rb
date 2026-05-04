@@ -12,23 +12,60 @@ module IpsSingle
   ATTEMPTS = 10
 
   def run
-    print_letter('single')
-    cli = make_client
-    prepare(cli)
-    bench(
-      cli: cli,
+    print "################################################################################\n"
+    print "# Single\n"
+    print "################################################################################\n"
+    print "\n"
+
+    client = make_client
+
+    ATTEMPTS.times { |i| client.call('set', "key#{i}", "val#{i}") }
+
+    clients = {
+      client: client,
       envoy: make_client_for_envoy,
       cproxy: make_client_for_cluster_proxy
-    )
-    async_bench(make_async_client)
-    valkey_bench(make_valkey_client)
+    }.freeze
+    valkey = make_valkey_client
+    async = make_async_client
+
+    Benchmark.ips do |x|
+      x.time = 5
+      x.warmup = 1
+
+      clients.each do |key, cli|
+        x.report(key) do
+          ATTEMPTS.times { |i| cli.call('get', "key#{i}") }
+        end
+      end
+
+      x.report('valkey') do
+        ATTEMPTS.times { |i| valkey.get("key#{i}") }
+      end
+
+      x.compare!
+    end
+
+    Async do
+      Benchmark.ips do |x|
+        x.time = 5
+        x.warmup = 1
+
+        x.report('async') do
+          ATTEMPTS.times do |i|
+            key = "key#{i}"
+            async.client_for(async.slot_for(key)).get(key)
+          end
+        end
+
+        x.compare!
+      end
+    end
   end
 
   def make_client
     ::RedisClient.cluster(
       nodes: TEST_NODE_URIS,
-      replica: true,
-      replica_affinity: :random,
       fixed_hostname: TEST_FIXED_HOSTNAME,
       **TEST_GENERIC_OPTIONS
     ).new_client
@@ -58,71 +95,6 @@ module IpsSingle
       cluster_mode: true,
       protocol: 3
     )
-  end
-
-  def print_letter(title)
-    print "################################################################################\n"
-    print "# #{title}\n"
-    print "################################################################################\n"
-    print "\n"
-  end
-
-  def prepare(client)
-    ATTEMPTS.times do |i|
-      client.call('set', "key#{i}", "val#{i}")
-    end
-  end
-
-  def bench(**kwargs)
-    Benchmark.ips do |x|
-      x.time = 5
-      x.warmup = 1
-
-      kwargs.each do |key, client|
-        x.report("single: #{key}") do
-          ATTEMPTS.times do |i|
-            client.call('get', "key#{i}")
-          end
-        end
-      end
-
-      x.compare!
-    end
-  end
-
-  def async_bench(cluster)
-    Async do
-      Benchmark.ips do |x|
-        x.time = 5
-        x.warmup = 1
-
-        x.report('single: async') do
-          ATTEMPTS.times do |i|
-            key = "key#{i}"
-            slot = cluster.slot_for(key)
-            client = cluster.client_for(slot)
-            client.get(key)
-          end
-        end
-
-        x.compare!
-      end
-    end
-  end
-
-  def valkey_bench(client)
-    Benchmark.ips do |x|
-      x.time = 5
-      x.warmup = 1
-
-      x.report('single: valkey') do
-        ATTEMPTS.times do |i|
-          client.get("key#{i}")
-        end
-      end
-
-      x.compare!
-    end
   end
 end
 
