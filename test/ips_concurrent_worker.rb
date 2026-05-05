@@ -36,8 +36,8 @@ module IpsConcurrentWorker
       x.time = 5
       x.warmup = 1
 
-      kwargs.each do |key, worker|
-        x.report("model: #{key}") do
+      kwargs.each do |sbj, worker|
+        x.report(sbj) do
           group = worker.new_group(size: TASK_SIZE)
 
           TASK_SIZE.times do |i|

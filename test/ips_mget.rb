@@ -23,19 +23,20 @@ module IpsMget
     end
 
     original = ['mget'] + Array.new(ATTEMPTS) { |i| "{key}#{i}" }
-    emulated = ['mget'] + Array.new(ATTEMPTS) { |i| "key#{i}" }
-    single_get = ['mget', '']
+    keys = Array.new(ATTEMPTS) { |i| "key#{i}" }
+    emulated = ['mget'] + keys
+    single = ['mget', '']
 
     Benchmark.ips do |x|
       x.time = 5
       x.warmup = 1
 
-      x.report('MGET: original') { client.call_v(original) }
-      x.report('MGET: emulated') { client.call_v(emulated) }
-      x.report('MGET: single') do
-        ATTEMPTS.times do |i|
-          single_get[1] = "key#{i}"
-          client.call_v(single_get)
+      x.report('original') { client.call_v(original) }
+      x.report('emulated') { client.call_v(emulated) }
+      x.report('single') do
+        keys.each do |key|
+          single[1] = key
+          client.call_v(single)
         end
       end
 
@@ -46,10 +47,7 @@ module IpsMget
   def make_client
     ::RedisClient.cluster(
       nodes: TEST_NODE_URIS,
-      replica: true,
-      replica_affinity: :random,
       fixed_hostname: TEST_FIXED_HOSTNAME,
-      concurrency: { model: :on_demand },
       **TEST_GENERIC_OPTIONS
     ).new_client
   end
