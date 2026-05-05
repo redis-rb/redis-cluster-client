@@ -230,10 +230,10 @@ class RedisClient
 
       def append_pipeline(node_key)
         @pipelines ||= {}
-        @pipelines[node_key] ||= ::RedisClient::Cluster::Pipeline::Extended.new(::RedisClient::Cluster::NoopCommandBuilder)
-        @pipelines[node_key].add_outer_index(@size)
+        pi = (@pipelines[node_key] ||= ::RedisClient::Cluster::Pipeline::Extended.new(::RedisClient::Cluster::NoopCommandBuilder))
+        pi.add_outer_index(@size)
         @size += 1
-        @pipelines[node_key]
+        pi
       end
 
       def do_pipelining(client, pipeline)

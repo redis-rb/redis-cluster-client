@@ -9,18 +9,57 @@ class RedisClient
     class Command
       EMPTY_STRING = ''
       EMPTY_HASH = {}.freeze
-      EMPTY_ARRAY = [].freeze
 
-      private_constant :EMPTY_STRING, :EMPTY_HASH, :EMPTY_ARRAY
+      private_constant :EMPTY_HASH
 
-      Detail = Struct.new(
+      Spec = Struct.new(
         'RedisCommand',
         :first_key_position,
         :key_step,
         :write?,
         :readonly?,
         keyword_init: true
-      )
+      ) do
+        def extract_first_key(command)
+          i = first_key_position.to_i
+          return command[i] if i > 0
+
+          i = determine_first_key_position(command)
+          return ::RedisClient::Cluster::Command::EMPTY_STRING if i == 0
+
+          command[i]
+        end
+
+        def should_send_to_primary?
+          write?
+        end
+
+        def should_send_to_replica?
+          readonly?
+        end
+
+        private
+
+        def determine_first_key_position(command) # rubocop:disable Metrics/AbcSize
+          cmd_name = command.first
+          if cmd_name.casecmp('xread').zero?
+            determine_optional_key_position(command, 'streams')
+          elsif cmd_name.casecmp('xreadgroup').zero?
+            determine_optional_key_position(command, 'streams')
+          elsif cmd_name.casecmp('migrate').zero?
+            command[3].empty? ? determine_optional_key_position(command, 'keys') : 3
+          elsif cmd_name.casecmp('memory').zero?
+            command[1].to_s.casecmp('usage').zero? ? 2 : 0
+          else
+            0
+          end
+        end
+
+        def determine_optional_key_position(command, option_name)
+          i = command.index { |v| v.to_s.casecmp(option_name).zero? }
+          i.nil? ? 0 : i + 1
+        end
+      end
 
       class << self
         def load(nodes, slow_command_timeout: -1) # rubocop:disable Metrics/AbcSize
@@ -65,7 +104,7 @@ class RedisClient
                        else row[2].include?('write')
                        end
 
-            acc[row.first] = ::RedisClient::Cluster::Command::Detail.new(
+            acc[row.first] = ::RedisClient::Cluster::Command::Spec.new(
               first_key_position: pos,
               key_step: row[5],
               write?: writable,
@@ -79,52 +118,12 @@ class RedisClient
         @commands = commands || EMPTY_HASH
       end
 
-      def extract_first_key(command)
-        i = determine_first_key_position(command)
-        return EMPTY_STRING if i == 0
-
-        command[i]
-      end
-
-      def should_send_to_primary?(command)
-        find_command_info(command.first)&.write?
-      end
-
-      def should_send_to_replica?(command)
-        find_command_info(command.first)&.readonly?
+      def get_spec(name)
+        @commands[name] || @commands[name.to_s.downcase(:ascii)]
       end
 
       def exists?(name)
         @commands.key?(name) || @commands.key?(name.to_s.downcase(:ascii))
-      end
-
-      private
-
-      def find_command_info(name)
-        @commands[name] || @commands[name.to_s.downcase(:ascii)]
-      end
-
-      def determine_first_key_position(command) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/AbcSize, Metrics/PerceivedComplexity
-        i = find_command_info(command.first)&.first_key_position.to_i
-        return i if i > 0
-
-        cmd_name = command.first
-        if cmd_name.casecmp('xread').zero?
-          determine_optional_key_position(command, 'streams')
-        elsif cmd_name.casecmp('xreadgroup').zero?
-          determine_optional_key_position(command, 'streams')
-        elsif cmd_name.casecmp('migrate').zero?
-          command[3].empty? ? determine_optional_key_position(command, 'keys') : 3
-        elsif cmd_name.casecmp('memory').zero?
-          command[1].to_s.casecmp('usage').zero? ? 2 : 0
-        else
-          i
-        end
-      end
-
-      def determine_optional_key_position(command, option_name)
-        i = command.index { |v| v.to_s.casecmp(option_name).zero? }
-        i.nil? ? 0 : i + 1
       end
     end
   end

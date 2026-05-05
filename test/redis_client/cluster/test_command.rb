@@ -111,11 +111,15 @@ class RedisClient
           { command: %w[memory usage key], want: 'key' },
           { command: %w[xread count 2 streams mystream writers 0-0 0-0], want: 'mystream' },
           { command: %w[xreadgroup group group consumer streams key id], want: 'key' },
-          { command: %w[unknown foo bar], want: '' }
+          { command: %w[unknown foo bar], want: nil }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
-          got = cmd.extract_first_key(c[:command])
-          assert_equal(c[:want], got, msg)
+          got = cmd.get_spec(c[:command].first)&.extract_first_key(c[:command])
+          if c[:want].nil?
+            assert_nil(got, msg)
+          else
+            assert_equal(c[:want], got, msg)
+          end
         end
       end
 
@@ -130,7 +134,7 @@ class RedisClient
           { command: [], want: nil }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
-          got = cmd.should_send_to_primary?(c[:command])
+          got = cmd.get_spec(c[:command].first)&.should_send_to_primary?
           c[:want].nil? ? assert_nil(got, msg) : assert_equal(c[:want], got, msg)
         end
       end
@@ -146,7 +150,7 @@ class RedisClient
           { command: [], want: nil }
         ].each_with_index do |c, idx|
           msg = "Case: #{idx}"
-          got = cmd.should_send_to_replica?(c[:command])
+          got = cmd.get_spec(c[:command].first)&.should_send_to_replica?
           c[:want].nil? ? assert_nil(got, msg) : assert_equal(c[:want], got, msg)
         end
       end
