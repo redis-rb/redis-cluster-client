@@ -246,23 +246,27 @@ class RedisClient
       end
 
       def find_node_key(command, seed: nil)
-        key = @command.extract_first_key(command)
-        find_node_key_by_key(key, seed: seed, primary: @command.should_send_to_primary?(command))
+        cmd_spec = @command.get_spec(command.first)
+        find_node_key_by_key(
+          cmd_spec&.extract_first_key(command),
+          seed: seed,
+          primary: cmd_spec&.should_send_to_primary?
+        )
       end
 
       def find_primary_node_key(command)
-        key = @command.extract_first_key(command)
-        return nil unless key&.size&.> 0
+        key = @command.get_spec(command.first)&.extract_first_key(command)
+        return unless key&.size&.> 0
 
         find_node_key_by_key(key, primary: true)
       end
 
       def find_slot(command)
-        find_slot_by_key(@command.extract_first_key(command))
+        find_slot_by_key(@command.get_spec(command.first)&.extract_first_key(command))
       end
 
       def find_slot_by_key(key)
-        return if key.empty?
+        return if key.nil? || key.empty?
 
         ::RedisClient::Cluster::KeySlotConverter.convert(key)
       end
