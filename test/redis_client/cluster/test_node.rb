@@ -895,15 +895,6 @@ class RedisClient
         capture_buffer = ::Middlewares::CommandCapture::CommandBuffer.new
         test_node = make_node(replica: true, pool: { size: 2 }, capture_buffer: capture_buffer)
 
-        # Simulate refetch_node_info_list taking a long time
-        test_node.singleton_class.prepend(Module.new do
-          def refetch_node_info_list(...)
-            r = super
-            sleep 2
-            r
-          end
-        end)
-
         capture_buffer.clear
         t1 = Thread.new { test_node.try_reload! }
         t2 = Thread.new { test_node.try_reload! }
