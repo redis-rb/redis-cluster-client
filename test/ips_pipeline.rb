@@ -17,10 +17,11 @@ module IpsPipeline
     print "################################################################################\n"
     print "\n"
 
+    keys = Array.new(ATTEMPTS) { |i| "key#{i}" }
     client = make_client(:none)
 
     client.pipelined do |pi|
-      ATTEMPTS.times { |i| pi.call('set', "key#{i}", "val#{i}") }
+      keys.each { |key| pi.call('set', key, key) }
     end
 
     clients = {
@@ -31,26 +32,46 @@ module IpsPipeline
       cproxy: make_client_for_cluster_proxy
     }
     valkey = make_valkey_client
+    async = make_async_client
 
     Benchmark.ips do |x|
       x.time = 5
       x.warmup = 1
 
-      clients.each do |key, cli|
-        x.report(key) do
+      clients.each do |sbj, cli|
+        x.report(sbj) do
           cli.pipelined do |pi|
-            ATTEMPTS.times { |i| pi.call('get', "key#{i}") }
+            keys.each { |key| pi.call('get', key) }
           end
         end
       end
 
       x.report('valkey') do
         valkey.pipelined do |pi|
-          ATTEMPTS.times { |i| pi.get("key#{i}") }
+          keys.each { |key| pi.get(key) }
         end
       end
 
       x.compare!
+    end
+
+    Async do
+      Benchmark.ips do |x|
+        x.time = 5
+        x.warmup = 1
+
+        x.report('async') do
+          # TODO: aggregate results along the order
+          keys.group_by { |key| async.client_for(async.slot_for(key)) }.each do |client, keys|
+            client.pipeline do |context|
+              keys.each { |key| context.get(key) }
+              context.collect
+            end
+          end
+        end
+
+        x.compare!
+      end
     end
   end
 
