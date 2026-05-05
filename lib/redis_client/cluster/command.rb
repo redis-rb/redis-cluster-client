@@ -13,7 +13,7 @@ class RedisClient
       private_constant :EMPTY_HASH
 
       Spec = Struct.new(
-        'RedisCommand',
+        'RedisCommandSpec',
         :first_key_position,
         :key_step,
         :write?,

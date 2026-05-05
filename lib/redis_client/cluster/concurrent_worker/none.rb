@@ -43,8 +43,8 @@ class RedisClient
 
           private
 
-          def exec(*args, **kwargs, &block)
-            block&.call(*args, **kwargs)
+          def exec(*args, **kwargs)
+            yield(*args, **kwargs) if block_given?
           rescue StandardError => e
             e
           end
