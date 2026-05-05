@@ -8,6 +8,10 @@ class RedisClient
           @worker = ::RedisClient::Cluster::ConcurrentWorker.create(model: model)
         end
 
+        def teardown
+          @worker.close
+        end
+
         def test_work_group
           size = 10
           group = @worker.new_group(size: size)
@@ -67,10 +71,6 @@ class RedisClient
           assert_equal(10, sum)
         ensure
           group&.close
-        end
-
-        def teardown
-          @worker.close
         end
       end
     end
