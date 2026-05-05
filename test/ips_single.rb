@@ -17,9 +17,10 @@ module IpsSingle
     print "################################################################################\n"
     print "\n"
 
+    keys = Array.new(ATTEMPTS) { |i| "key#{i}" }
     client = make_client
 
-    ATTEMPTS.times { |i| client.call('set', "key#{i}", "val#{i}") }
+    keys.each { |key| client.call('set', key, key) }
 
     clients = {
       client: client,
@@ -33,14 +34,14 @@ module IpsSingle
       x.time = 5
       x.warmup = 1
 
-      clients.each do |key, cli|
-        x.report(key) do
-          ATTEMPTS.times { |i| cli.call('get', "key#{i}") }
+      clients.each do |sbj, cli|
+        x.report(sbj) do
+          keys.each { |key| cli.call('get', key) }
         end
       end
 
       x.report('valkey') do
-        ATTEMPTS.times { |i| valkey.get("key#{i}") }
+        keys.each { |key| valkey.get(key) }
       end
 
       x.compare!
@@ -52,10 +53,7 @@ module IpsSingle
         x.warmup = 1
 
         x.report('async') do
-          ATTEMPTS.times do |i|
-            key = "key#{i}"
-            async.client_for(async.slot_for(key)).get(key)
-          end
+          keys.each { |key| async.client_for(async.slot_for(key)).get(key) }
         end
 
         x.compare!
