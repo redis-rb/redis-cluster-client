@@ -3,6 +3,7 @@
 require 'benchmark/ips'
 require 'redis_cluster_client'
 require 'testing_constants'
+require 'hiredis-client'
 
 module IpsMget
   module_function

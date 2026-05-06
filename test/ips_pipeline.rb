@@ -3,6 +3,7 @@
 require 'benchmark/ips'
 require 'redis_cluster_client'
 require 'testing_constants'
+require 'hiredis-client'
 require 'async/redis/cluster_client'
 require 'valkey'
 
