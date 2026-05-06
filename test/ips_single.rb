@@ -29,7 +29,6 @@ module IpsSingle
       cproxy: make_client_for_cluster_proxy
     }.freeze
     valkey = make_valkey_client
-    async = make_async_client
 
     Benchmark.ips do |x|
       x.time = 5
@@ -48,13 +47,19 @@ module IpsSingle
       x.compare!
     end
 
-    Async do
+    Sync do |parent_task|
+      async = make_async_client
+
       Benchmark.ips do |x|
         x.time = 5
         x.warmup = 1
 
         x.report('async') do
-          keys.each { |key| async.client_for(async.slot_for(key)).get(key) }
+          keys.each do |key|
+            parent_task.async do |_child_task|
+              async.get(key)
+            end.wait
+          end
         end
 
         x.compare!

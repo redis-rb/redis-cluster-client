@@ -33,7 +33,6 @@ module IpsPipeline
       cproxy: make_client_for_cluster_proxy
     }
     valkey = make_valkey_client
-    async = make_async_client
 
     Benchmark.ips do |x|
       x.time = 5
@@ -56,18 +55,17 @@ module IpsPipeline
       x.compare!
     end
 
-    Async do
+    Sync do |parent_task|
+      async = make_async_client
+
       Benchmark.ips do |x|
         x.time = 5
         x.warmup = 1
 
         x.report('async') do
-          # TODO: aggregate results along the order
-          keys.group_by { |key| async.client_for(async.slot_for(key)) }.each do |client, keys|
-            client.pipeline do |context|
-              keys.each { |key| context.get(key) }
-              context.collect
-            end
+          async.pipeline(task: parent_task) do |context|
+            keys.each { |key| context.get(key) }
+            context.collect
           end
         end
 
@@ -109,6 +107,60 @@ module IpsPipeline
       cluster_mode: true,
       protocol: 3
     )
+  end
+end
+
+module Async
+  module Redis
+    class ClusterClient
+      class DummyContext
+        def initialize(cluster, task: ::Async::Task.current)
+          @cluster = cluster
+          @parent_task = task
+          @clients = {}
+          @keys = {}
+          @indices = {}
+          @idx = 0
+        end
+
+        def get(key)
+          slot = @cluster.slot_for(key)
+          client = @cluster.client_for(slot)
+          id = client.endpoint.to_s
+          @clients[id] ||= client
+          keys = (@keys[id] ||= [])
+          keys << key
+          indices = (@indices[id] ||= [])
+          indices << @idx
+          @idx += 1
+        end
+
+        def collect
+          tasks = @clients.to_h do |id, client|
+            task = @parent_task.async do |_child_task|
+              client.pipeline do |context|
+                @keys.fetch(id).each { |key| context.get(key) }
+                context.collect
+              end
+            end
+
+            [id, task]
+          end
+
+          tasks.each_with_object(Array.new(@idx)) do |(id, task), acc|
+            indices = @indices.fetch(id)
+            task.wait.each_with_index { |r, i| acc[indices[i]] = r }
+          end
+        end
+      end
+
+      unless method_defined? :pipeline
+        def pipeline(task: ::Async::Task.current)
+          ctx = DummyContext.new(self, task: task)
+          yield(ctx)
+        end
+      end
+    end
   end
 end
 
