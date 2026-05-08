@@ -509,6 +509,89 @@ class RedisClient
         assert_equal(want.sort_by { |e| e.fetch(:id) }, got.sort_by(&:id).map(&:to_h))
       end
 
+      def test_parse_cluster_shards_reply_prefers_endpoint_over_ip
+        # AWS ElastiCache Serverless reports `127.0.0.1` in `ip` and the real
+        # FQDN in `endpoint`/`hostname`. The parser must build node_keys from
+        # `endpoint` so the resulting topology is reachable.
+        reply = [
+          {
+            'slots' => [0, 16_383],
+            'nodes' => [
+              {
+                'id' => '378a36b26f92565b8839570562532b0800000000',
+                'tls-port' => 6379,
+                'ip' => '127.0.0.1',
+                'endpoint' => 'cache.example.com',
+                'hostname' => 'cache.example.com',
+                'role' => 'master',
+                'replication-offset' => 0,
+                'health' => 'online'
+              },
+              {
+                'id' => '8bbdfb0ec88b53eabcecf25ccb2e16b000000000',
+                'tls-port' => 6380,
+                'ip' => '127.0.0.1',
+                'endpoint' => 'cache.example.com',
+                'hostname' => 'cache.example.com',
+                'role' => 'replica',
+                'replication-offset' => 0,
+                'health' => 'online'
+              }
+            ]
+          }
+        ]
+
+        got = @test_node.send(:parse_cluster_shards_reply, reply)
+
+        assert_equal(%w[cache.example.com:6379 cache.example.com:6380], got.map(&:node_key).sort)
+      end
+
+      def test_parse_cluster_shards_reply_falls_back_to_hostname_when_endpoint_unknown
+        reply = [
+          {
+            'slots' => [0, 16_383],
+            'nodes' => [
+              {
+                'id' => '378a36b26f92565b8839570562532b0800000000',
+                'port' => 6379,
+                'ip' => '10.0.0.1',
+                'endpoint' => '?',
+                'hostname' => 'node.example.com',
+                'role' => 'master',
+                'replication-offset' => 0,
+                'health' => 'online'
+              }
+            ]
+          }
+        ]
+
+        got = @test_node.send(:parse_cluster_shards_reply, reply)
+
+        assert_equal(['node.example.com:6379'], got.map(&:node_key))
+      end
+
+      def test_parse_cluster_shards_reply_falls_back_to_ip_when_no_endpoint_or_hostname
+        reply = [
+          {
+            'slots' => [0, 16_383],
+            'nodes' => [
+              {
+                'id' => '378a36b26f92565b8839570562532b0800000000',
+                'port' => 6379,
+                'ip' => '10.0.0.1',
+                'role' => 'master',
+                'replication-offset' => 0,
+                'health' => 'online'
+              }
+            ]
+          }
+        ]
+
+        got = @test_node.send(:parse_cluster_shards_reply, reply)
+
+        assert_equal(['10.0.0.1:6379'], got.map(&:node_key))
+      end
+
       def test_inspect
         assert_match(/^#<RedisClient::Cluster::Node [0-9., :]*>$/, @test_node.inspect)
       end
