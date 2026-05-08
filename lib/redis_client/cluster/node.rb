@@ -412,19 +412,38 @@ class RedisClient
           primary_id = nodes.find { |n| n.fetch('role') == 'master' }.fetch('id')
 
           nodes.each do |node|
-            ip = node.fetch('ip')
-            next if node.fetch('health') != 'online' || ip.nil? || ip.empty? || ip == '?'
+            host = pick_shard_host(node)
+            next if node.fetch('health') != 'online' || host.nil? || host.empty? || host == '?'
 
             role = node.fetch('role')
             acc << ::RedisClient::Cluster::Node::Info.new(
               id: node.fetch('id'),
-              node_key: NodeKey.build_from_host_port(ip, node['port'] || node['tls-port']),
+              node_key: NodeKey.build_from_host_port(host, node['port'] || node['tls-port']),
               role: role == 'master' ? role : 'slave',
               primary_id: role == 'master' ? EMPTY_STRING : primary_id,
               slots: role == 'master' ? shard.fetch('slots').each_slice(2).to_a.freeze : EMPTY_ARRAY
             )
           end
         end
+      end
+
+      # Pick the host for a CLUSTER SHARDS node entry.
+      #
+      # `endpoint` is the server-selected preferred endpoint (driven by the
+      # `cluster-preferred-endpoint-type` config), so prefer it when present and
+      # usable. Some managed services (e.g. AWS ElastiCache Serverless) report
+      # `127.0.0.1` in `ip` while exposing the reachable address only via
+      # `endpoint` / `hostname`; falling through to `ip` in that case would build
+      # an unreachable topology. This mirrors the precedence `parse_node_key`
+      # uses for CLUSTER NODES output (see #207).
+      def pick_shard_host(node)
+        endpoint = node['endpoint']
+        return endpoint if endpoint && !endpoint.empty? && endpoint != '?'
+
+        hostname = node['hostname']
+        return hostname if hostname && !hostname.empty?
+
+        node['ip']
       end
 
       # As redirection node_key is dependent on `cluster-preferred-endpoint-type` config,
