@@ -168,7 +168,8 @@ class RedisClient
       def multi
         transaction = ::RedisClient::Cluster::Transaction.new(@router, @command_builder)
         yield transaction
-        raise ConsistencyError.new('unable to determine slot').with_config(@router.config) if transaction.node_key.nil?
+        slots = transaction.pipeline._commands.map { |command| @router.find_slot(command) }.compact.uniq
+        raise ::RedisClient::Cluster::Transaction::ConsistencyError.new('unable to determine slot').with_config(@router.config) if transaction.node_key.nil? || slots.size != 1
 
         transaction.pipeline._commands.zip(transaction.pipeline._blocks || []).each do |command, block|
           append_pipeline_noreply(transaction.node_key).call_once_v(command, &block)
