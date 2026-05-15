@@ -164,7 +164,7 @@ class RedisClient
       end
 
       def test_pipelined_with_errors
-        assert_raises(RedisClient::Cluster::ErrorCollection) do
+        err = assert_raises(RedisClient::Cluster::ErrorCollection) do
           @client.pipelined do |pipeline|
             10.times do |i|
               pipeline.call('SET', "string#{i}", i)
@@ -172,6 +172,11 @@ class RedisClient
               pipeline.call('SET', "string#{i}", i + 10)
             end
           end
+        end
+
+        refute_empty(err.errors)
+        err.errors.each_value do |e|
+          assert_instance_of(::RedisClient::CommandError, e)
         end
 
         wait_for_replication
