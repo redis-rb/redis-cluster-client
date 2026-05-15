@@ -127,6 +127,7 @@ class RedisClient
         @seed = seed
         @pipelines = nil
         @size = 0
+        @multi_exec_metadata = {}
       end
 
       def call(*args, **kwargs, &block)
@@ -171,6 +172,11 @@ class RedisClient
         slots = transaction.pipeline._commands.map { |command| @router.find_slot(command) }.compact.uniq
         raise ::RedisClient::Cluster::Transaction::ConsistencyError.new('unable to determine slot').with_config(@router.config) if transaction.node_key.nil? || slots.size != 1
 
+        @multi_exec_metadata[@size] = {
+          outer: @size,
+          node_key: transaction.node_key
+        }
+
         transaction.pipeline._commands.zip(transaction.pipeline._blocks || []).each do |command, block|
           append_pipeline_noreply(transaction.node_key).call_once_v(command, &block)
         end
@@ -211,7 +217,17 @@ class RedisClient
             errors[node_key] = v
           else
             all_replies ||= Array.new(@size)
-            @pipelines[node_key].outer_indices.each_with_index { |outer, inner| all_replies[outer] = v[inner] }
+            @pipelines[node_key].outer_indices.each_with_index do |outer, inner|
+              if @multi_exec_metadata.key?(outer) && v[inner].is_a?(Array)
+                v[inner].each do |result|
+                  if result.is_a?(::RedisClient::CommandError)
+                    errors ||= {}
+                    errors[node_key] = result
+                  end
+                end
+              end
+              all_replies[outer] = v[inner]
+            end
           end
         end
 

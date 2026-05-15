@@ -249,6 +249,26 @@ class RedisClient
         end
       end
 
+      def test_pipelined_transactions_with_command_errors
+        assert_raises(::RedisClient::Cluster::ErrorCollection) do
+          @client.pipelined do |pipeline|
+            10.times do |i|
+              pipeline.multi do |multi|
+                multi.call('SET', "string#{i}", i)
+                multi.call('SET', "string#{i}", i, 'too many args')
+                multi.call('SET', "string#{i}", i + 10)
+              end
+            end
+          end
+        end
+
+        wait_for_replication
+
+        10.times do |i|
+          assert_equal((i + 10).to_s, @client.call('GET', "string#{i}"))
+        end
+      end
+
       def test_transaction_with_multiple_key
         assert_raises(::RedisClient::Cluster::Transaction::ConsistencyError) do
           @client.multi do |t|
