@@ -176,7 +176,7 @@ class RedisClient
         @multi_exec_indices.add(@size)
 
         node_key = transaction.node_key
-        inner_lo = (@pipelines || {})[node_key]&.size || 0
+        inner_lo = (@pipelines || {})[node_key]&._size || 0
 
         transaction.pipeline._commands.zip(transaction.pipeline._blocks || []).each do |command, block|
           append_pipeline_noreply(node_key).call_once_v(command, &block)
