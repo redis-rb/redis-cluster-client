@@ -223,7 +223,7 @@ class RedisClient
           else
             all_replies ||= Array.new(@size)
             @pipelines[node_key].outer_indices.each_with_index do |outer, inner|
-              if @multi_exec_indices.include?(outer) && v[inner].is_a?(Array)
+              if @exception && @multi_exec_indices.include?(outer) && v[inner].is_a?(Array)
                 v[inner].each do |result|
                   if result.is_a?(::RedisClient::CommandError)
                     errors ||= {}

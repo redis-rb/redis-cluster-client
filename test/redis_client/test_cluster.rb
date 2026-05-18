@@ -255,7 +255,7 @@ class RedisClient
       end
 
       def test_pipelined_transactions_with_command_errors
-        assert_raises(::RedisClient::Cluster::ErrorCollection) do
+        err = assert_raises(::RedisClient::Cluster::ErrorCollection) do
           @client.pipelined do |pipeline|
             10.times do |i|
               pipeline.multi do |multi|
@@ -265,6 +265,36 @@ class RedisClient
               end
             end
           end
+        end
+
+        refute_empty(err.errors)
+        err.errors.each_value do |e|
+          assert_instance_of(::RedisClient::CommandError, e)
+        end
+
+        wait_for_replication
+
+        10.times do |i|
+          assert_equal((i + 10).to_s, @client.call('GET', "string#{i}"))
+        end
+      end
+
+      def test_pipelined_transactions_with_command_errors_as_is
+        got = @client.pipelined(exception: false) do |pipeline|
+          10.times do |i|
+            pipeline.multi do |multi|
+              multi.call('SET', "string#{i}", i)
+              multi.call('SET', "string#{i}", i, 'too many args')
+              multi.call('SET', "string#{i}", i + 10)
+            end
+          end
+        end
+
+        assert_equal(10, got.size)
+        got.each do |result|
+          assert_equal('OK', result[0])
+          assert_instance_of(::RedisClient::CommandError, result[1])
+          assert_equal('OK', result[2])
         end
 
         wait_for_replication
