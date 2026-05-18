@@ -214,6 +214,56 @@ module TestAgainstClusterState
       end
     end
 
+    def test_the_state_of_cluster_resharding_with_pipelined_transactions_after_moved
+      # Tests that multis within pipelines get redirected properly.
+      moved_keys = nil
+      do_resharding_test(number_of_keys: 200) do |keys|
+        moved_keys = keys
+      end
+
+      error = assert_raises(::RedisClient::CommandError) do
+        @client.pipelined do |pipeline|
+          moved_keys.each do |key|
+            pipeline.multi do |multi|
+              multi.call('SET', key, '0')
+              multi.call('INCR', key)
+              multi.call('INCRBY', key, 2)
+            end
+          end
+        end
+      end
+
+      assert_match(/^EXECABORT/, error.message)
+
+      moved_keys.each do |key|
+        assert_equal(key, @client.call('GET', key), "Case: GET after pipelined multi: #{key}")
+      end
+    end
+
+    def test_the_state_of_cluster_resharding_with_pipelined_transactions_during_slot_migration_ask
+      # Tests that multis within pipelines get redirected properly.
+      do_resharding_test(number_of_keys: 200) do |keys|
+        sample = keys.first(10)
+
+        error = assert_raises(::RedisClient::CommandError) do
+          @client.pipelined do |pipeline|
+            sample.each do |key|
+              pipeline.multi do |multi|
+                multi.call('SET', key, '0')
+                multi.call('INCR', key)
+                multi.call('INCRBY', key, 2)
+              end
+            end
+          end
+        end
+        assert_match(/^EXECABORT/, error.message)
+
+        sample.each do |key|
+          assert_equal(key, @client.call('GET', key), "Case: GET after pipelined multi: #{key}")
+        end
+      end
+    end
+
     private
 
     def wait_for_replication

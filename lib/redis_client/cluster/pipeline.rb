@@ -128,6 +128,7 @@ class RedisClient
         @pipelines = nil
         @size = 0
         @multi_exec_indices = Set.new
+        @multi_exec_segments = {}
       end
 
       def call(*args, **kwargs, &block)
@@ -174,10 +175,17 @@ class RedisClient
 
         @multi_exec_indices.add(@size)
 
+        node_key = transaction.node_key
+        inner_lo = (@pipelines || {})[node_key]&.size || 0
+
         transaction.pipeline._commands.zip(transaction.pipeline._blocks || []).each do |command, block|
-          append_pipeline_noreply(transaction.node_key).call_once_v(command, &block)
+          append_pipeline_noreply(node_key).call_once_v(command, &block)
         end
-        append_pipeline(transaction.node_key).call_once('EXEC')
+        append_pipeline(node_key).call_once('EXEC')
+
+        inner_hi = @pipelines[node_key]._size - 1
+        @multi_exec_segments[node_key] ||= []
+        @multi_exec_segments[node_key] << (inner_lo..inner_hi)
       end
 
       def empty?
@@ -237,7 +245,7 @@ class RedisClient
 
           all_replies ||= Array.new(@size)
           pipeline = @pipelines[node_key]
-          v.indices.each { |i| v.replies[i] = handle_redirection(v.replies[i], pipeline, i) }
+          v.indices.each { |i| v.replies[i] = handle_redirection(node_key, v.replies[i], pipeline, i) }
           pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
         end
 
@@ -290,22 +298,22 @@ class RedisClient
         pipeline._coerce!(results)
       end
 
-      def handle_redirection(err, pipeline, inner_index)
+      def handle_redirection(node_key, err, pipeline, inner_index)
         return err unless err.is_a?(::RedisClient::CommandError)
 
         if err.message.start_with?('MOVED')
           node = @router.assign_redirection_node(err.message)
-          try_redirection(node, pipeline, inner_index)
+          try_redirection(node_key, node, pipeline, inner_index)
         elsif err.message.start_with?('ASK')
           node = @router.assign_asking_node(err.message)
-          try_asking(node) ? try_redirection(node, pipeline, inner_index) : err
+          try_asking(node) ? try_redirection(node_key, node, pipeline, inner_index) : err
         else
           err
         end
       end
 
-      def try_redirection(node, pipeline, inner_index)
-        redirect_command(node, pipeline, inner_index)
+      def try_redirection(node_key, node, pipeline, inner_index)
+        redirect_command(node, pipeline, inner_index) unless (@multi_exec_segments[node_key] || []).any? { |segment| segment.include?(inner_index) }
       rescue StandardError => e
         @exception ? raise : e
       end
