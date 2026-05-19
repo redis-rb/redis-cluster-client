@@ -193,7 +193,7 @@ class RedisClient
         @size.zero?
       end
 
-      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      def execute # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity,Metrics/MethodLength
         return if @pipelines.nil? || @pipelines.empty?
 
         work_group = @concurrent_worker.new_group(size: @pipelines.size)
