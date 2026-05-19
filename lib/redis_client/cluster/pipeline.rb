@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'set'
 require 'redis_client'
 require 'redis_client/cluster/errors'
 require 'redis_client/cluster/noop_command_builder'
@@ -241,11 +242,23 @@ class RedisClient
         raise ::RedisClient::Cluster::ErrorCollection.with_errors(errors).with_config(@router.config) unless errors.nil?
 
         required_redirections&.each do |node_key, v|
-          raise v.first_exception if v.first_exception
-
           all_replies ||= Array.new(@size)
           pipeline = @pipelines[node_key]
-          v.indices.each { |i| v.replies[i] = handle_redirection(node_key, v.replies[i], pipeline, i) }
+          redirected_segments = Set.new
+          v.indices.each do |i|
+            segment = find_multi_exec_segment(node_key, i)
+            if segment
+              key = [node_key, segment.begin, segment.end]
+              next if redirected_segments.include?(key)
+
+              redirected_segments.add(key)
+              v.replies[segment.end] = handle_redirection(node_key, v.replies[i], pipeline, i)
+            else
+              v.replies[i] = handle_redirection(node_key, v.replies[i], pipeline, i)
+            end
+          end
+          raise v.first_exception if v.first_exception && redirected_segments.empty?
+
           pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
         end
 
@@ -312,10 +325,25 @@ class RedisClient
         end
       end
 
+      def find_multi_exec_segment(node_key, inner_index)
+        (@multi_exec_segments[node_key] || []).find { |segment| segment.include?(inner_index) }
+      end
+
       def try_redirection(node_key, node, pipeline, inner_index)
-        redirect_command(node, pipeline, inner_index) unless (@multi_exec_segments[node_key] || []).any? { |segment| segment.include?(inner_index) }
+        segment = find_multi_exec_segment(node_key, inner_index)
+        if segment
+          redirect_multi_exec_segment(node, pipeline, segment)
+        else
+          redirect_command(node, pipeline, inner_index)
+        end
       rescue StandardError => e
         @exception ? raise : e
+      end
+
+      def redirect_multi_exec_segment(node, pipeline, segment)
+        segment.map do |inner_index|
+          redirect_command(node, pipeline, inner_index)
+        end.last
       end
 
       def redirect_command(node, pipeline, inner_index)
