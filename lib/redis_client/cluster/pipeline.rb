@@ -239,7 +239,6 @@ class RedisClient
 
         work_group.close
         @router.renew_cluster_state if cluster_state_errors
-        raise ::RedisClient::Cluster::ErrorCollection.with_errors(errors).with_config(@router.config) unless errors.nil?
 
         required_redirections&.each do |node_key, v|
           all_replies ||= Array.new(@size)
@@ -252,7 +251,13 @@ class RedisClient
               next if redirected_segments.include?(key)
 
               redirected_segments.add(key)
-              v.replies[segment.end] = handle_redirection(node_key, v.replies[i], pipeline, i)
+              v.replies[segment.end] = handle_redirection(node_key, v.replies[i], pipeline, i).map do |result|
+                if @exception && result.is_a?(::RedisClient::CommandError)
+                  errors ||= {}
+                  errors[node_key] = result
+                end
+                result
+              end
             else
               v.replies[i] = handle_redirection(node_key, v.replies[i], pipeline, i)
             end
@@ -268,6 +273,7 @@ class RedisClient
           all_replies ||= Array.new(@size)
           @pipelines[node_key].outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
         end
+        raise ::RedisClient::Cluster::ErrorCollection.with_errors(errors).with_config(@router.config) unless errors.nil?
 
         all_replies
       end

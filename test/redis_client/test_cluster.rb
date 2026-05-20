@@ -326,27 +326,77 @@ class RedisClient
           }
         )
 
-        Thread.current[:redirect_read_inject_once] = nil
-        ::Middlewares::MultiExecOnly.with do
-          got = client.pipelined do |pipeline|
-            pipeline.call('SET', 'decoy', 'must-not-appear')
-            pipeline.multi do |multi|
-              multi.call('SET', key, '0')
-              multi.call('INCR', key)
+        got = nil
+        ::Middlewares::RedirectReadInject.with do
+          ::Middlewares::MultiExecOnly.with do
+            got = client.pipelined do |pipeline|
+              pipeline.call('SET', 'decoy', 'must-not-appear')
+              pipeline.multi do |multi|
+                multi.call('SET', key, '0')
+                multi.call('INCR', key)
+              end
+              pipeline.call('GET', 'decoy')
             end
-            pipeline.call('GET', 'decoy')
           end
-
-          refute(redirect_count.zero?, redirect_count.get)
-          assert_equal(3, got.size)
-          assert_nil(got[0], 'decoy SET is dropped by MultiExecOnly and not sent to Redis')
-          assert_equal(['OK', 1], got[1])
-          assert_nil(got[2], 'decoy GET is dropped by MultiExecOnly and not sent to Redis')
-          assert_nil(client.call('GET', 'decoy'))
-          assert_equal('1', client.call('GET', key))
         end
+
+        refute(redirect_count.zero?, redirect_count.get)
+        assert_equal(3, got.size)
+        assert_nil(got[0], 'decoy SET is dropped by MultiExecOnly and not sent to Redis')
+        assert_equal(['OK', 1], got[1])
+        assert_nil(got[2], 'decoy GET is dropped by MultiExecOnly and not sent to Redis')
+        assert_nil(client.call('GET', 'decoy'))
+        assert_equal('1', client.call('GET', key))
       ensure
-        Thread.current[:redirect_read_inject_once] = nil
+        client&.close
+      end
+
+      def test_pipelined_transaction_redirects_on_moved_with_errors
+        key = 'tx_redirect_err_key'
+        slot = ::RedisClient::Cluster::KeySlotConverter.convert(key)
+        router = @client.instance_variable_get(:@router)
+        target_node_key = router.find_node_key_by_key(key, primary: true)
+        redirect_count = ::Middlewares::RedirectCount::Counter.new
+
+        client = new_test_client(
+          middlewares: [
+            ::Middlewares::RedirectReadInject
+          ],
+          custom: {
+            redirect_count: redirect_count,
+            redirect_read_inject: ::Middlewares::RedirectReadInject::Setting.new(
+              slot: slot,
+              to: target_node_key,
+              command: %w[SET tx_redirect_err_key 0],
+              once: true
+            )
+          }
+        )
+
+        err = nil
+        ::Middlewares::RedirectReadInject.with do
+          ::Middlewares::MultiExecOnly.with do
+            err = assert_raises(::RedisClient::Cluster::ErrorCollection) do
+              client.pipelined do |pipeline|
+                pipeline.call('SET', 'decoy_err', 'must-not-appear')
+                pipeline.multi do |multi|
+                  multi.call('SET', key, '0')
+                  multi.call('SET', key, '0', 'too many args')
+                  multi.call('SET', key, '2')
+                end
+              end
+            end
+          end
+        end
+        refute(redirect_count.zero?, redirect_count.get)
+        assert_instance_of(::RedisClient::Cluster::ErrorCollection, err)
+        refute_empty(err.errors)
+        err.errors.each_value do |e|
+          assert_instance_of(::RedisClient::CommandError, e)
+        end
+        assert_nil(client.call('GET', 'decoy_err'))
+        assert_equal('2', client.call('GET', key))
+      ensure
         client&.close
       end
 
@@ -372,28 +422,28 @@ class RedisClient
           }
         )
 
-        Thread.current[:redirect_read_inject_once] = nil
-        ::Middlewares::MultiExecOnly.with do
-          got = client.pipelined(exception: false) do |pipeline|
-            pipeline.call('SET', 'decoy_err', 'must-not-appear')
-            pipeline.multi do |multi|
-              multi.call('SET', key, '0')
-              multi.call('SET', key, '0', 'too many args')
-              multi.call('SET', key, '2')
+        ::Middlewares::RedirectReadInject.with do
+          ::Middlewares::MultiExecOnly.with do
+            got = client.pipelined(exception: false) do |pipeline|
+              pipeline.call('SET', 'decoy_err', 'must-not-appear')
+              pipeline.multi do |multi|
+                multi.call('SET', key, '0')
+                multi.call('SET', key, '0', 'too many args')
+                multi.call('SET', key, '2')
+              end
             end
-          end
 
-          refute(redirect_count.zero?, redirect_count.get)
-          assert_equal(2, got.size)
-          assert_nil(got[0], 'decoy SET is dropped by MultiExecOnly and not sent to Redis')
-          assert_equal('OK', got[1][0])
-          assert_instance_of(::RedisClient::CommandError, got[1][1])
-          assert_equal('OK', got[1][2])
-          assert_nil(client.call('GET', 'decoy_err'))
-          assert_equal('2', client.call('GET', key))
+            refute(redirect_count.zero?, redirect_count.get)
+            assert_equal(2, got.size)
+            assert_nil(got[0], 'decoy SET is dropped by MultiExecOnly and not sent to Redis')
+            assert_equal('OK', got[1][0])
+            assert_instance_of(::RedisClient::CommandError, got[1][1])
+            assert_equal('OK', got[1][2])
+            assert_nil(client.call('GET', 'decoy_err'))
+            assert_equal('2', client.call('GET', key))
+          end
         end
       ensure
-        Thread.current[:redirect_read_inject_once] = nil
         client&.close
       end
 

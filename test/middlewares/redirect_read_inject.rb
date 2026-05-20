@@ -96,8 +96,7 @@ module Middlewares
 
       super
     ensure
-      Thread.current[:redirect_read_inject_context] = nil
-      Thread.current[:redirect_read_inject_registry] = nil
+      ::Middlewares::RedirectReadInject.clear_active_inject_state!
     end
 
     module_function
@@ -107,6 +106,25 @@ module Middlewares
 
       ::RedisClient::RubyConnection.prepend(Injected)
       @installed = true
+    end
+
+    # Resets per-setting MOVED injection tracking. +once+ state persists across
+    # +pipelined+ calls within the block (not cleared per +call_pipelined+).
+    def with
+      install!
+      clear_redirect_counts!
+      yield
+    ensure
+      clear_redirect_counts!
+    end
+
+    def clear_active_inject_state!
+      Thread.current[:redirect_read_inject_context] = nil
+      Thread.current[:redirect_read_inject_registry] = nil
+    end
+
+    def clear_redirect_counts!
+      Thread.current[:redirect_read_inject_once] = nil
     end
 
     def matching_command?(cmd, setting)
