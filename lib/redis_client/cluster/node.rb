@@ -378,7 +378,7 @@ class RedisClient
             config_epoch: fields[6],
             link_state: fields[7],
             slots: slots
-          )
+          ).freeze
         end
       end
 
@@ -398,7 +398,7 @@ class RedisClient
               role: role,
               primary_id: role == 'master' ? EMPTY_STRING : primary_id,
               slots: role == 'master' ? slots : EMPTY_ARRAY
-            )
+            ).freeze
           end
         end
       end
@@ -422,7 +422,7 @@ class RedisClient
               role: role == 'master' ? role : 'slave',
               primary_id: role == 'master' ? EMPTY_STRING : primary_id,
               slots: role == 'master' ? shard.fetch('slots').each_slice(2).to_a.freeze : EMPTY_ARRAY
-            )
+            ).freeze
           end
         end
       end
