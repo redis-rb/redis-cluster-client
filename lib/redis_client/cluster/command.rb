@@ -109,7 +109,7 @@ class RedisClient
               key_step: row[5],
               write?: writable,
               readonly?: row[2].include?('readonly')
-            )
+            ).freeze
           end.freeze || EMPTY_HASH
         end
       end
