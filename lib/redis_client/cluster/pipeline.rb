@@ -23,10 +23,6 @@ class RedisClient
           @outer_indices << index
         end
 
-        def get_inner_index(outer_index)
-          @outer_indices&.find_index(outer_index)
-        end
-
         def get_callee_method(inner_index)
           if @timeouts.is_a?(Array) && !@timeouts[inner_index].nil?
             :blocking_call_v
@@ -66,6 +62,7 @@ class RedisClient
             if result.is_a?(::RedisClient::Error)
               result._set_command(commands[index])
               result._set_config(config)
+              result._set_retry_attempt(@retry_attempt)
 
               if result.is_a?(::RedisClient::CommandError) && result.message.start_with?('MOVED', 'ASK')
                 redirection_indices ||= []
