@@ -53,15 +53,10 @@ class RedisClient
       end
 
       class CharArray
-        BASE = ''
-        PADDING = '0'
-
-        private_constant :BASE, :PADDING
-
         def initialize(size, elements)
           @elements = elements
-          @string = String.new(BASE, encoding: Encoding::BINARY, capacity: size)
-          size.times { @string << PADDING }
+          @string = String.new('', encoding: Encoding::BINARY, capacity: size)
+          size.times { @string << 0xff }
         end
 
         def [](index)
