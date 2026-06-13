@@ -314,7 +314,6 @@ class RedisClient
             e
           ensure
             client.read_timeout = regular_timeout
-            client&.close
           end
         end
 
