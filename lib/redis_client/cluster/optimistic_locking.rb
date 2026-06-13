@@ -2,6 +2,7 @@
 
 require 'redis_client'
 require 'redis_client/cluster/transaction'
+require 'redis_client/cluster/error_identification'
 
 class RedisClient
   class Cluster
