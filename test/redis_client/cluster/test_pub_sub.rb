@@ -81,11 +81,9 @@ class RedisClient
         pubsub = ::RedisClient::Cluster::PubSub.new(router, @command_builder)
         skip_sleep(pubsub)
 
-        max_attempts = ::RedisClient::Cluster::PubSub.const_get(:RECOVERY_MAX_ATTEMPTS, false)
-
         err = assert_raises(::RedisClient::ConnectionError) { pubsub.send(:start_over) }
         assert_equal('boom', err.message)
-        assert_equal(max_attempts, router.calls)
+        assert_equal(10, router.calls)
       end
 
       def test_start_over_raises_for_node_might_be_down_after_exhausting_attempts
@@ -93,14 +91,12 @@ class RedisClient
         pubsub = ::RedisClient::Cluster::PubSub.new(router, @command_builder)
         skip_sleep(pubsub)
 
-        max_attempts = ::RedisClient::Cluster::PubSub.const_get(:RECOVERY_MAX_ATTEMPTS, false)
-
         assert_raises(::RedisClient::Cluster::NodeMightBeDown) { pubsub.send(:start_over) }
-        assert_equal(max_attempts, router.calls)
+        assert_equal(10, router.calls)
       end
 
       def test_start_over_succeeds_after_transient_failure
-        max_attempts = ::RedisClient::Cluster::PubSub.const_get(:RECOVERY_MAX_ATTEMPTS, false)
+        max_attempts = 10
         fail_times = max_attempts - 1
         router = FakeRouter.new(error: ::RedisClient::ConnectionError.new('transient'), fail_times: fail_times)
         pubsub = ::RedisClient::Cluster::PubSub.new(router, @command_builder)
@@ -123,13 +119,10 @@ class RedisClient
         router = FakeRouter.new
         pubsub = ::RedisClient::Cluster::PubSub.new(router, @command_builder)
 
-        base = ::RedisClient::Cluster::PubSub.const_get(:RECOVERY_BASE_INTERVAL, false)
-        max = ::RedisClient::Cluster::PubSub.const_get(:RECOVERY_MAX_INTERVAL, false)
-
-        assert_equal(base, pubsub.send(:recovery_interval, 1))
-        assert_equal(base * 2, pubsub.send(:recovery_interval, 2))
-        assert_equal(base * 4, pubsub.send(:recovery_interval, 3))
-        assert_equal(max, pubsub.send(:recovery_interval, 64))
+        assert_equal(1.0, pubsub.send(:recovery_interval, 1))
+        assert_equal(2.0, pubsub.send(:recovery_interval, 2))
+        assert_equal(4.0, pubsub.send(:recovery_interval, 3))
+        assert_equal(30.0, pubsub.send(:recovery_interval, 6))
       end
 
       def test_subscribe_then_unsubscribe_prunes_commands
