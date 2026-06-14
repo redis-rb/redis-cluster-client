@@ -167,19 +167,20 @@ class RedisClient
         raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
 
         renew_cluster_state
-        retry_count -= 1
+        raise if command.nil? || command.empty?
 
-        if retry_count >= 0
-          # Find the node to use for this command - if this fails for some reason, though, re-use
-          # the old node.
-          begin
-            node = find_node(find_node_key(command)) if command
-          rescue StandardError # rubocop:disable Lint/SuppressedException
-          end
-          retry
+        retry_count -= 1
+        raise if retry_count < 0
+
+        # Find the node to use for this command - if this fails for some reason, though, re-use
+        # the old node.
+        begin
+          node = find_node(find_node_key(command))
+        rescue StandardError
+          raise e
         end
 
-        raise
+        retry
       end
 
       def scan(command, seed: nil) # rubocop:disable Metrics/AbcSize
