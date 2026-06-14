@@ -208,7 +208,6 @@ class RedisClient
       def test_non_pubsub_commands_are_stored
         @pubsub.call('ping')
 
-        assert_equal(0, commands.size)
         assert_empty(commands)
       end
 
