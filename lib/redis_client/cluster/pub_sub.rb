@@ -74,14 +74,14 @@ class RedisClient
       def call(*args, **kwargs)
         command = @command_builder.generate(args, kwargs)
         _call(command)
-        remember(command)
+        remember_subscription(command)
         nil
       end
 
       def call_v(command)
         command = @command_builder.generate(command)
         _call(command)
-        remember(command)
+        remember_subscription(command)
         nil
       end
 
@@ -198,31 +198,34 @@ class RedisClient
         [1.0 * (2**(attempt - 1)), 30.0].min
       end
 
-      def remember(command) # rubocop:disable Metrics/AbcSize
-        if command.first.casecmp('unsubscribe').zero?
+      def remember_subscription(command) # rubocop:disable Metrics/AbcSize
+        if command.first.casecmp('subscribe').zero?
+          @commands << command
+        elsif command.first.casecmp('psubscribe').zero?
+          @commands << command
+        elsif command.first.casecmp('ssubscribe').zero?
+          @commands << command
+        elsif command.first.casecmp('unsubscribe').zero?
           forget_subscriptions('subscribe', command[1, command.size])
         elsif command.first.casecmp('punsubscribe').zero?
           forget_subscriptions('psubscribe', command[1, command.size])
         elsif command.first.casecmp('sunsubscribe').zero?
           forget_subscriptions('ssubscribe', command[1, command.size])
-        else
-          @commands << command
         end
       end
 
       def forget_subscriptions(subscribe_cmd, channels)
-        @commands.reject! { |c| prune_entry(c, subscribe_cmd, channels) }
-      end
+        @commands.map! do |command|
+          next command unless command.first.casecmp(subscribe_cmd).zero?
+          next if channels.nil? || channels.empty?
 
-      def prune_entry(entry, subscribe_cmd, channels)
-        return false unless entry.first.casecmp(subscribe_cmd).zero?
-        return true if channels.nil? || channels.empty?
+          remaining = command[1, command.size] - channels
+          next if remaining.empty?
 
-        remaining = entry[1, entry.size] - channels
-        return true if remaining.empty?
+          [command.first, *remaining]
+        end
 
-        entry.replace([entry.first, *remaining])
-        false
+        @commands.compact!
       end
     end
   end
