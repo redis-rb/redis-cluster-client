@@ -64,14 +64,7 @@ class RedisClient
       RECOVERY_BASE_INTERVAL = Float(ENV.fetch('REDIS_CLIENT_PUBSUB_RECOVERY_INTERVAL_SEC', 1.0))
       RECOVERY_MAX_INTERVAL = Float(ENV.fetch('REDIS_CLIENT_PUBSUB_RECOVERY_MAX_INTERVAL_SEC', 30.0))
       RECOVERY_MAX_ATTEMPTS = Integer(ENV.fetch('REDIS_CLIENT_PUBSUB_RECOVERY_MAX_ATTEMPTS', 10))
-      SUBSCRIBE_COMMANDS = %w[subscribe psubscribe ssubscribe].freeze
-      UNSUBSCRIBE_TO_SUBSCRIBE = {
-        'unsubscribe' => 'subscribe',
-        'punsubscribe' => 'psubscribe',
-        'sunsubscribe' => 'ssubscribe'
-      }.freeze
-      private_constant :BUF_SIZE, :RECOVERY_BASE_INTERVAL, :RECOVERY_MAX_INTERVAL, :RECOVERY_MAX_ATTEMPTS,
-                       :SUBSCRIBE_COMMANDS, :UNSUBSCRIBE_TO_SUBSCRIBE
+      private_constant :BUF_SIZE, :RECOVERY_BASE_INTERVAL, :RECOVERY_MAX_INTERVAL, :RECOVERY_MAX_ATTEMPTS
 
       def initialize(router, command_builder)
         @router = router
@@ -127,35 +120,6 @@ class RedisClient
       end
 
       private
-
-      def remember(command)
-        cmd = command.first.to_s.downcase
-        if SUBSCRIBE_COMMANDS.include?(cmd)
-          @commands << command
-        elsif (subscribe_cmd = UNSUBSCRIBE_TO_SUBSCRIBE[cmd])
-          forget_subscriptions(subscribe_cmd, command[1..])
-        else
-          @commands << command
-        end
-      end
-
-      def forget_subscriptions(subscribe_cmd, channels)
-        if channels.nil? || channels.empty?
-          @commands.reject! { |c| c.first.to_s.casecmp(subscribe_cmd).zero? }
-        else
-          @commands.reject! { |c| prune_entry(c, subscribe_cmd, channels) }
-        end
-      end
-
-      def prune_entry(entry, subscribe_cmd, channels)
-        return false unless entry.first.to_s.casecmp(subscribe_cmd).zero?
-
-        remaining = entry[1..] - channels
-        return true if remaining.empty?
-
-        entry.replace([entry.first, *remaining])
-        false
-      end
 
       def _call(command) # rubocop:disable Metrics/AbcSize
         if command.first.casecmp('subscribe').zero?
@@ -235,6 +199,33 @@ class RedisClient
 
       def recovery_interval(attempt)
         [RECOVERY_BASE_INTERVAL * (2**(attempt - 1)), RECOVERY_MAX_INTERVAL].min
+      end
+
+      def remember(command) # rubocop:disable Metrics/AbcSize
+        if command.first.casecmp('unsubscribe').zero?
+          forget_subscriptions('subscribe', command[1, command.size])
+        elsif command.first.casecmp('punsubscribe').zero?
+          forget_subscriptions('psubscribe', command[1, command.size])
+        elsif command.first.casecmp('sunsubscribe').zero?
+          forget_subscriptions('ssubscribe', command[1, command.size])
+        else
+          @commands << command
+        end
+      end
+
+      def forget_subscriptions(subscribe_cmd, channels)
+        @commands.reject! { |c| prune_entry(c, subscribe_cmd, channels) }
+      end
+
+      def prune_entry(entry, subscribe_cmd, channels)
+        return false unless entry.first.casecmp(subscribe_cmd).zero?
+        return true if channels.nil? || channels.empty?
+
+        remaining = entry[1, entry.size] - channels
+        return true if remaining.empty?
+
+        entry.replace([entry.first, *remaining])
+        false
       end
     end
   end
