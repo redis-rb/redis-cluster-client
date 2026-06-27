@@ -12,6 +12,7 @@ gem 'logger'
 gem 'memory_profiler'
 gem 'minitest'
 gem 'rake'
+gem 'rbs', '4.1.0.pre.2' if RUBY_ENGINE == 'jruby' # FIXME: https://github.com/ruby/rdoc/issues/1746
 gem 'rubocop'
 gem 'rubocop-minitest', require: false
 gem 'rubocop-performance', require: false
