@@ -614,7 +614,7 @@ class RedisClient
 
         assert_equal(%w[127.0.0.1:16384], got.map(&:node_key))
         assert_equal(%w[slave], got.map(&:role))
-        assert(got.all? { |info| info.primary_id.nil? })
+        assert_equal([''], got.map(&:primary_id))
       end
 
       def test_inspect

@@ -403,7 +403,7 @@ class RedisClient
           shard = shard.each_slice(2).to_h if resp2
           nodes = shard.fetch('nodes')
           nodes = nodes.map { |n| n.each_slice(2).to_h } if resp2
-          primary_id = nodes.find { |n| n.fetch('role') == 'master' }&.fetch('id')
+          primary_id = nodes.find { |n| n.fetch('role') == 'master' }&.fetch('id') || EMPTY_STRING
 
           nodes.each do |node|
             host = pick_shard_host(node)
