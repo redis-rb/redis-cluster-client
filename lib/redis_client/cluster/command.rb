@@ -9,15 +9,25 @@ class RedisClient
     class Command
       EMPTY_STRING = ''
       EMPTY_HASH = {}.freeze
+      EMPTY_POLICIES = [nil, nil].freeze
+      REQUEST_POLICY_PREFIX = 'request_policy:'
+      RESPONSE_POLICY_PREFIX = 'response_policy:'
+      SUBCOMMAND_DELIMITER = '|'
 
-      private_constant :EMPTY_HASH
+      private_constant :EMPTY_HASH, :EMPTY_POLICIES, :REQUEST_POLICY_PREFIX,
+                       :RESPONSE_POLICY_PREFIX, :SUBCOMMAND_DELIMITER
 
+      # @see https://redis.io/docs/latest/commands/command/ The reply of the COMMAND command
+      # @see https://redis.io/docs/latest/develop/reference/command-tips/ Command tips
       Spec = Struct.new(
         'RedisCommandSpec',
         :first_key_position,
         :key_step,
         :write?,
         :readonly?,
+        :request_policy,
+        :response_policy,
+        :subcommands,
         keyword_init: true
       ) do
         def extract_first_key(command)
@@ -86,31 +96,76 @@ class RedisClient
 
         private
 
-        def parse_command_reply(rows) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+        def parse_command_reply(rows)
           rows&.each_with_object({}) do |row, acc|
             next if row.first.nil?
 
-            # TODO: in redis 7.0 or later, subcommand information included in the command reply
-
-            pos = case row.first
-                  when 'eval', 'evalsha', 'zinterstore', 'zunionstore' then 3
-                  when 'object', 'xgroup' then 2
-                  when 'migrate', 'xread', 'xreadgroup' then 0
-                  else row[3]
-                  end
-
-            writable = case row.first
-                       when 'xgroup' then true
-                       else row[2].include?('write')
-                       end
-
-            acc[row.first] = ::RedisClient::Cluster::Command::Spec.new(
-              first_key_position: pos,
-              key_step: row[5],
-              write?: writable,
-              readonly?: row[2].include?('readonly')
-            ).freeze
+            acc[row.first] = build_spec(row)
           end.freeze || EMPTY_HASH
+        end
+
+        def build_spec(row)
+          request_policy, response_policy = parse_tips(row[7])
+
+          ::RedisClient::Cluster::Command::Spec.new(
+            first_key_position: parse_first_key_position(row),
+            key_step: row[5],
+            write?: parse_writability(row),
+            readonly?: row[2].include?('readonly'),
+            request_policy: request_policy,
+            response_policy: response_policy,
+            subcommands: parse_subcommands(row[9])
+          ).freeze
+        end
+
+        # The redis 6.2 or earlier doesn't include the information of the subcommands in the reply.
+        # These hard-coded positions are the fallback for such old versions.
+        def parse_first_key_position(row)
+          case row.first
+          when 'eval', 'evalsha', 'zinterstore', 'zunionstore' then 3
+          when 'object', 'xgroup' then 2
+          when 'migrate', 'xread', 'xreadgroup' then 0
+          else row[3]
+          end
+        end
+
+        def parse_writability(row)
+          case row.first
+          when 'xgroup' then true
+          else row[2].include?('write')
+          end
+        end
+
+        # The command tips are available in the redis 7.0 or later.
+        def parse_tips(tips)
+          return EMPTY_POLICIES if tips.nil? || tips.empty?
+
+          request_policy = response_policy = nil
+
+          tips.each do |tip|
+            if tip.start_with?(REQUEST_POLICY_PREFIX)
+              request_policy = -tip[REQUEST_POLICY_PREFIX.size..]
+            elsif tip.start_with?(RESPONSE_POLICY_PREFIX)
+              response_policy = -tip[RESPONSE_POLICY_PREFIX.size..]
+            end
+          end
+
+          [request_policy, response_policy]
+        end
+
+        # The information of the subcommands is available in the redis 7.0 or later.
+        # A container command such as XINFO reports its key positions per subcommand.
+        def parse_subcommands(rows)
+          return if rows.nil? || rows.empty?
+
+          rows.each_with_object({}) do |row, acc|
+            name = row.first
+            next if name.nil?
+
+            # The server replies with a full name of the subcommand such as `xinfo|stream`.
+            i = name.index(SUBCOMMAND_DELIMITER)
+            acc[i.nil? ? name : name[(i + 1)..]] = build_spec(row)
+          end.freeze
         end
       end
 
@@ -118,8 +173,15 @@ class RedisClient
         @commands = commands || EMPTY_HASH
       end
 
-      def get_spec(name)
-        @commands[name] || @commands[name.to_s.downcase(:ascii)]
+      def get_spec(command) # rubocop:disable Metrics/AbcSize
+        name = command.first
+        spec = @commands[name] || @commands[name.to_s.downcase(:ascii)]
+        return spec if spec.nil? || spec.subcommands.nil?
+
+        subcommand = command[1]
+        return spec if subcommand.nil?
+
+        spec.subcommands[subcommand] || spec.subcommands[subcommand.to_s.downcase(:ascii)] || spec
       end
 
       def exists?(name)

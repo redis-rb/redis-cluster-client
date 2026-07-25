@@ -141,6 +141,16 @@ class RedisClient
         call_multiple_nodes!(@topology.replica_clients, method, command, args, &block)
       end
 
+      # for the `response_policy:one_succeeded` command tip
+      def call_all_leniently(method, command, args, &block)
+        call_multiple_nodes_leniently(@topology.clients, method, command, args, &block)
+      end
+
+      # for the `response_policy:one_succeeded` command tip
+      def call_primaries_leniently(method, command, args, &block)
+        call_multiple_nodes_leniently(@topology.primary_clients, method, command, args, &block)
+      end
+
       def send_ping(method, command, args, &block)
         result_values, errors = call_multiple_nodes(@topology.clients, method, command, args, &block)
         return result_values if errors.nil? || errors.empty?
@@ -261,6 +271,13 @@ class RedisClient
       def call_multiple_nodes!(clients, method, command, args, &block)
         result_values, errors = call_multiple_nodes(clients, method, command, args, &block)
         return result_values if errors.nil? || errors.empty?
+
+        raise ::RedisClient::Cluster::ErrorCollection.with_errors(errors)
+      end
+
+      def call_multiple_nodes_leniently(clients, method, command, args, &block)
+        result_values, errors = call_multiple_nodes(clients, method, command, args, &block)
+        return result_values unless result_values.nil? || result_values.empty?
 
         raise ::RedisClient::Cluster::ErrorCollection.with_errors(errors)
       end

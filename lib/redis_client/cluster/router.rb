@@ -17,38 +17,39 @@ class RedisClient
     class Router
       ZERO_CURSOR_FOR_SCAN = '0'
       TSF = ->(f, x) { f.nil? ? x : f.call(x) }.curry
+      RoutingAction = Struct.new('RedisCommandRoutingAction', :method_name, :reply_transformer, keyword_init: true)
+      PICK_FIRST = ->(reply) { reply.first } # rubocop:disable Style/SymbolProc
+      FLATTEN_STRINGS = ->(reply) { reply.flatten.sort_by(&:to_s) }
+      SUM_NUM = ->(reply) { reply.select { |e| e.is_a?(Integer) }.sum }
+      SORT_NUMBERS = ->(reply) { reply.sort_by(&:to_i) }
+      if Object.const_defined?(:Ractor, false) && Ractor.respond_to?(:make_shareable)
+        Ractor.make_shareable(PICK_FIRST)
+        Ractor.make_shareable(FLATTEN_STRINGS)
+        Ractor.make_shareable(SUM_NUM)
+        Ractor.make_shareable(SORT_NUMBERS)
+      end
       DEDICATED_ACTIONS = lambda do # rubocop:disable Metrics/BlockLength
-        action = Struct.new('RedisCommandRoutingAction', :method_name, :reply_transformer, keyword_init: true)
-        pick_first = ->(reply) { reply.first } # rubocop:disable Style/SymbolProc
-        flatten_strings = ->(reply) { reply.flatten.sort_by(&:to_s) }
-        sum_num = ->(reply) { reply.select { |e| e.is_a?(Integer) }.sum }
-        sort_numbers = ->(reply) { reply.sort_by(&:to_i) }
-        if Object.const_defined?(:Ractor, false) && Ractor.respond_to?(:make_shareable)
-          Ractor.make_shareable(pick_first)
-          Ractor.make_shareable(flatten_strings)
-          Ractor.make_shareable(sum_num)
-          Ractor.make_shareable(sort_numbers)
-        end
-        multiple_key_action = action.new(method_name: :send_multiple_keys_command)
-        all_node_first_action = action.new(method_name: :send_command_to_all_nodes, reply_transformer: pick_first)
-        primary_first_action = action.new(method_name: :send_command_to_primaries, reply_transformer: pick_first)
-        not_supported_action = action.new(method_name: :fail_not_supported_command)
-        keyless_action = action.new(method_name: :fail_keyless_command)
+        multiple_key_action = RoutingAction.new(method_name: :send_multiple_keys_command)
+        all_node_first_action = RoutingAction.new(method_name: :send_command_to_all_nodes, reply_transformer: PICK_FIRST)
+        primary_first_action = RoutingAction.new(method_name: :send_command_to_primaries, reply_transformer: PICK_FIRST)
+        not_supported_action = RoutingAction.new(method_name: :fail_not_supported_command)
+        keyless_action = RoutingAction.new(method_name: :fail_keyless_command)
+        single_node_action = RoutingAction.new(method_name: :assign_node_and_send_command)
         {
-          'ping' => action.new(method_name: :send_ping_command, reply_transformer: pick_first),
-          'wait' => action.new(method_name: :send_wait_command),
-          'keys' => action.new(method_name: :send_command_to_replicas, reply_transformer: flatten_strings),
-          'dbsize' => action.new(method_name: :send_command_to_replicas, reply_transformer: sum_num),
-          'scan' => action.new(method_name: :send_scan_command),
-          'lastsave' => action.new(method_name: :send_command_to_all_nodes, reply_transformer: sort_numbers),
-          'role' => action.new(method_name: :send_command_to_all_nodes),
-          'config' => action.new(method_name: :send_config_command),
-          'client' => action.new(method_name: :send_client_command),
-          'cluster' => action.new(method_name: :send_cluster_command),
-          'memory' => action.new(method_name: :send_memory_command),
-          'script' => action.new(method_name: :send_script_command),
-          'pubsub' => action.new(method_name: :send_pubsub_command),
-          'watch' => action.new(method_name: :send_watch_command),
+          'ping' => RoutingAction.new(method_name: :send_ping_command, reply_transformer: PICK_FIRST),
+          'wait' => RoutingAction.new(method_name: :send_wait_command),
+          'keys' => RoutingAction.new(method_name: :send_command_to_replicas, reply_transformer: FLATTEN_STRINGS),
+          'dbsize' => RoutingAction.new(method_name: :send_command_to_replicas, reply_transformer: SUM_NUM),
+          'scan' => RoutingAction.new(method_name: :send_scan_command),
+          'lastsave' => RoutingAction.new(method_name: :send_command_to_all_nodes, reply_transformer: SORT_NUMBERS),
+          'role' => RoutingAction.new(method_name: :send_command_to_all_nodes),
+          'config' => RoutingAction.new(method_name: :send_config_command),
+          'client' => RoutingAction.new(method_name: :send_client_command),
+          'cluster' => RoutingAction.new(method_name: :send_cluster_command),
+          'memory' => RoutingAction.new(method_name: :send_memory_command),
+          'script' => RoutingAction.new(method_name: :send_script_command),
+          'pubsub' => RoutingAction.new(method_name: :send_pubsub_command),
+          'watch' => RoutingAction.new(method_name: :send_watch_command),
           'mget' => multiple_key_action,
           'mset' => multiple_key_action,
           'del' => multiple_key_action,
@@ -61,6 +62,10 @@ class RedisClient
           'select' => all_node_first_action,
           'flushall' => primary_first_action,
           'flushdb' => primary_first_action,
+          # The redis 7.0 tags RANDOMKEY with `request_policy:all_shards` but without any response policy.
+          # It was corrected to `response_policy:special` in the redis 7.2.
+          # This entry keeps the historical single node routing for the redis 7.0.
+          'randomkey' => single_node_action,
           'readonly' => not_supported_action,
           'readwrite' => not_supported_action,
           'shutdown' => not_supported_action,
@@ -74,7 +79,33 @@ class RedisClient
         end
       end.call.freeze
 
-      private_constant :ZERO_CURSOR_FOR_SCAN, :TSF, :DEDICATED_ACTIONS
+      # The routing which the command tips of the COMMAND command reply instruct.
+      # The `multi_shard` and the `special` request policies are out of scope.
+      # The `special` response policy is also out of scope because the aggregation is undefined,
+      # and the fan-out would change the return value of commands such as INFO.
+      # The `agg_min`, `agg_max` and `agg_logical_*` response policies are out of scope too:
+      # the only reachable command with them today is WAITAOF, whose reply is an array,
+      # and the aggregation of array replies is undefined. Such a command falls back to
+      # the single node routing until a command with a settled semantics appears.
+      # The entries of the DEDICATED_ACTIONS take precedence over these to keep the existing behavior.
+      # @see https://redis.io/docs/latest/develop/reference/command-tips/
+      POLICY_ACTIONS = {
+        'all_shards' => {
+          nil => RoutingAction.new(method_name: :send_command_to_primaries).freeze,
+          'all_succeeded' => RoutingAction.new(method_name: :send_command_to_primaries, reply_transformer: PICK_FIRST).freeze,
+          'one_succeeded' => RoutingAction.new(method_name: :send_command_to_primaries_leniently, reply_transformer: PICK_FIRST).freeze,
+          'agg_sum' => RoutingAction.new(method_name: :send_command_to_primaries, reply_transformer: SUM_NUM).freeze
+        }.freeze,
+        'all_nodes' => {
+          nil => RoutingAction.new(method_name: :send_command_to_all_nodes).freeze,
+          'all_succeeded' => RoutingAction.new(method_name: :send_command_to_all_nodes, reply_transformer: PICK_FIRST).freeze,
+          'one_succeeded' => RoutingAction.new(method_name: :send_command_to_all_nodes_leniently, reply_transformer: PICK_FIRST).freeze,
+          'agg_sum' => RoutingAction.new(method_name: :send_command_to_all_nodes, reply_transformer: SUM_NUM).freeze
+        }.freeze
+      }.freeze
+
+      private_constant :ZERO_CURSOR_FOR_SCAN, :TSF, :RoutingAction, :PICK_FIRST, :FLATTEN_STRINGS,
+                       :SUM_NUM, :SORT_NUMBERS, :DEDICATED_ACTIONS, :POLICY_ACTIONS
 
       attr_reader :config
 
@@ -94,7 +125,12 @@ class RedisClient
 
       def send_command(method, command, *args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         action = DEDICATED_ACTIONS[command.first]
-        return assign_node_and_send_command(method, command, args, &block) if action.nil?
+        if action.nil?
+          cmd_spec = @command.get_spec(command)
+          action = find_policy_action(cmd_spec)
+          return assign_node_and_send_command(method, command, args, cmd_spec: cmd_spec, &block) if action.nil?
+        end
+
         return send(action.method_name, method, command, args, &block) if action.reply_transformer.nil?
 
         reply = send(action.method_name, method, command, args)
@@ -124,8 +160,8 @@ class RedisClient
       end
 
       # @see https://redis.io/docs/reference/cluster-spec/#redirection-and-resharding Redirection and resharding
-      def assign_node_and_send_command(method, command, args, retry_count: 3, &block)
-        node = assign_node(command)
+      def assign_node_and_send_command(method, command, args, retry_count: 3, cmd_spec: nil, &block)
+        node = assign_node(command, cmd_spec: cmd_spec)
         send_command_to_node(node, method, command, args, retry_count: retry_count, &block)
       end
 
@@ -218,9 +254,9 @@ class RedisClient
         end
       end
 
-      def assign_node(command)
+      def assign_node(command, cmd_spec: nil)
         handle_node_reload_error do
-          node_key = find_node_key(command)
+          node_key = find_node_key(command, cmd_spec: cmd_spec)
           @node.find_by(node_key)
         end
       end
@@ -246,8 +282,8 @@ class RedisClient
         end
       end
 
-      def find_node_key(command, seed: nil)
-        cmd_spec = @command.get_spec(command.first)
+      def find_node_key(command, seed: nil, cmd_spec: nil)
+        cmd_spec = @command.get_spec(command) if cmd_spec.nil?
         find_node_key_by_key(
           cmd_spec&.extract_first_key(command),
           seed: seed,
@@ -256,14 +292,14 @@ class RedisClient
       end
 
       def find_primary_node_key(command)
-        key = @command.get_spec(command.first)&.extract_first_key(command)
+        key = @command.get_spec(command)&.extract_first_key(command)
         return unless key&.size&.> 0
 
         find_node_key_by_key(key, primary: true)
       end
 
       def find_slot(command)
-        find_slot_by_key(@command.get_spec(command.first)&.extract_first_key(command))
+        find_slot_by_key(@command.get_spec(command)&.extract_first_key(command))
       end
 
       def find_slot_by_key(key)
@@ -308,12 +344,29 @@ class RedisClient
 
       private
 
+      def find_policy_action(cmd_spec)
+        return if cmd_spec.nil?
+
+        request_policy = cmd_spec.request_policy
+        return if request_policy.nil?
+
+        POLICY_ACTIONS.dig(request_policy, cmd_spec.response_policy)
+      end
+
       def send_command_to_all_nodes(method, command, args, &block)
         @node.call_all(method, command, args, &block)
       end
 
       def send_command_to_primaries(method, command, args, &block)
         @node.call_primaries(method, command, args, &block)
+      end
+
+      def send_command_to_all_nodes_leniently(method, command, args, &block)
+        @node.call_all_leniently(method, command, args, &block)
+      end
+
+      def send_command_to_primaries_leniently(method, command, args, &block)
+        @node.call_primaries_leniently(method, command, args, &block)
       end
 
       def send_command_to_replicas(method, command, args, &block)

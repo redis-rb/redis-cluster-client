@@ -138,6 +138,29 @@ The `#multi` method supports the transaction feature but you should use a hashta
 The `#pubsub` method supports sharded subscriptions.
 Every interface handles redirections and resharding states internally.
 
+## Command routing
+This gem calls the [COMMAND](https://redis.io/commands/command) command on startup and decides
+which node each command should be sent to according to the reply.
+
+* The key positions of the subcommands of a container command such as `XINFO STREAM` are used
+  if the server reports them. It's available in the Redis 7.0 or later.
+* The [command tips](https://redis.io/docs/latest/develop/reference/command-tips/) are used
+  if the server reports them. It's available in the Redis 7.0 or later.
+  A command with `request_policy:all_shards` is sent to every primary node,
+  and a command with `request_policy:all_nodes` is sent to every node.
+  The replies are aggregated according to the `response_policy` tip.
+  It means that a newly added command such as `FUNCTION LOAD` is routed correctly
+  without waiting for a new release of this gem.
+
+The following cases fall back to the built-in table of this gem:
+
+* The Redis 6.2 or earlier which doesn't report the above information.
+* The commands which this gem handles in its own way such as `SCAN`, `KEYS` and `CLUSTER`.
+* The `request_policy:multi_shard` and the `request_policy:special` tips.
+* The `response_policy:special` tip. Such a command is sent to a single node as before
+  because the aggregation of the replies is undefined.
+  For example, `INFO` still returns the reply of a single node.
+
 ## Multiple keys and CROSSSLOT error
 A subset of commands can be passed multiple keys.
 In cluster mode, these commands have a constraint that passed keys should belong to the same slot
