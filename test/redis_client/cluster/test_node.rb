@@ -592,6 +592,31 @@ class RedisClient
         assert_equal(['10.0.0.1:6379'], got.map(&:node_key))
       end
 
+      def test_parse_cluster_shards_reply_without_master
+        reply = [
+          [
+            'slots', [],
+            'nodes', [
+              [
+                'id', 'beeb7f1c33cde531e290c32c830f2401ab1b8dea',
+                'port', 16_384,
+                'ip', '127.0.0.1',
+                'endpoint', '127.0.0.1',
+                'role', 'replica',
+                'replication-offset', 642_515,
+                'health', 'online'
+              ]
+            ]
+          ]
+        ]
+
+        got = @test_node.send(:parse_cluster_shards_reply, reply)
+
+        assert_equal(%w[127.0.0.1:16384], got.map(&:node_key))
+        assert_equal(%w[slave], got.map(&:role))
+        assert_equal([''], got.map(&:primary_id))
+      end
+
       def test_inspect
         assert_match(/^#<RedisClient::Cluster::Node [0-9., :]*>$/, @test_node.inspect)
       end
