@@ -26,7 +26,7 @@ class RedisClient
         pos = node_key.rindex(DELIMITER, -1)
         return [node_key, nil] if pos.nil?
 
-        [node_key[0, pos], node_key[(pos + 1)..]]
+        [node_key[0, pos], node_key[pos + 1, node_key.size]]
       end
 
       def split_bracketed(node_key)
@@ -36,7 +36,7 @@ class RedisClient
         return nil if end_bracket.nil?
 
         host = node_key[1, end_bracket - 1]
-        remainder = node_key[(end_bracket + 1)..]
+        remainder = node_key[end_bracket + 1, node_key.size]
         port = remainder.start_with?(DELIMITER) ? remainder[1..] : nil
         [host, port]
       end

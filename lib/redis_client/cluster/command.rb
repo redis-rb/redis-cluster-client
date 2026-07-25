@@ -144,9 +144,9 @@ class RedisClient
 
           tips.each do |tip|
             if tip.start_with?(REQUEST_POLICY_PREFIX)
-              request_policy = -tip[REQUEST_POLICY_PREFIX.size..]
+              request_policy = -tip.delete_prefix(REQUEST_POLICY_PREFIX)
             elsif tip.start_with?(RESPONSE_POLICY_PREFIX)
-              response_policy = -tip[RESPONSE_POLICY_PREFIX.size..]
+              response_policy = -tip.delete_prefix(RESPONSE_POLICY_PREFIX)
             end
           end
 
@@ -164,7 +164,7 @@ class RedisClient
 
             # The server replies with a full name of the subcommand such as `xinfo|stream`.
             i = name.index(SUBCOMMAND_DELIMITER)
-            acc[i.nil? ? name : name[(i + 1)..]] = build_spec(row)
+            acc[i.nil? ? name : name[i + 1, name.size]] = build_spec(row)
           end.freeze
         end
       end
