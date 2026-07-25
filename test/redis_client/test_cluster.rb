@@ -750,6 +750,64 @@ class RedisClient
         assert_equal('data2', got2.fetch('{stream}1')[0][1][1])
       end
 
+      def test_container_command_routing
+        skip('The key specs of the subcommands are available in the redis 7.0 or later.') if TEST_REDIS_MAJOR_VERSION < 7
+
+        @client.call('xadd', 'mystream', '*', 'message', 'foo')
+        wait_for_replication
+        @captured_commands.clear
+
+        # The router should be able to resolve the key of a container command.
+        router = @client.instance_variable_get(:@router)
+
+        refute_nil(router.find_primary_node_key(%w[XINFO STREAM mystream]))
+
+        got = @client.call('XINFO', 'STREAM', 'mystream')
+        got = got.each_slice(2).to_h if got.is_a?(Array)
+
+        assert_equal(1, got.fetch('length'))
+        assert_equal(1, @captured_commands.count('xinfo', 'stream'))
+
+        # A container command should be able to pin the node of a transaction.
+        got = @client.multi { |tx| tx.call('XINFO', 'STREAM', 'mystream') }.first
+        got = got.each_slice(2).to_h if got.is_a?(Array)
+
+        assert_equal(1, got.fetch('length'))
+      end
+
+      def test_command_tips_request_policy
+        skip('The command tips are available in the redis 7.0 or later.') if TEST_REDIS_MAJOR_VERSION < 7
+
+        lua = "#!lua name=mylib\nredis.register_function('myfunc', function(keys, args) return 1 end)"
+        @captured_commands.clear
+
+        # FUNCTION LOAD is tagged with `request_policy:all_shards` and `response_policy:all_succeeded`.
+        assert_equal('mylib', @client.call('FUNCTION', 'LOAD', 'REPLACE', lua))
+
+        loaded = @captured_commands.to_a.select { |e| e.command.first.casecmp('function').zero? }
+
+        assert_equal(TEST_SHARD_SIZE, loaded.size)
+        assert_equal(TEST_SHARD_SIZE, loaded.map(&:server_url).uniq.size)
+
+        # The library should be available on every shard.
+        assert_equal(TEST_SHARD_SIZE, count_primaries_having_functions)
+      ensure
+        @client&.call('FUNCTION', 'FLUSH') if TEST_REDIS_MAJOR_VERSION >= 7
+      end
+
+      def test_command_tips_special_response_policy_is_ignored
+        # The commands with `response_policy:special` are sent to a single node as before
+        # because the aggregation of the replies is undefined.
+        @captured_commands.clear
+
+        assert_instance_of(String, @client.call('INFO'))
+        assert_equal(1, @captured_commands.count('info'))
+
+        @captured_commands.clear
+        refute_instance_of(Array, @client.call('RANDOMKEY'))
+        assert_equal(1, @captured_commands.count('randomkey'))
+      end
+
       def test_dedicated_multiple_keys_command
         [
           { command: %w[MSET key1 val1], want: 'OK', wait: true },
@@ -933,6 +991,17 @@ class RedisClient
       end
 
       private
+
+      def count_primaries_having_functions
+        TEST_NODE_URIS.count do |uri|
+          raw = ::RedisClient.config(url: uri, **TEST_GENERIC_OPTIONS).new_client
+          begin
+            raw.call('INFO', 'replication').include?('role:master') && !raw.call('FUNCTION', 'LIST').empty?
+          ensure
+            raw.close
+          end
+        end
+      end
 
       def wait_for_replication
         client_side_timeout = TEST_TIMEOUT_SEC + 1.0
