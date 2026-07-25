@@ -89,24 +89,20 @@ class RedisClient
       # the single node routing until a command with a settled semantics appears.
       # The entries of the DEDICATED_ACTIONS take precedence over these to keep the existing behavior.
       # @see https://redis.io/docs/latest/develop/reference/command-tips/
-      POLICY_ACTIONS = lambda do
-        transformers = {
-          nil => nil,
-          'all_succeeded' => PICK_FIRST,
-          'one_succeeded' => PICK_FIRST,
-          'agg_sum' => SUM_NUM
+      POLICY_ACTIONS = {
+        'all_shards' => {
+          nil => RoutingAction.new(method_name: :send_command_to_primaries).freeze,
+          'all_succeeded' => RoutingAction.new(method_name: :send_command_to_primaries, reply_transformer: PICK_FIRST).freeze,
+          'one_succeeded' => RoutingAction.new(method_name: :send_command_to_primaries_leniently, reply_transformer: PICK_FIRST).freeze,
+          'agg_sum' => RoutingAction.new(method_name: :send_command_to_primaries, reply_transformer: SUM_NUM).freeze
+        }.freeze,
+        'all_nodes' => {
+          nil => RoutingAction.new(method_name: :send_command_to_all_nodes).freeze,
+          'all_succeeded' => RoutingAction.new(method_name: :send_command_to_all_nodes, reply_transformer: PICK_FIRST).freeze,
+          'one_succeeded' => RoutingAction.new(method_name: :send_command_to_all_nodes_leniently, reply_transformer: PICK_FIRST).freeze,
+          'agg_sum' => RoutingAction.new(method_name: :send_command_to_all_nodes, reply_transformer: SUM_NUM).freeze
         }.freeze
-
-        {
-          'all_shards' => %i[send_command_to_primaries send_command_to_primaries_leniently],
-          'all_nodes' => %i[send_command_to_all_nodes send_command_to_all_nodes_leniently]
-        }.each_with_object({}) do |(request_policy, (strictly, leniently)), acc|
-          acc[request_policy] = transformers.each_with_object({}) do |(response_policy, transformer), specified|
-            method_name = response_policy == 'one_succeeded' ? leniently : strictly
-            specified[response_policy] = RoutingAction.new(method_name: method_name, reply_transformer: transformer).freeze
-          end.freeze
-        end
-      end.call.freeze
+      }.freeze
 
       private_constant :ZERO_CURSOR_FOR_SCAN, :TSF, :RoutingAction, :PICK_FIRST, :FLATTEN_STRINGS,
                        :SUM_NUM, :SORT_NUMBERS, :DEDICATED_ACTIONS, :POLICY_ACTIONS
