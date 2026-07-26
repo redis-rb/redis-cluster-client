@@ -138,6 +138,9 @@ The `#multi` method supports the transaction feature but you should use a hashta
 The `#pubsub` method supports sharded subscriptions.
 Every interface handles redirections and resharding states internally.
 
+This gem is aimed to keep the compatibility with the public API of [redis-client](https://github.com/redis-rb/redis-client).
+Hence, there is no plan to add its own public methods beyond the above for the time being.
+
 ## Command routing
 This gem calls the [COMMAND](https://redis.io/commands/command) command on startup and decides
 which node each command should be sent to according to the reply.
