@@ -9,12 +9,11 @@ class RedisClient
     class Command
       EMPTY_STRING = ''
       EMPTY_HASH = {}.freeze
-      EMPTY_POLICIES = [nil, nil].freeze
       REQUEST_POLICY_PREFIX = 'request_policy:'
       RESPONSE_POLICY_PREFIX = 'response_policy:'
       SUBCOMMAND_DELIMITER = '|'
 
-      private_constant :EMPTY_HASH, :EMPTY_POLICIES, :REQUEST_POLICY_PREFIX,
+      private_constant :EMPTY_HASH, :REQUEST_POLICY_PREFIX,
                        :RESPONSE_POLICY_PREFIX, :SUBCOMMAND_DELIMITER
 
       # @see https://redis.io/docs/latest/commands/command/ The reply of the COMMAND command
@@ -105,15 +104,13 @@ class RedisClient
         end
 
         def build_spec(row)
-          request_policy, response_policy = parse_tips(row[7])
-
           ::RedisClient::Cluster::Command::Spec.new(
             first_key_position: parse_first_key_position(row),
             key_step: row[5],
             write?: parse_writability(row),
             readonly?: row[2].include?('readonly'),
-            request_policy: request_policy,
-            response_policy: response_policy,
+            request_policy: parse_policy_tip(row[7], REQUEST_POLICY_PREFIX),
+            response_policy: parse_policy_tip(row[7], RESPONSE_POLICY_PREFIX),
             subcommands: parse_subcommands(row[9])
           ).freeze
         end
@@ -137,20 +134,10 @@ class RedisClient
         end
 
         # The command tips are available in the redis 7.0 or later.
-        def parse_tips(tips)
-          return EMPTY_POLICIES if tips.nil? || tips.empty?
-
-          request_policy = response_policy = nil
-
-          tips.each do |tip|
-            if tip.start_with?(REQUEST_POLICY_PREFIX)
-              request_policy = -tip.delete_prefix(REQUEST_POLICY_PREFIX)
-            elsif tip.start_with?(RESPONSE_POLICY_PREFIX)
-              response_policy = -tip.delete_prefix(RESPONSE_POLICY_PREFIX)
-            end
-          end
-
-          [request_policy, response_policy]
+        # It returns a single value instead of a pair to avoid the allocation of the array.
+        def parse_policy_tip(tips, prefix)
+          tip = tips&.find { |t| t.start_with?(prefix) }
+          tip.nil? ? nil : -tip.delete_prefix(prefix)
         end
 
         # The information of the subcommands is available in the redis 7.0 or later.
