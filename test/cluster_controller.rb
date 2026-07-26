@@ -66,6 +66,8 @@ class ClusterController
     wait_cluster_building(@clients, max_attempts: @max_attempts)
     print_debug('wait for the replication to be established...')
     wait_replication(@clients, number_of_replicas: @number_of_replicas, max_attempts: @max_attempts)
+    print_debug('wait for the replicas to be recognized as online...')
+    wait_replication_health(@clients, max_attempts: @max_attempts)
     print_debug('wait for commands to be accepted...')
     wait_cluster_recovering(@clients, max_attempts: @max_attempts, skip_clients: skip_clients)
   end
@@ -81,6 +83,7 @@ class ClusterController
     save_config(@clients)
     wait_cluster_building(@clients, max_attempts: @max_attempts)
     wait_replication(@clients, number_of_replicas: @number_of_replicas, max_attempts: @max_attempts)
+    wait_replication_health(@clients, max_attempts: @max_attempts)
     wait_cluster_recovering(@clients, max_attempts: @max_attempts)
   end
 
@@ -382,6 +385,33 @@ class ClusterController
       rows.count(&:replica?) == number_of_replicas
     rescue ::RedisClient::ConnectionError
       true
+    end
+  end
+
+  # The client library trusts the health field of the CLUSTER SHARDS reply and excludes non-online nodes
+  # from the topology. Right after a cluster is built, replicas are reported as loading until the queried
+  # node learns their replication offsets via gossip, and each node converges at a different time.
+  # Tests expecting replicas flake unless we wait for every node's view to be settled.
+  def wait_replication_health(clients, max_attempts:)
+    wait_for_state(clients, max_attempts: max_attempts) do |client|
+      healths = fetch_cluster_shard_node_healths(client)
+      print_debug("#{client.config.host}:#{client.config.port} ... #{healths.tally}")
+      healths.none? { |health| health == 'loading' }
+    rescue ::RedisClient::CommandError => e
+      raise unless e.message.start_with?('ERR Unknown subcommand')
+
+      true
+    rescue ::RedisClient::ConnectionError
+      true
+    end
+  end
+
+  def fetch_cluster_shard_node_healths(client)
+    client.call_once('CLUSTER', 'SHARDS').flat_map do |shard|
+      shard = shard.each_slice(2).to_h if shard.is_a?(Array)
+      nodes = shard.fetch('nodes')
+      nodes = nodes.map { |node| node.each_slice(2).to_h } unless nodes.first.is_a?(Hash)
+      nodes.map { |node| node.fetch('health') }
     end
   end
 
