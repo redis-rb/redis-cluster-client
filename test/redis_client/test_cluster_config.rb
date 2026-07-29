@@ -140,6 +140,68 @@ class RedisClient
       end
     end
 
+    def test_command_routings
+      [
+        { value: nil, name: 'ping', want: :send_ping_command },
+        { value: {}, name: 'ping', want: :send_ping_command },
+        { value: { 'echo' => { request_policy: 'all_shards' } }, name: 'echo', want: :send_command_to_primaries },
+        { value: { 'echo' => { request_policy: 'all_nodes' } }, name: 'echo', want: :send_command_to_all_nodes },
+        { value: { 'echo' => { request_policy: :all_shards } }, name: 'echo', want: :send_command_to_primaries },
+        { value: { echo: { 'request_policy' => 'all_shards' } }, name: 'echo', want: :send_command_to_primaries },
+        { value: { 'ECHO' => { request_policy: 'all_shards' } }, name: 'echo', want: :send_command_to_primaries },
+        { value: { 'echo' => { request_policy: 'all_shards', response_policy: 'all_succeeded' } }, name: 'echo', want: :send_command_to_primaries },
+        { value: { 'echo' => { request_policy: 'all_shards', response_policy: 'one_succeeded' } }, name: 'echo', want: :send_command_to_primaries_leniently },
+        { value: { 'echo' => { request_policy: 'all_nodes', response_policy: 'one_succeeded' } }, name: 'echo', want: :send_command_to_all_nodes_leniently },
+        { value: { 'ping' => { request_policy: 'all_shards' } }, name: 'ping', want: :send_command_to_primaries },
+        { value: { 'keys' => {} }, name: 'keys', want: :assign_node_and_send_command },
+        { value: { 'echo' => { request_policy: 'all_over' } }, error: true },
+        { value: { 'echo' => { request_policy: 'multi_shard' } }, error: true },
+        { value: { 'echo' => { request_policy: 'all_shards', response_policy: 'special' } }, error: true },
+        { value: { 'echo' => { response_policy: 'agg_sum' } }, error: true },
+        { value: { 'echo' => { request_policy: 'all_shards', foo: true } }, error: true },
+        { value: { 'echo' => 'all_shards' }, error: true },
+        { value: { 'echo' => nil }, error: true },
+        { value: { 'multi' => { request_policy: 'all_shards' } }, error: true },
+        { value: { 'watch' => {} }, error: true },
+        { value: { 'SUBSCRIBE' => {} }, error: true },
+        { value: { 'config get' => { request_policy: 'all_shards' } }, error: true },
+        { value: { '' => {} }, error: true },
+        { value: { 123 => {} }, error: true },
+        { value: [], error: true },
+        { value: 'all_shards', error: true }
+      ].each_with_index do |c, idx|
+        msg = "Case: #{idx}: #{c}"
+        got = -> { ::RedisClient::ClusterConfig.new(command_routings: c[:value]).routing_table }
+        if c.key?(:error)
+          assert_raises(::RedisClient::ClusterConfig::InvalidClientConfigError, msg, &got)
+        else
+          table = got.call
+          assert_predicate(table, :frozen?, msg)
+          assert_equal(c[:want], table[c[:name]].method_name, msg)
+          assert_same(table[c[:name]], table[c[:name].upcase], msg)
+          assert_equal(:send_command_to_replicas, table['dbsize'].method_name, msg)
+        end
+      end
+
+      # The table object is shared unless the option is given.
+      assert_same(
+        ::RedisClient::ClusterConfig.new.routing_table,
+        ::RedisClient::ClusterConfig.new(command_routings: nil).routing_table
+      )
+
+      # The response policy decides the aggregation of the replies of the nodes.
+      table = ::RedisClient::ClusterConfig.new(
+        command_routings: {
+          'echo' => { request_policy: 'all_shards', response_policy: 'agg_sum' },
+          'time' => { request_policy: 'all_nodes', response_policy: 'all_succeeded' },
+          'lolwut' => { request_policy: 'all_shards' }
+        }
+      ).routing_table
+      assert_equal(3, table['echo'].reply_transformer.call([1, 2, 'x']))
+      assert_equal('a', table['time'].reply_transformer.call(%w[a b]))
+      assert_nil(table['lolwut'].reply_transformer)
+    end
+
     def test_build_node_configs
       config = ::RedisClient::ClusterConfig.new
       [

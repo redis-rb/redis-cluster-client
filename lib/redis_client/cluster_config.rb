@@ -6,6 +6,7 @@ require 'redis_client/cluster'
 require 'redis_client/cluster/errors'
 require 'redis_client/cluster/node_key'
 require 'redis_client/cluster/noop_command_builder'
+require 'redis_client/cluster/router/routing_table'
 require 'redis_client/command_builder'
 
 class RedisClient
@@ -39,9 +40,9 @@ class RedisClient
     private_constant :SENSITIVE_INSPECT_KEYS, :INSPECT_REDACTED_KEYS, :INSPECT_PLACEHOLDER
 
     attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout,
-                :connect_with_original_config, :startup_nodes, :max_startup_sample, :id
+                :connect_with_original_config, :startup_nodes, :max_startup_sample, :id, :routing_table
 
-    def initialize( # rubocop:disable Metrics/ParameterLists
+    def initialize( # rubocop:disable Metrics/ParameterLists, Metrics/AbcSize
       nodes: DEFAULT_NODES,
       replica: false,
       replica_affinity: :random,
@@ -52,6 +53,7 @@ class RedisClient
       slow_command_timeout: SLOW_COMMAND_TIMEOUT,
       command_builder: ::RedisClient::CommandBuilder,
       max_startup_sample: MAX_STARTUP_SAMPLE,
+      command_routings: nil,
       **client_config
     )
       @replica = true & replica
@@ -67,6 +69,7 @@ class RedisClient
       @client_implementation = client_implementation
       @slow_command_timeout = slow_command_timeout
       @max_startup_sample = max_startup_sample
+      @routing_table = build_routing_table(command_routings)
       @id = client_config[:id]
     end
 
@@ -195,6 +198,12 @@ class RedisClient
       Integer(value)
     rescue ArgumentError => e
       raise InvalidClientConfigError, e.message
+    end
+
+    def build_routing_table(command_routings)
+      ::RedisClient::Cluster::Router::RoutingTable.build(command_routings)
+    rescue ArgumentError => e
+      raise InvalidClientConfigError, "`command_routings` option is invalid: #{e.message}"
     end
 
     def merge_generic_config(client_config, node_configs)

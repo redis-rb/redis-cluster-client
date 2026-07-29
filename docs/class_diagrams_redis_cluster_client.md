@@ -168,7 +168,13 @@ classDiagram
     +close()
   }
 
+  class RedisClient_Cluster_Router_RoutingTable {
+    +build()
+    +find_policy_action()
+  }
+
   RedisClient_ClusterConfig ..> RedisClient_Cluster : new
+  RedisClient_ClusterConfig ..> RedisClient_Cluster_Router_RoutingTable : call
 
   RedisClient_Cluster ..> RedisClient_Cluster_Pipeline : new
   RedisClient_Cluster ..> RedisClient_Cluster_Transaction : new
@@ -186,6 +192,7 @@ classDiagram
   RedisClient_Cluster_Router ..> RedisClient_Cluster_OptimisticLocking : new
   RedisClient_Cluster_Router ..> module_RedisClient_Cluster_KeySlotConverter : call
   RedisClient_Cluster_Router ..> module_RedisClient_Cluster_NodeKey : call
+  RedisClient_Cluster_Router ..> RedisClient_Cluster_Router_RoutingTable : call
 
   RedisClient_Cluster_Node_PrimaryOnly --|> RedisClient_Cluster_Node_BaseTopology : inherit
   RedisClient_Cluster_Node_RandomReplica --|> RedisClient_Cluster_Node_BaseTopology : inherit
