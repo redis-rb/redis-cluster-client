@@ -17,13 +17,13 @@ class RedisClient
           Ractor.make_shareable(SUM_NUM)
           Ractor.make_shareable(SORT_NUMBERS)
         end
-        SINGLE_NODE_ACTION = RoutingAction.new(method_name: :assign_node_and_send_command).freeze
         DEDICATED_ACTIONS = lambda do # rubocop:disable Metrics/BlockLength
           multiple_key_action = RoutingAction.new(method_name: :send_multiple_keys_command)
           all_node_first_action = RoutingAction.new(method_name: :send_command_to_all_nodes, reply_transformer: PICK_FIRST)
           primary_first_action = RoutingAction.new(method_name: :send_command_to_primaries, reply_transformer: PICK_FIRST)
           not_supported_action = RoutingAction.new(method_name: :fail_not_supported_command)
           keyless_action = RoutingAction.new(method_name: :fail_keyless_command)
+          single_node_action = RoutingAction.new(method_name: :assign_node_and_send_command)
           {
             'ping' => RoutingAction.new(method_name: :send_ping_command, reply_transformer: PICK_FIRST),
             'wait' => RoutingAction.new(method_name: :send_wait_command),
@@ -54,7 +54,7 @@ class RedisClient
             # The redis 7.0 tags RANDOMKEY with `request_policy:all_shards` but without any response policy.
             # It was corrected to `response_policy:special` in the redis 7.2.
             # This entry keeps the historical single node routing for the redis 7.0.
-            'randomkey' => SINGLE_NODE_ACTION,
+            'randomkey' => single_node_action,
             'readonly' => not_supported_action,
             'readwrite' => not_supported_action,
             'shutdown' => not_supported_action,
@@ -103,7 +103,7 @@ class RedisClient
         OVERRIDE_KEYS = %i[request_policy response_policy].freeze
 
         private_constant :RoutingAction, :PICK_FIRST, :FLATTEN_STRINGS, :SUM_NUM, :SORT_NUMBERS,
-                         :SINGLE_NODE_ACTION, :DEDICATED_ACTIONS, :POLICY_ACTIONS,
+                         :DEDICATED_ACTIONS, :POLICY_ACTIONS,
                          :UNSAFE_OVERRIDE_COMMANDS, :OVERRIDE_KEYS
 
         class << self
@@ -119,8 +119,9 @@ class RedisClient
           # Builds the routing table: the built-in entries overridden by the user-defined routings.
           # The value of each routing is the request policy and the response policy which the client
           # should follow, in the same vocabulary as the command tips of the COMMAND command reply.
-          # An empty hash means the command has no routing policy: it doesn't fan out and is routed
-          # by its key, or is sent to an arbitrary node if it has no key.
+          # A nil or an empty hash removes the built-in entry of the command, so that the command
+          # follows the default resolution: the command tips which the server reports, or the routing
+          # by its key.
           def build(overrides)
             return DEDICATED_ACTIONS if overrides.nil? || (overrides.is_a?(Hash) && overrides.empty?)
             raise ArgumentError, "the option must be a Hash: #{overrides.class}" unless overrides.is_a?(Hash)
@@ -128,8 +129,13 @@ class RedisClient
             overrides.each_with_object(DEDICATED_ACTIONS.dup) do |(name, value), acc|
               key = normalize_command_name(name)
               action = normalize_action(key, value)
-              acc[key] = action
-              acc[key.upcase] = action
+              if action.nil?
+                acc.delete(key)
+                acc.delete(key.upcase)
+              else
+                acc[key] = action
+                acc[key.upcase] = action
+              end
             end.freeze
           end
 
@@ -151,8 +157,8 @@ class RedisClient
           end
 
           def normalize_action(key, value)
+            return if value.nil? || (value.is_a?(Hash) && value.empty?)
             raise ArgumentError, "the routing of the #{key} command must be a Hash: #{value.inspect}" unless value.is_a?(Hash)
-            return SINGLE_NODE_ACTION if value.empty?
 
             fetch_policy_action(key, value.transform_keys { |k| k.respond_to?(:to_sym) ? k.to_sym : k })
           end

@@ -17,16 +17,17 @@ class RedisClient
             { value: { 'echo' => { request_policy: 'all_shards', response_policy: 'one_succeeded' } }, name: 'echo', want: :send_command_to_primaries_leniently },
             { value: { 'echo' => { request_policy: 'all_nodes', response_policy: 'one_succeeded' } }, name: 'echo', want: :send_command_to_all_nodes_leniently },
             { value: { 'ping' => { request_policy: 'all_shards' } }, name: 'ping', want: :send_command_to_primaries },
-            { value: { 'keys' => {} }, name: 'keys', want: :assign_node_and_send_command },
+            { value: { 'keys' => nil }, name: 'keys', removed: true },
+            { value: { 'keys' => {} }, name: 'keys', removed: true },
+            { value: { 'echo' => nil }, name: 'echo', removed: true },
             { value: { 'echo' => { request_policy: 'all_over' } }, error: true },
             { value: { 'echo' => { request_policy: 'multi_shard' } }, error: true },
             { value: { 'echo' => { request_policy: 'all_shards', response_policy: 'special' } }, error: true },
             { value: { 'echo' => { response_policy: 'agg_sum' } }, error: true },
             { value: { 'echo' => { request_policy: 'all_shards', foo: true } }, error: true },
             { value: { 'echo' => 'all_shards' }, error: true },
-            { value: { 'echo' => nil }, error: true },
             { value: { 'multi' => { request_policy: 'all_shards' } }, error: true },
-            { value: { 'watch' => {} }, error: true },
+            { value: { 'watch' => nil }, error: true },
             { value: { 'SUBSCRIBE' => {} }, error: true },
             { value: { 'config get' => { request_policy: 'all_shards' } }, error: true },
             { value: { '' => {} }, error: true },
@@ -38,6 +39,12 @@ class RedisClient
             got = -> { ::RedisClient::Cluster::Router::RoutingTable.build(c[:value]) }
             if c.key?(:error)
               assert_raises(ArgumentError, msg, &got)
+            elsif c.key?(:removed)
+              table = got.call
+              assert_predicate(table, :frozen?, msg)
+              refute(table.key?(c[:name]), msg)
+              refute(table.key?(c[:name].upcase), msg)
+              assert_equal(:send_command_to_replicas, table['dbsize'].method_name, msg)
             else
               table = got.call
               assert_predicate(table, :frozen?, msg)

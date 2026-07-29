@@ -171,15 +171,17 @@ The value of each command is the request policy and the response policy which th
 in the same vocabulary as the command tips: `request_policy` is `all_shards` or `all_nodes`,
 and `response_policy` is `all_succeeded`, `one_succeeded`, `agg_sum` or omitted.
 The replies of the nodes are returned as an array if the response policy is omitted.
-An empty hash means the command has no routing policy:
-it doesn't fan out and is routed by its key, or is sent to an arbitrary node if it has no key.
+A `nil` or an empty hash removes the built-in entry of the command, so that the command follows
+the default resolution: the command tips which the server reports, or the routing by its key.
+Note that the routing of such a command can vary with the version of the server,
+because the command tips are what the server reports.
 
 ```ruby
 RedisClient.cluster(
   command_routings: {
     'foo' => { request_policy: 'all_shards', response_policy: 'agg_sum' },
     'bar' => { request_policy: 'all_nodes' },
-    'randomkey' => {}
+    'dbsize' => nil
   }
 ).new_client
 ```
