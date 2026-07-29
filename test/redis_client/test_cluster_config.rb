@@ -140,6 +140,51 @@ class RedisClient
       end
     end
 
+    def test_command_routings
+      [
+        { value: nil, want: nil },
+        { value: {}, want: nil },
+        { value: { 'echo' => { request_policy: 'all_shards' } },
+          want: { 'echo' => { request_policy: 'all_shards', response_policy: nil } } },
+        { value: { 'echo' => { request_policy: 'all_nodes', response_policy: 'agg_sum' } },
+          want: { 'echo' => { request_policy: 'all_nodes', response_policy: 'agg_sum' } } },
+        { value: { echo: { 'request_policy' => :all_shards } },
+          want: { 'echo' => { request_policy: 'all_shards', response_policy: nil } } },
+        { value: { 'ECHO' => { request_policy: 'all_shards' } },
+          want: { 'echo' => { request_policy: 'all_shards', response_policy: nil } } },
+        { value: { 'keys' => {} }, want: { 'keys' => nil } },
+        { value: { 'keys' => nil }, want: { 'keys' => nil } },
+        { value: { 'echo' => { request_policy: 'all_over' } }, error: true },
+        { value: { 'echo' => { request_policy: 'multi_shard' } }, error: true },
+        { value: { 'echo' => { request_policy: 'all_shards', response_policy: 'special' } }, error: true },
+        { value: { 'echo' => { response_policy: 'agg_sum' } }, error: true },
+        { value: { 'echo' => { request_policy: 'all_shards', foo: true } }, error: true },
+        { value: { 'echo' => 'all_shards' }, error: true },
+        { value: { 'multi' => { request_policy: 'all_shards' } }, error: true },
+        { value: { 'watch' => nil }, error: true },
+        { value: { 'watch' => {} }, error: true },
+        { value: { 'SUBSCRIBE' => {} }, error: true },
+        { value: { 'config get' => { request_policy: 'all_shards' } }, error: true },
+        { value: { '' => {} }, error: true },
+        { value: { 123 => {} }, error: true },
+        { value: [], error: true },
+        { value: 'all_shards', error: true }
+      ].each_with_index do |c, idx|
+        msg = "Case: #{idx}: #{c}"
+        got = -> { ::RedisClient::ClusterConfig.new(command_routings: c[:value]).command_routings }
+        if c.key?(:error)
+          assert_raises(::RedisClient::ClusterConfig::InvalidClientConfigError, msg, &got)
+        elsif c[:want].nil?
+          assert_nil(got.call, msg)
+        else
+          routings = got.call
+
+          assert_equal(c[:want], routings, msg)
+          assert_predicate(routings, :frozen?, msg)
+        end
+      end
+    end
+
     def test_build_node_configs
       config = ::RedisClient::ClusterConfig.new
       [

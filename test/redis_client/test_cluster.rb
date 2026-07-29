@@ -808,6 +808,61 @@ class RedisClient
         assert_equal(1, @captured_commands.count('randomkey'))
       end
 
+      def test_command_routings_option
+        client = new_test_client(
+          command_routings: {
+            'echo' => { request_policy: 'all_shards', response_policy: 'all_succeeded' },
+            'ping' => { request_policy: 'all_shards' }
+          }
+        )
+        client.call('ECHO', 'warmup') # boot the lazy router apart from the assertions
+        @captured_commands.clear
+
+        # The plain client sends the command to a single node.
+        assert_equal('hi', @client.call('ECHO', 'hi'))
+        assert_equal(1, @captured_commands.count('echo'))
+
+        # The user-defined routing fans out the command although it has no built-in entry and no command tips.
+        @captured_commands.clear
+
+        assert_equal('hi', client.call('ECHO', 'hi'))
+
+        echoes = @captured_commands.to_a.select { |e| e.command.first.casecmp('echo').zero? }
+
+        assert_equal(TEST_SHARD_SIZE, echoes.size)
+        assert_equal(TEST_SHARD_SIZE, echoes.map(&:server_url).uniq.size)
+
+        # The user-defined routing takes precedence over the built-in entry,
+        # and the replies of the nodes are returned as an array without a response policy.
+        @captured_commands.clear
+        got = client.call('PING')
+
+        assert_equal(TEST_SHARD_SIZE, @captured_commands.count('ping'))
+        assert_equal(%w[PONG], got.uniq)
+      ensure
+        client&.close
+      end
+
+      def test_command_routings_option_removes_the_built_in_entry
+        skip('The command tips are available in the redis 7.0 or later.') if TEST_REDIS_MAJOR_VERSION < 7
+
+        client = new_test_client(command_routings: { 'dbsize' => nil })
+        client.call('ECHO', 'warmup') # boot the lazy router apart from the assertions
+        @captured_commands.clear
+
+        # Without the built-in entry which sends DBSIZE to the replicas, the command follows
+        # its command tips: `request_policy:all_shards` and `response_policy:agg_sum`.
+        got = client.call('DBSIZE')
+
+        captured = @captured_commands.to_a.select { |e| e.command.first.casecmp('dbsize').zero? }
+
+        assert_kind_of(Integer, got)
+        assert_equal(TEST_SHARD_SIZE, captured.size)
+        assert_equal(TEST_SHARD_SIZE, captured.map(&:server_url).uniq.size)
+      ensure
+        client&.close
+      end
+
       def test_dedicated_multiple_keys_command
         [
           { command: %w[MSET key1 val1], want: 'OK', wait: true },

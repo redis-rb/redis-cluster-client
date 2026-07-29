@@ -32,6 +32,7 @@ gem 'redis-cluster-client'
 | `:concurrency` | Hash | `{ model: :none }` | concurrency settings, `:on_demand`, `:pooled` and `:none` are valid models, size is a max number of workers, `:none` model is no concurrency, Please choose the one suited to your environment if needed. |
 | `:connect_with_original_config` | Boolean | `false` | `true` if client should retry the connection using the original endpoint that was passed in |
 | `:max_startup_sample` | Integer | `3` | maximum number of nodes to fetch `CLUSTER SHARDS` information for startup |
+| `:command_routings` | Hash | `nil` | overrides the routing of the specified commands, described in the command routing section |
 
 Also, [the other generic options](https://github.com/redis-rb/redis-client#configuration) can be passed.
 But `:url`, `:host`, `:port` and `:path` are ignored because they conflict with the `:nodes` option.
@@ -163,6 +164,31 @@ The following cases fall back to the built-in table of this gem:
 * The `response_policy:special` tip. Such a command is sent to a single node as before
   because the aggregation of the replies is undefined.
   For example, `INFO` still returns the reply of a single node.
+
+The routing can be overridden per command with the `:command_routings` option.
+It takes precedence over both the built-in table and the command tips.
+The value of each command is the request policy and the response policy which the client should follow,
+in the same vocabulary as the command tips: `request_policy` is `all_shards` or `all_nodes`,
+and `response_policy` is `all_succeeded`, `one_succeeded`, `agg_sum` or omitted.
+The replies of the nodes are returned as an array if the response policy is omitted.
+A `nil` or an empty hash removes the built-in entry of the command, so that the command follows
+the default resolution: the command tips which the server reports, or the routing by its key.
+Note that the routing of such a command can vary with the version of the server,
+because the command tips are what the server reports.
+
+```ruby
+RedisClient.cluster(
+  command_routings: {
+    'foo' => { request_policy: 'all_shards', response_policy: 'agg_sum' },
+    'bar' => { request_policy: 'all_nodes' },
+    'dbsize' => nil
+  }
+).new_client
+```
+
+It affects the direct calls such as `#call`. The commands inside the `#pipelined`, `#multi` and `#pubsub`
+blocks are routed by their keys as before. The commands which change the state of a connection
+such as `MULTI`, `WATCH` and `SUBSCRIBE` can't be overridden.
 
 ## Multiple keys and CROSSSLOT error
 A subset of commands can be passed multiple keys.

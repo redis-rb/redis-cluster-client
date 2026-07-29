@@ -6,6 +6,7 @@ require 'redis_client/cluster'
 require 'redis_client/cluster/errors'
 require 'redis_client/cluster/node_key'
 require 'redis_client/cluster/noop_command_builder'
+require 'redis_client/cluster/router/routing_table'
 require 'redis_client/command_builder'
 
 class RedisClient
@@ -25,10 +26,18 @@ class RedisClient
     SLOW_COMMAND_TIMEOUT = Float(ENV.fetch('REDIS_CLIENT_SLOW_COMMAND_TIMEOUT', -1))
     # Controls the balance between startup load and stability during initialization or cluster state changes.
     MAX_STARTUP_SAMPLE = Integer(ENV.fetch('REDIS_CLIENT_MAX_STARTUP_SAMPLE', 3))
+    VALID_COMMAND_ROUTING_KEYS = %i[request_policy response_policy].freeze
+    # Routing these could wedge the state of the connections in the pool,
+    # e.g. leave them inside a MULTI or a subscription.
+    UNSAFE_COMMAND_ROUTINGS = %w[
+      multi exec discard watch unwatch
+      subscribe unsubscribe psubscribe punsubscribe ssubscribe sunsubscribe
+    ].freeze
 
     private_constant :DEFAULT_HOST, :DEFAULT_PORT, :DEFAULT_SCHEME, :SECURE_SCHEME, :DEFAULT_NODES,
                      :VALID_SCHEMES, :VALID_NODES_KEYS, :MERGE_CONFIG_KEYS, :IGNORE_GENERIC_CONFIG_KEYS,
-                     :MAX_WORKERS, :SLOW_COMMAND_TIMEOUT, :MAX_STARTUP_SAMPLE
+                     :MAX_WORKERS, :SLOW_COMMAND_TIMEOUT, :MAX_STARTUP_SAMPLE,
+                     :VALID_COMMAND_ROUTING_KEYS, :UNSAFE_COMMAND_ROUTINGS
 
     InvalidClientConfigError = Class.new(::RedisClient::Cluster::Error)
 
@@ -39,9 +48,9 @@ class RedisClient
     private_constant :SENSITIVE_INSPECT_KEYS, :INSPECT_REDACTED_KEYS, :INSPECT_PLACEHOLDER
 
     attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout,
-                :connect_with_original_config, :startup_nodes, :max_startup_sample, :id
+                :connect_with_original_config, :startup_nodes, :max_startup_sample, :id, :command_routings
 
-    def initialize( # rubocop:disable Metrics/ParameterLists
+    def initialize( # rubocop:disable Metrics/ParameterLists, Metrics/AbcSize
       nodes: DEFAULT_NODES,
       replica: false,
       replica_affinity: :random,
@@ -52,6 +61,7 @@ class RedisClient
       slow_command_timeout: SLOW_COMMAND_TIMEOUT,
       command_builder: ::RedisClient::CommandBuilder,
       max_startup_sample: MAX_STARTUP_SAMPLE,
+      command_routings: nil,
       **client_config
     )
       @replica = true & replica
@@ -67,6 +77,7 @@ class RedisClient
       @client_implementation = client_implementation
       @slow_command_timeout = slow_command_timeout
       @max_startup_sample = max_startup_sample
+      @command_routings = normalize_command_routings(command_routings)
       @id = client_config[:id]
     end
 
@@ -195,6 +206,52 @@ class RedisClient
       Integer(value)
     rescue ArgumentError => e
       raise InvalidClientConfigError, e.message
+    end
+
+    def normalize_command_routings(routings)
+      return if routings.nil? || (routings.is_a?(Hash) && routings.empty?)
+      raise InvalidClientConfigError, "`command_routings` option must be a Hash: #{routings.class}" unless routings.is_a?(Hash)
+
+      routings.each_with_object({}) do |(name, value), acc|
+        acc[normalize_command_routing_name(name)] = normalize_command_routing_value(name, value)
+      end.freeze
+    end
+
+    def normalize_command_routing_name(name)
+      raise InvalidClientConfigError, "`command_routings` option includes an invalid command name: #{name.inspect}" unless name.is_a?(String) || name.is_a?(Symbol)
+
+      key = name.to_s.downcase
+      raise InvalidClientConfigError, '`command_routings` option includes an empty command name' if key.empty?
+      raise InvalidClientConfigError, "`command_routings` option can route a command, not a subcommand: #{name.inspect}" if key.match?(/\s/)
+      raise InvalidClientConfigError, "`command_routings` option can't route the command which changes the state of a connection: #{key}" if UNSAFE_COMMAND_ROUTINGS.include?(key)
+
+      -key
+    end
+
+    def normalize_command_routing_value(name, value)
+      return if value.nil? || (value.is_a?(Hash) && value.empty?)
+      raise InvalidClientConfigError, "`command_routings` option includes an invalid routing of #{name}: #{value.inspect}" unless value.is_a?(Hash)
+
+      normalize_command_routing_policies(name, value.transform_keys { |k| k.respond_to?(:to_sym) ? k.to_sym : k })
+    end
+
+    def normalize_command_routing_policies(name, policies)
+      unknown_keys = policies.keys - VALID_COMMAND_ROUTING_KEYS
+      raise InvalidClientConfigError, "`command_routings` option includes unknown keys of #{name}: #{unknown_keys.join(', ')}" unless unknown_keys.empty?
+      raise InvalidClientConfigError, "`command_routings` option needs the request_policy key of #{name}" if policies[:request_policy].nil?
+
+      build_command_routing_policies(name, policies[:request_policy], policies[:response_policy])
+    end
+
+    def build_command_routing_policies(name, request_policy, response_policy)
+      request_policy = -request_policy.to_s
+      response_policy = response_policy.nil? ? nil : -response_policy.to_s
+      if ::RedisClient::Cluster::Router::RoutingTable.find_policy_action(request_policy, response_policy).nil?
+        raise InvalidClientConfigError,
+              "`command_routings` option includes unsupported policies of #{name}: request_policy=#{request_policy}, response_policy=#{response_policy.inspect}"
+      end
+
+      { request_policy: request_policy, response_policy: response_policy }.freeze
     end
 
     def merge_generic_config(client_config, node_configs)
