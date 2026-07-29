@@ -8,37 +8,22 @@ class RedisClient
       class TestRoutingTable < TestingWrapper
         def test_build
           [
-            { value: { 'echo' => { request_policy: 'all_shards' } }, name: 'echo', want: :send_command_to_primaries },
-            { value: { 'echo' => { request_policy: 'all_nodes' } }, name: 'echo', want: :send_command_to_all_nodes },
-            { value: { 'echo' => { request_policy: :all_shards } }, name: 'echo', want: :send_command_to_primaries },
-            { value: { echo: { 'request_policy' => 'all_shards' } }, name: 'echo', want: :send_command_to_primaries },
-            { value: { 'ECHO' => { request_policy: 'all_shards' } }, name: 'echo', want: :send_command_to_primaries },
+            { value: { 'echo' => { request_policy: 'all_shards', response_policy: nil } }, name: 'echo', want: :send_command_to_primaries },
+            { value: { 'echo' => { request_policy: 'all_nodes', response_policy: nil } }, name: 'echo', want: :send_command_to_all_nodes },
             { value: { 'echo' => { request_policy: 'all_shards', response_policy: 'all_succeeded' } }, name: 'echo', want: :send_command_to_primaries },
             { value: { 'echo' => { request_policy: 'all_shards', response_policy: 'one_succeeded' } }, name: 'echo', want: :send_command_to_primaries_leniently },
             { value: { 'echo' => { request_policy: 'all_nodes', response_policy: 'one_succeeded' } }, name: 'echo', want: :send_command_to_all_nodes_leniently },
-            { value: { 'ping' => { request_policy: 'all_shards' } }, name: 'ping', want: :send_command_to_primaries },
+            { value: { 'ping' => { request_policy: 'all_shards', response_policy: nil } }, name: 'ping', want: :send_command_to_primaries },
             { value: { 'keys' => nil }, name: 'keys', removed: true },
-            { value: { 'keys' => {} }, name: 'keys', removed: true },
             { value: { 'echo' => nil }, name: 'echo', removed: true },
-            { value: { 'echo' => { request_policy: 'all_over' } }, error: true },
-            { value: { 'echo' => { request_policy: 'multi_shard' } }, error: true },
-            { value: { 'echo' => { request_policy: 'all_shards', response_policy: 'special' } }, error: true },
-            { value: { 'echo' => { response_policy: 'agg_sum' } }, error: true },
-            { value: { 'echo' => { request_policy: 'all_shards', foo: true } }, error: true },
-            { value: { 'echo' => 'all_shards' }, error: true },
-            { value: { 'multi' => { request_policy: 'all_shards' } }, error: true },
-            { value: { 'watch' => nil }, error: true },
-            { value: { 'SUBSCRIBE' => {} }, error: true },
-            { value: { 'config get' => { request_policy: 'all_shards' } }, error: true },
-            { value: { '' => {} }, error: true },
-            { value: { 123 => {} }, error: true },
-            { value: [], error: true },
-            { value: 'all_shards', error: true }
+            { value: { 'echo' => { request_policy: 'all_over', response_policy: nil } }, error: true },
+            { value: { 'echo' => { request_policy: 'multi_shard', response_policy: nil } }, error: true },
+            { value: { 'echo' => { request_policy: 'all_shards', response_policy: 'special' } }, error: true }
           ].each_with_index do |c, idx|
             msg = "Case: #{idx}: #{c}"
             got = -> { ::RedisClient::Cluster::Router::RoutingTable.build(c[:value]) }
             if c.key?(:error)
-              assert_raises(ArgumentError, msg, &got)
+              assert_raises(::RedisClient::Cluster::Router::RoutingTable::BuildError, msg, &got)
             elsif c.key?(:removed)
               table = got.call
               assert_predicate(table, :frozen?, msg)
@@ -56,7 +41,7 @@ class RedisClient
         end
 
         def test_build_default_table
-          # The table object is shared unless the overrides are given.
+          # The table object is shared unless the routings are given.
           assert_same(
             ::RedisClient::Cluster::Router::RoutingTable.build(nil),
             ::RedisClient::Cluster::Router::RoutingTable.build({})
@@ -69,22 +54,12 @@ class RedisClient
           table = ::RedisClient::Cluster::Router::RoutingTable.build(
             'echo' => { request_policy: 'all_shards', response_policy: 'agg_sum' },
             'time' => { request_policy: 'all_nodes', response_policy: 'all_succeeded' },
-            'lolwut' => { request_policy: 'all_shards' }
+            'lolwut' => { request_policy: 'all_shards', response_policy: nil }
           )
 
           assert_equal(3, table['echo'].reply_transformer.call([1, 2, 'x']))
           assert_equal('a', table['time'].reply_transformer.call(%w[a b]))
           assert_nil(table['lolwut'].reply_transformer)
-        end
-
-        def test_validate!
-          assert_raises(ArgumentError) { ::RedisClient::Cluster::Router::RoutingTable.validate!('all_shards') }
-          assert_raises(ArgumentError) { ::RedisClient::Cluster::Router::RoutingTable.validate!('echo' => { request_policy: 'all_over' }) }
-
-          # The valid inputs raise nothing.
-          ::RedisClient::Cluster::Router::RoutingTable.validate!(nil)
-          ::RedisClient::Cluster::Router::RoutingTable.validate!({})
-          ::RedisClient::Cluster::Router::RoutingTable.validate!('echo' => { request_policy: 'all_shards' })
         end
 
         def test_find_policy_action

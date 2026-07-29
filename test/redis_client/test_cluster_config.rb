@@ -142,13 +142,18 @@ class RedisClient
 
     def test_command_routings
       [
-        { value: nil },
-        { value: {} },
-        { value: { 'echo' => { request_policy: 'all_shards' } } },
-        { value: { 'echo' => { request_policy: 'all_nodes', response_policy: 'agg_sum' } } },
-        { value: { echo: { 'request_policy' => :all_shards } } },
-        { value: { 'keys' => {} } },
-        { value: { 'keys' => nil } },
+        { value: nil, want: nil },
+        { value: {}, want: nil },
+        { value: { 'echo' => { request_policy: 'all_shards' } },
+          want: { 'echo' => { request_policy: 'all_shards', response_policy: nil } } },
+        { value: { 'echo' => { request_policy: 'all_nodes', response_policy: 'agg_sum' } },
+          want: { 'echo' => { request_policy: 'all_nodes', response_policy: 'agg_sum' } } },
+        { value: { echo: { 'request_policy' => :all_shards } },
+          want: { 'echo' => { request_policy: 'all_shards', response_policy: nil } } },
+        { value: { 'ECHO' => { request_policy: 'all_shards' } },
+          want: { 'echo' => { request_policy: 'all_shards', response_policy: nil } } },
+        { value: { 'keys' => {} }, want: { 'keys' => nil } },
+        { value: { 'keys' => nil }, want: { 'keys' => nil } },
         { value: { 'echo' => { request_policy: 'all_over' } }, error: true },
         { value: { 'echo' => { request_policy: 'multi_shard' } }, error: true },
         { value: { 'echo' => { request_policy: 'all_shards', response_policy: 'special' } }, error: true },
@@ -169,10 +174,13 @@ class RedisClient
         got = -> { ::RedisClient::ClusterConfig.new(command_routings: c[:value]).command_routings }
         if c.key?(:error)
           assert_raises(::RedisClient::ClusterConfig::InvalidClientConfigError, msg, &got)
-        elsif c[:value].nil?
+        elsif c[:want].nil?
           assert_nil(got.call, msg)
         else
-          assert_equal(c[:value], got.call, msg)
+          routings = got.call
+
+          assert_equal(c[:want], routings, msg)
+          assert_predicate(routings, :frozen?, msg)
         end
       end
     end

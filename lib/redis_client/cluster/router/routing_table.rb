@@ -1,11 +1,14 @@
 # frozen_string_literal: true
 
+require 'redis_client/cluster/errors'
+
 class RedisClient
   class Cluster
     class Router
       # The routing table for the commands which shouldn't be routed by their keys.
       # The built-in entries can be overridden with the `command_routings` option of the config.
       class RoutingTable
+        BuildError = Class.new(::RedisClient::Cluster::Error)
         RoutingAction = Struct.new('RedisCommandRoutingAction', :method_name, :reply_transformer, keyword_init: true)
         PICK_FIRST = ->(reply) { reply.first } # rubocop:disable Style/SymbolProc
         FLATTEN_STRINGS = ->(reply) { reply.flatten.sort_by(&:to_s) }
@@ -93,42 +96,20 @@ class RedisClient
           }.freeze
         }.freeze
 
-        # Overriding these could wedge the state of the connections in the pool,
-        # e.g. leave them inside a MULTI or a subscription.
-        UNSAFE_OVERRIDE_COMMANDS = %w[
-          multi exec discard watch unwatch
-          subscribe unsubscribe psubscribe punsubscribe ssubscribe sunsubscribe
-        ].freeze
-
-        OVERRIDE_KEYS = %i[request_policy response_policy].freeze
-
         private_constant :RoutingAction, :PICK_FIRST, :FLATTEN_STRINGS, :SUM_NUM, :SORT_NUMBERS,
-                         :DEDICATED_ACTIONS, :POLICY_ACTIONS,
-                         :UNSAFE_OVERRIDE_COMMANDS, :OVERRIDE_KEYS
+                         :DEDICATED_ACTIONS, :POLICY_ACTIONS
 
         class << self
-          # Validates the user-defined routings and raises an ArgumentError for an invalid input.
-          # The config calls this to reject the invalid option at its construction.
-          def validate!(overrides)
-            return if overrides.nil? || (overrides.is_a?(Hash) && overrides.empty?)
-            raise ArgumentError, "the option must be a Hash: #{overrides.class}" unless overrides.is_a?(Hash)
+          # Builds the routing table: the built-in entries overridden by the command routings
+          # which the config validated and normalized. A nil routing removes the built-in entry
+          # of the command, so that the command follows the default resolution: the command tips
+          # which the server reports, or the routing by its key.
+          # It raises a BuildError for an unnormalized input as a defense, e.g. an unsupported policy.
+          def build(routings)
+            return DEDICATED_ACTIONS if routings.nil? || routings.empty?
 
-            overrides.each { |name, value| normalize_action(normalize_command_name(name), value) }
-          end
-
-          # Builds the routing table: the built-in entries overridden by the user-defined routings.
-          # The value of each routing is the request policy and the response policy which the client
-          # should follow, in the same vocabulary as the command tips of the COMMAND command reply.
-          # A nil or an empty hash removes the built-in entry of the command, so that the command
-          # follows the default resolution: the command tips which the server reports, or the routing
-          # by its key.
-          def build(overrides)
-            return DEDICATED_ACTIONS if overrides.nil? || (overrides.is_a?(Hash) && overrides.empty?)
-            raise ArgumentError, "the option must be a Hash: #{overrides.class}" unless overrides.is_a?(Hash)
-
-            overrides.each_with_object(DEDICATED_ACTIONS.dup) do |(name, value), acc|
-              key = normalize_command_name(name)
-              merge_action(acc, key, normalize_action(key, value))
+            routings.each_with_object(DEDICATED_ACTIONS.dup) do |(key, policies), acc|
+              merge_action(acc, key, fetch_action(key, policies))
             end.freeze
           end
 
@@ -149,33 +130,13 @@ class RedisClient
             end
           end
 
-          def normalize_command_name(name)
-            raise ArgumentError, "the command name must be a String or a Symbol: #{name.inspect}" unless name.is_a?(String) || name.is_a?(Symbol)
+          def fetch_action(key, policies)
+            return if policies.nil?
 
-            key = name.to_s.downcase
-            raise ArgumentError, 'the command name must not be empty' if key.empty?
-            raise ArgumentError, "the routing can be overridden per command, not per subcommand: #{name.inspect}" if key.match?(/\s/)
-            raise ArgumentError, "the command changes the state of a connection: #{key}" if UNSAFE_OVERRIDE_COMMANDS.include?(key)
-
-            -key
-          end
-
-          def normalize_action(key, value)
-            return if value.nil? || (value.is_a?(Hash) && value.empty?)
-            raise ArgumentError, "the routing of the #{key} command must be a Hash: #{value.inspect}" unless value.is_a?(Hash)
-
-            fetch_policy_action(key, value.transform_keys { |k| k.respond_to?(:to_sym) ? k.to_sym : k })
-          end
-
-          def fetch_policy_action(key, policies)
-            unknown_keys = policies.keys - OVERRIDE_KEYS
-            raise ArgumentError, "the routing of the #{key} command includes unknown keys: #{unknown_keys.join(', ')}" unless unknown_keys.empty?
-            raise ArgumentError, "the routing of the #{key} command needs the request_policy key" if policies[:request_policy].nil?
-
-            action = POLICY_ACTIONS.dig(policies[:request_policy].to_s, policies[:response_policy]&.to_s)
+            action = POLICY_ACTIONS.dig(policies[:request_policy], policies[:response_policy])
             return action unless action.nil?
 
-            raise ArgumentError, "the policies of the #{key} command are unsupported: #{policies.inspect}"
+            raise BuildError, "the policies of the #{key} command are unsupported: #{policies.inspect}"
           end
         end
       end
