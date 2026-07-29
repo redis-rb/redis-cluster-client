@@ -107,6 +107,15 @@ class RedisClient
                          :UNSAFE_OVERRIDE_COMMANDS, :OVERRIDE_KEYS
 
         class << self
+          # Validates the user-defined routings and raises an ArgumentError for an invalid input.
+          # The config calls this to reject the invalid option at its construction.
+          def validate!(overrides)
+            return if overrides.nil? || (overrides.is_a?(Hash) && overrides.empty?)
+            raise ArgumentError, "the option must be a Hash: #{overrides.class}" unless overrides.is_a?(Hash)
+
+            overrides.each { |name, value| normalize_action(normalize_command_name(name), value) }
+          end
+
           # Builds the routing table: the built-in entries overridden by the user-defined routings.
           # The value of each routing is the request policy and the response policy which the client
           # should follow, in the same vocabulary as the command tips of the COMMAND command reply.

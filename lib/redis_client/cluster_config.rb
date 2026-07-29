@@ -40,7 +40,7 @@ class RedisClient
     private_constant :SENSITIVE_INSPECT_KEYS, :INSPECT_REDACTED_KEYS, :INSPECT_PLACEHOLDER
 
     attr_reader :command_builder, :client_config, :replica_affinity, :slow_command_timeout,
-                :connect_with_original_config, :startup_nodes, :max_startup_sample, :id, :routing_table
+                :connect_with_original_config, :startup_nodes, :max_startup_sample, :id, :command_routings
 
     def initialize( # rubocop:disable Metrics/ParameterLists, Metrics/AbcSize
       nodes: DEFAULT_NODES,
@@ -69,7 +69,7 @@ class RedisClient
       @client_implementation = client_implementation
       @slow_command_timeout = slow_command_timeout
       @max_startup_sample = max_startup_sample
-      @routing_table = build_routing_table(command_routings)
+      @command_routings = ensure_command_routings(command_routings)
       @id = client_config[:id]
     end
 
@@ -200,8 +200,9 @@ class RedisClient
       raise InvalidClientConfigError, e.message
     end
 
-    def build_routing_table(command_routings)
-      ::RedisClient::Cluster::Router::RoutingTable.build(command_routings)
+    def ensure_command_routings(command_routings)
+      ::RedisClient::Cluster::Router::RoutingTable.validate!(command_routings)
+      command_routings
     rescue ArgumentError => e
       raise InvalidClientConfigError, "`command_routings` option is invalid: #{e.message}"
     end

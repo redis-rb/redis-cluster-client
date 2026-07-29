@@ -24,7 +24,7 @@ class RedisClient
 
       def initialize(config, concurrent_worker, pool: nil, **kwargs)
         @config = config
-        @dedicated_actions = config.routing_table
+        @dedicated_actions = RoutingTable.build(config.command_routings)
         @concurrent_worker = concurrent_worker
         @pool = pool
         @client_kwargs = kwargs

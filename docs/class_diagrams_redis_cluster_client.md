@@ -169,6 +169,7 @@ classDiagram
   }
 
   class RedisClient_Cluster_Router_RoutingTable {
+    +validate!()
     +build()
     +find_policy_action()
   }
