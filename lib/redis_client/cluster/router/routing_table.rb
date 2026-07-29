@@ -128,14 +128,7 @@ class RedisClient
 
             overrides.each_with_object(DEDICATED_ACTIONS.dup) do |(name, value), acc|
               key = normalize_command_name(name)
-              action = normalize_action(key, value)
-              if action.nil?
-                acc.delete(key)
-                acc.delete(key.upcase)
-              else
-                acc[key] = action
-                acc[key.upcase] = action
-              end
+              merge_action(acc, key, normalize_action(key, value))
             end.freeze
           end
 
@@ -144,6 +137,17 @@ class RedisClient
           end
 
           private
+
+          # Stores both the lowercase and the uppercase keys to avoid a per-call case conversion.
+          def merge_action(table, key, action)
+            if action.nil?
+              table.delete(key)
+              table.delete(key.upcase)
+            else
+              table[key] = action
+              table[key.upcase] = action
+            end
+          end
 
           def normalize_command_name(name)
             raise ArgumentError, "the command name must be a String or a Symbol: #{name.inspect}" unless name.is_a?(String) || name.is_a?(Symbol)
