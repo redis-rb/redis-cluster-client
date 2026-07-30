@@ -190,6 +190,14 @@ It affects the direct calls such as `#call`. The commands inside the `#pipelined
 blocks are routed by their keys as before. The commands which change the state of a connection
 such as `MULTI`, `WATCH` and `SUBSCRIBE` can't be overridden.
 
+Also, the option is keyed by a command, not by a subcommand.
+A container command whose subcommands need different routings such as `HIMPORT`,
+whose `PREPARE` fans out to every primary node but whose `SET` is routed by its key,
+can't be expressed with this option.
+Such a command doesn't need this option in the first place,
+because this gem follows the key specs and the command tips of the subcommands which the server reports.
+This option is the escape hatch for the commands without usable command tips.
+
 ## Multiple keys and CROSSSLOT error
 A subset of commands can be passed multiple keys.
 In cluster mode, these commands have a constraint that passed keys should belong to the same slot
