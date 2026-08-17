@@ -556,8 +556,8 @@ class ClusterController
 
     regular_timeout = client.read_timeout
     updater.call(client, timeout)
-    result = yield client
+    yield client
+  ensure
     updater.call(client, regular_timeout)
-    result
   end
 end

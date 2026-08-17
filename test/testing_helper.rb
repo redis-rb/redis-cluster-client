@@ -32,8 +32,8 @@ class TestingWrapper < Minitest::Test
 
     regular_timeout = node.first.read_timeout
     node.each { |cli| updater.call(cli, timeout) }
-    result = yield client
-    node.each { |cli| updater.call(cli, regular_timeout) }
-    result
+    yield client
+  ensure
+    node&.each { |cli| updater.call(cli, regular_timeout) }
   end
 end
