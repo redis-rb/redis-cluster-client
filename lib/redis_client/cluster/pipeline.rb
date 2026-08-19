@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'set'
 require 'redis_client'
 require 'redis_client/cluster/errors'
 require 'redis_client/cluster/noop_command_builder'
@@ -43,6 +44,19 @@ class RedisClient
 
         def get_block(inner_index)
           @blocks.is_a?(Array) ? @blocks[inner_index] : nil
+        end
+
+        def coerce_except!(replies, indices)
+          return replies unless @blocks.is_a?(Array)
+
+          skipped = Set.new(indices)
+          @blocks.each_with_index do |block, index|
+            next if block.nil? || skipped.include?(index)
+
+            replies[index] = block.call(replies[index])
+          end
+
+          replies
         end
       end
 
@@ -209,6 +223,7 @@ class RedisClient
 
           all_replies ||= Array.new(@size)
           pipeline = @pipelines[node_key]
+          pipeline.coerce_except!(v.replies, v.indices)
           v.indices.each { |i| v.replies[i] = handle_redirection(v.replies[i], pipeline, i) }
           pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
         end
@@ -217,7 +232,9 @@ class RedisClient
           raise v.first_exception if v.first_exception
 
           all_replies ||= Array.new(@size)
-          @pipelines[node_key].outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
+          pipeline = @pipelines[node_key]
+          pipeline._coerce!(v.replies)
+          pipeline.outer_indices.each_with_index { |outer, inner| all_replies[outer] = v.replies[inner] }
         end
 
         all_replies
