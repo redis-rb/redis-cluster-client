@@ -208,6 +208,31 @@ class RedisClient
         results.each_with_index { |got, i| assert_equal(i.to_s, got) }
       end
 
+      def test_pipelined_with_redirection
+        keys = Array.new(100) { |i| "key#{i}" }
+        @client.pipelined { |pipeline| keys.each { |key| pipeline.call('SET', key, key) } }
+        wait_for_replication
+
+        router = @client.instance_variable_get(:@router)
+        node = router.instance_variable_get(:@node)
+        grouped = keys.group_by { |key| router.find_node_key_by_key(key, primary: true) }
+        assert_operator(grouped.size, :>=, 2, 'Case: the keys should be spread over multiple primaries')
+
+        (_, moved_keys), (host_node_key, host_keys) = grouped.sort_by(&:first).first(2)
+        moved_key = moved_keys.first
+        slot = ::RedisClient::Cluster::KeySlotConverter.convert(moved_key)
+        node.update_slot(slot, host_node_key)
+        assert_equal(host_node_key, router.find_node_key_by_key(moved_key, primary: true), 'Case: a stale slot mapping')
+
+        keys_in_pipeline = [moved_key] + host_keys
+        got = @client.pipelined do |pipeline|
+          keys_in_pipeline.each { |key| pipeline.call('GET', key) { |reply| { key => reply } } }
+        end
+
+        want = keys_in_pipeline.map { |key| { key => key } }
+        assert_equal(want, got)
+      end
+
       def test_transaction_with_single_key
         got = @client.multi do |t|
           t.call('SET', 'counter', '0')
