@@ -103,7 +103,8 @@ module IpsPipeline
   def make_valkey_client
     ::Valkey.new(
       nodes: [{ host: TEST_REDIS_HOST, port: TEST_REDIS_PORT }],
-      timeout: TEST_TIMEOUT_SEC,
+      # NOTE: valkey-rb passes this straight to the request timeout of GLIDE, which is in milliseconds.
+      timeout: (TEST_TIMEOUT_SEC * 1000).to_i,
       cluster_mode: true,
       protocol: 3
     )
