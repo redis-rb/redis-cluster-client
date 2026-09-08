@@ -8,10 +8,11 @@ class ClusterController
   DEFAULT_REPLICA_SIZE = 1
   DEFAULT_MAX_ATTEMPTS = 300
   DEFAULT_TIMEOUT_SEC = 5.0
+  MIN_FAILOVER_TIMEOUT_SEC = 5.0
   SLEEP_SEC = 1.0
 
   private_constant :SLOT_SIZE, :DEFAULT_SHARD_SIZE, :DEFAULT_REPLICA_SIZE,
-                   :DEFAULT_MAX_ATTEMPTS, :DEFAULT_TIMEOUT_SEC
+                   :DEFAULT_MAX_ATTEMPTS, :DEFAULT_TIMEOUT_SEC, :MIN_FAILOVER_TIMEOUT_SEC
 
   MaxRetryExceeded = Class.new(StandardError)
 
@@ -98,7 +99,14 @@ class ClusterController
     replica_info = rows.find { |row| row.primary_id == primary_info.id }
 
     wait_replication_delay(@clients, replica_size: @replica_size, timeout: @timeout)
-    replica_info.client.call_once('CLUSTER', 'FAILOVER', 'TAKEOVER')
+    # Before replying, the replica bumps its config epoch without consensus, claims every slot of the
+    # primary, and saves and fsyncs its config file. That takes tens of milliseconds even on an idle
+    # machine, so the caller's timeout, which is tuned for regular commands, can be too tight for a
+    # loaded CI runner. The command is not safe to retry either, because a reply lost to a timeout does
+    # not mean the takeover was rejected.
+    swap_timeout(replica_info.client, timeout: [@timeout, MIN_FAILOVER_TIMEOUT_SEC].max) do |client|
+      client.call_once('CLUSTER', 'FAILOVER', 'TAKEOVER')
+    end
     wait_failover(
       @clients,
       primary_node_key: primary_info.node_key,
