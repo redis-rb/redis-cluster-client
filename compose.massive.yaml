@@ -168,40 +168,37 @@ services:
   clustering:
     image: "redis:${REDIS_VERSION:-8}"
     command: >
-      bash -c "apt-get update > /dev/null
-      && apt-get install --no-install-recommends --no-install-suggests -y dnsutils > /dev/null
-      && rm -rf /var/lib/apt/lists/*
-      && yes yes | redis-cli --cluster create
-      $$(dig node001 +short):6379
-      $$(dig node002 +short):6379
-      $$(dig node003 +short):6379
-      $$(dig node004 +short):6379
-      $$(dig node005 +short):6379
-      $$(dig node006 +short):6379
-      $$(dig node007 +short):6379
-      $$(dig node008 +short):6379
-      $$(dig node009 +short):6379
-      $$(dig node010 +short):6379
-      $$(dig node011 +short):6379
-      $$(dig node012 +short):6379
-      $$(dig node013 +short):6379
-      $$(dig node014 +short):6379
-      $$(dig node015 +short):6379
-      $$(dig node016 +short):6379
-      $$(dig node017 +short):6379
-      $$(dig node018 +short):6379
-      $$(dig node019 +short):6379
-      $$(dig node020 +short):6379
-      $$(dig node021 +short):6379
-      $$(dig node022 +short):6379
-      $$(dig node023 +short):6379
-      $$(dig node024 +short):6379
-      $$(dig node025 +short):6379
-      $$(dig node026 +short):6379
-      $$(dig node027 +short):6379
-      $$(dig node028 +short):6379
-      $$(dig node029 +short):6379
-      $$(dig node030 +short):6379
+      bash -c "yes yes | redis-cli --cluster create
+      $$(getent hosts node001 | awk '{print $$1}'):6379
+      $$(getent hosts node002 | awk '{print $$1}'):6379
+      $$(getent hosts node003 | awk '{print $$1}'):6379
+      $$(getent hosts node004 | awk '{print $$1}'):6379
+      $$(getent hosts node005 | awk '{print $$1}'):6379
+      $$(getent hosts node006 | awk '{print $$1}'):6379
+      $$(getent hosts node007 | awk '{print $$1}'):6379
+      $$(getent hosts node008 | awk '{print $$1}'):6379
+      $$(getent hosts node009 | awk '{print $$1}'):6379
+      $$(getent hosts node010 | awk '{print $$1}'):6379
+      $$(getent hosts node011 | awk '{print $$1}'):6379
+      $$(getent hosts node012 | awk '{print $$1}'):6379
+      $$(getent hosts node013 | awk '{print $$1}'):6379
+      $$(getent hosts node014 | awk '{print $$1}'):6379
+      $$(getent hosts node015 | awk '{print $$1}'):6379
+      $$(getent hosts node016 | awk '{print $$1}'):6379
+      $$(getent hosts node017 | awk '{print $$1}'):6379
+      $$(getent hosts node018 | awk '{print $$1}'):6379
+      $$(getent hosts node019 | awk '{print $$1}'):6379
+      $$(getent hosts node020 | awk '{print $$1}'):6379
+      $$(getent hosts node021 | awk '{print $$1}'):6379
+      $$(getent hosts node022 | awk '{print $$1}'):6379
+      $$(getent hosts node023 | awk '{print $$1}'):6379
+      $$(getent hosts node024 | awk '{print $$1}'):6379
+      $$(getent hosts node025 | awk '{print $$1}'):6379
+      $$(getent hosts node026 | awk '{print $$1}'):6379
+      $$(getent hosts node027 | awk '{print $$1}'):6379
+      $$(getent hosts node028 | awk '{print $$1}'):6379
+      $$(getent hosts node029 | awk '{print $$1}'):6379
+      $$(getent hosts node030 | awk '{print $$1}'):6379
       --cluster-replicas 2"
     depends_on:
       node001:

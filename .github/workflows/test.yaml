@@ -82,6 +82,9 @@ jobs:
         run: docker compose -f $DOCKER_COMPOSE_FILE ps
       - name: Run minitest
         run: bundle exec rake ${{ matrix.task || 'test' }}
+      - name: Print container logs
+        if: failure()
+        run: docker compose -f $DOCKER_COMPOSE_FILE logs
       - name: Stop containers
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   lint:
@@ -134,6 +137,9 @@ jobs:
           DEBUG: "1"
       - name: Run minitest
         run: bundle exec rake test
+      - name: Print container logs
+        if: failure()
+        run: docker compose -f $DOCKER_COMPOSE_FILE logs
       - name: Stop containers
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   ips:
@@ -167,6 +173,9 @@ jobs:
         run: grep 'model name' /proc/cpuinfo
       - name: Run iteration per second
         run: bundle exec rake ips
+      - name: Print container logs
+        if: failure()
+        run: docker compose -f $DOCKER_COMPOSE_FILE logs
       - name: Stop containers
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   profiling:
@@ -206,6 +215,9 @@ jobs:
         run: bundle exec rake prof
         env:
           PROFILE_MODE: ${{ matrix.mode }}
+      - name: Print container logs
+        if: failure()
+        run: docker compose -f $DOCKER_COMPOSE_FILE logs
       - name: Stop containers
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
   massive:
@@ -267,5 +279,8 @@ jobs:
         run: bundle exec rake prof
         env:
           PROFILE_MODE: pipelining_in_moderation
+      - name: Print container logs
+        if: failure()
+        run: docker compose -f $DOCKER_COMPOSE_FILE logs
       - name: Stop containers
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE down || true
