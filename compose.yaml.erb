@@ -58,12 +58,9 @@ services:
   clustering:
     image: "redis:${REDIS_VERSION:-8}"
     command: >
-      bash -c "apt-get update > /dev/null
-      && apt-get install --no-install-recommends --no-install-suggests -y dnsutils > /dev/null
-      && rm -rf /var/lib/apt/lists/*
-      && yes yes | redis-cli --cluster create
+      bash -c "yes yes | redis-cli --cluster create
 <% n.times do |i| %>
-      $$(dig node<%= sprintf('%03d', i + 1) %> +short):<%= port %>
+      $$(getent hosts node<%= sprintf('%03d', i + 1) %> | awk '{print $$1}'):<%= port %>
 <% end %>
       --cluster-replicas <%= (n - shards) / shards %>"
     depends_on:
