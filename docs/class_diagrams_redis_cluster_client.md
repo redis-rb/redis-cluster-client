@@ -189,7 +189,6 @@ classDiagram
 
   RedisClient_Cluster_Router ..> RedisClient_Cluster_Node : new
   RedisClient_Cluster_Router ..> RedisClient_Cluster_Command : new
-  RedisClient_Cluster_Router ..> RedisClient_Cluster_OptimisticLocking : new
   RedisClient_Cluster_Router ..> module_RedisClient_Cluster_KeySlotConverter : call
   RedisClient_Cluster_Router ..> module_RedisClient_Cluster_NodeKey : call
   RedisClient_Cluster_Router ..> RedisClient_Cluster_Router_RoutingTable : call
