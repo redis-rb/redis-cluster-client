@@ -33,6 +33,7 @@ class RedisClient
             'keys' => RoutingAction.new(method_name: :send_command_to_replicas, reply_transformer: FLATTEN_STRINGS),
             'dbsize' => RoutingAction.new(method_name: :send_command_to_replicas, reply_transformer: SUM_NUM),
             'scan' => RoutingAction.new(method_name: :send_scan_command),
+            'bless' => RoutingAction.new(method_name: :send_bless_command),
             'lastsave' => RoutingAction.new(method_name: :send_command_to_all_nodes, reply_transformer: SORT_NUMBERS),
             'role' => RoutingAction.new(method_name: :send_command_to_all_nodes),
             'config' => RoutingAction.new(method_name: :send_config_command),
