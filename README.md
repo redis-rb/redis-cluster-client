@@ -134,6 +134,7 @@ The following methods are able to be used like `redis-client`.
 * `#close`
 
 The `#scan` method iterates all keys around every node seamlessly.
+The `SCAN` and `BLESS SCAN` commands sent with `#call` also walk every node, and the returned cursor carries on the iteration.
 The `#pipelined` method splits and sends commands to each node and aggregates replies.
 The `#multi` method supports the transaction feature but you should use a hashtag for your keys.
 The `#pubsub` method supports sharded subscriptions.
@@ -159,7 +160,7 @@ which node each command should be sent to according to the reply.
 The following cases fall back to the built-in table of this gem:
 
 * The Redis 6.2 or earlier which doesn't report the above information.
-* The commands which this gem handles in its own way such as `SCAN`, `KEYS` and `CLUSTER`.
+* The commands which this gem handles in its own way such as `SCAN`, `BLESS SCAN`, `KEYS` and `CLUSTER`.
 * The `request_policy:multi_shard` and the `request_policy:special` tips.
 * The `response_policy:special` tip. Such a command is sent to a single node as before
   because the aggregation of the replies is undefined.

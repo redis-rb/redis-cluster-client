@@ -102,6 +102,33 @@ class RedisClient
         assert_equal(want, got.sort)
       end
 
+      def test_bless_scan
+        skip('The BLESS command family is available in the redis 8.12 or later.') unless bless_supported?
+
+        10.times { |i| @client.call('SET', "key#{i}", i) }
+        10.times { |i| @client.call('BLESS', 'SET', "key#{i}", 'NO-EVICT') }
+        wait_for_replication
+        @captured_commands.clear
+
+        # The keyed subcommands are routed by the slot of their key.
+        assert_equal(%w[NO-EVICT], @client.call('BLESS', 'GET', 'key0'))
+        assert_equal(1, @captured_commands.count('bless', 'get'))
+
+        # The keyless BLESS SCAN walks every node like SCAN does, so a full
+        # iteration reaches the blessed keys of every shard.
+        want = (0..9).map { |i| "key#{i}" }
+        got = []
+        cursor = '0'
+        loop do
+          cursor, keys = @client.call('BLESS', 'SCAN', cursor, 'NO-EVICT', 'COUNT', '5')
+          got.concat(keys)
+          break if cursor == '0'
+        end
+
+        assert_equal(want, got.sort.uniq)
+        assert_operator(@captured_commands.count('bless', 'scan'), :>=, TEST_SHARD_SIZE)
+      end
+
       def test_sscan
         10.times do |i|
           10.times { |j| @client.call('SADD', "key#{i}", "member#{j}") }
@@ -1081,6 +1108,10 @@ class RedisClient
             raw.close
           end
         end
+      end
+
+      def bless_supported?
+        !@client.call('COMMAND', 'INFO', 'bless').first.nil?
       end
 
       def wait_for_replication

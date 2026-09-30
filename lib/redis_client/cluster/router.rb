@@ -133,9 +133,9 @@ class RedisClient
         retry
       end
 
-      def scan(command, seed: nil) # rubocop:disable Metrics/AbcSize
-        command[1] = ZERO_CURSOR_FOR_SCAN if command.size == 1
-        input_cursor = Integer(command[1])
+      def scan(command, seed: nil, cursor_index: 1) # rubocop:disable Metrics/AbcSize
+        command[cursor_index] = ZERO_CURSOR_FOR_SCAN if command.size == cursor_index
+        input_cursor = Integer(command[cursor_index])
 
         client_index = input_cursor % 256
         raw_cursor = input_cursor >> 8
@@ -145,7 +145,7 @@ class RedisClient
         client = clients[client_index]
         return [ZERO_CURSOR_FOR_SCAN, []] unless client
 
-        command[1] = raw_cursor.to_s
+        command[cursor_index] = raw_cursor.to_s
 
         result_cursor, result_keys = client.call_v(command)
         result_cursor = Integer(result_cursor)
@@ -322,6 +322,14 @@ class RedisClient
           @node.call_all(method, command, args).first.then(&TSF.call(block))
         elsif command[1].casecmp('set').zero?
           @node.call_all(method, command, args).first.then(&TSF.call(block))
+        else
+          assign_node(command).public_send(method, *args, command, &block)
+        end
+      end
+
+      def send_bless_command(method, command, args, &block)
+        if command[1].casecmp('scan').zero?
+          scan(command, seed: 1, cursor_index: 2).then(&TSF.call(block))
         else
           assign_node(command).public_send(method, *args, command, &block)
         end

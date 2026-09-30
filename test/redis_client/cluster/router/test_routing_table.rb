@@ -46,7 +46,11 @@ class RedisClient
             ::RedisClient::Cluster::Router::RoutingTable.build(nil),
             ::RedisClient::Cluster::Router::RoutingTable.build({})
           )
-          assert_equal(:send_ping_command, ::RedisClient::Cluster::Router::RoutingTable.build(nil)['ping'].method_name)
+          table = ::RedisClient::Cluster::Router::RoutingTable.build(nil)
+          assert_equal(:send_ping_command, table['ping'].method_name)
+          # The container command is routed by its subcommand.
+          assert_equal(:send_bless_command, table['bless'].method_name)
+          assert_same(table['bless'], table['BLESS'])
         end
 
         def test_build_reply_transformer
