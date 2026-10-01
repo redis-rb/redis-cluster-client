@@ -39,16 +39,9 @@ class RedisClient
 
       def send_command(method, command, *args, &block) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         action = @dedicated_actions[command.first]
-        if action.nil?
-          cmd_spec = @command.get_spec(command)
-          action = find_policy_action(cmd_spec)
-          return assign_node_and_send_command(method, command, args, cmd_spec: cmd_spec, &block) if action.nil?
-        end
+        return send_command_by_spec(method, command, args, &block) if action.nil?
 
-        return send(action.method_name, method, command, args, &block) if action.reply_transformer.nil?
-
-        reply = send(action.method_name, method, command, args)
-        action.reply_transformer.call(reply).then(&TSF.call(block))
+        send_command_by_action(action, method, command, args, &block)
       rescue ::RedisClient::CircuitBreaker::OpenCircuitError
         raise
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
@@ -258,6 +251,22 @@ class RedisClient
 
       private
 
+      # Follows the command tips which the server reports, or the routing by the key.
+      def send_command_by_spec(method, command, args, &block)
+        cmd_spec = @command.get_spec(command)
+        action = find_policy_action(cmd_spec)
+        return assign_node_and_send_command(method, command, args, cmd_spec: cmd_spec, &block) if action.nil?
+
+        send_command_by_action(action, method, command, args, &block)
+      end
+
+      def send_command_by_action(action, method, command, args, &block)
+        return send(action.method_name, method, command, args, &block) if action.reply_transformer.nil?
+
+        reply = send(action.method_name, method, command, args)
+        action.reply_transformer.call(reply).then(&TSF.call(block))
+      end
+
       def find_policy_action(cmd_spec)
         return if cmd_spec.nil?
 
@@ -331,7 +340,8 @@ class RedisClient
         if command[1].casecmp('scan').zero?
           scan(command, seed: 1, cursor_index: 2).then(&TSF.call(block))
         else
-          assign_node(command).public_send(method, *args, command, &block)
+          # The other subcommands keep the default routing with the redirection handling.
+          send_command_by_spec(method, command, args, &block)
         end
       end
 

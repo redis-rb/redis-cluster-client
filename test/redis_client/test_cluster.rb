@@ -129,6 +129,29 @@ class RedisClient
         assert_operator(@captured_commands.count('bless', 'scan'), :>=, TEST_SHARD_SIZE)
       end
 
+      def test_bless_with_redirection
+        skip('The BLESS command family is available in the redis 8.12 or later.') unless bless_supported?
+
+        @client.call('SET', 'key0', '0')
+        @client.call('BLESS', 'SET', 'key0', 'NO-EVICT')
+        wait_for_replication
+
+        router = @client.instance_variable_get(:@router)
+        node = router.instance_variable_get(:@node)
+        correct_node_key = router.find_node_key_by_key('key0', primary: true)
+        stale_node_key = node.primary_clients
+                             .map { |c| ::RedisClient::Cluster::NodeKey.build_from_client(c) }
+                             .find { |k| k != correct_node_key }
+        slot = ::RedisClient::Cluster::KeySlotConverter.convert('key0')
+        node.update_slot(slot, stale_node_key)
+        assert_equal(stale_node_key, router.find_node_key_by_key('key0', primary: true), 'Case: a stale slot mapping')
+
+        # The keyed subcommands follow the MOVED redirection.
+        assert_equal(%w[NO-EVICT], @client.call('BLESS', 'GET', 'key0'))
+        assert_equal(1, @redirect_count.get.moved)
+        @redirect_count.clear
+      end
+
       def test_sscan
         10.times do |i|
           10.times { |j| @client.call('SADD', "key#{i}", "member#{j}") }
