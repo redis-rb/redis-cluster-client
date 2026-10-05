@@ -883,6 +883,30 @@ class RedisClient
         assert_equal(1, @captured_commands.count('randomkey'))
       end
 
+      def test_client_pause_and_unpause
+        skip('The CLIENT UNPAUSE command is available in the redis 6.2 or later.') if TEST_REDIS_MAJOR_VERSION < 6
+
+        number_of_nodes = @client.instance_variable_get(:@router).instance_variable_get(:@node).count
+        @captured_commands.clear
+
+        # The UNPAUSE reaches every node which the PAUSE reached.
+        assert_equal('OK', @client.call('CLIENT', 'PAUSE', '3000', 'WRITE'))
+        assert_equal('OK', @client.call('CLIENT', 'UNPAUSE'))
+        assert_equal(number_of_nodes, @captured_commands.count('client', 'pause'))
+        assert_equal(number_of_nodes, @captured_commands.count('client', 'unpause'))
+      end
+
+      def test_client_setinfo
+        skip('The CLIENT SETINFO command is available in the redis 7.2 or later.') if @client.call('COMMAND', 'INFO', 'client|setinfo').first.nil?
+
+        number_of_nodes = @client.instance_variable_get(:@router).instance_variable_get(:@node).count
+        @captured_commands.clear
+
+        # The command follows its tips: `request_policy:all_nodes` and `response_policy:all_succeeded`.
+        assert_equal('OK', @client.call('CLIENT', 'SETINFO', 'LIB-NAME', 'redis-cluster-client-test'))
+        assert_equal(number_of_nodes, @captured_commands.count('client', 'setinfo', 'lib-name', 'redis-cluster-client-test'))
+      end
+
       def test_command_routings_option
         client = new_test_client(
           command_routings: {
