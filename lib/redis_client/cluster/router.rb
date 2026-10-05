@@ -360,12 +360,15 @@ class RedisClient
           @node.call_all(method, command, args, &block).flatten
         elsif command[1].casecmp('pause').zero?
           @node.call_all(method, command, args).first.then(&TSF.call(block))
+        elsif command[1].casecmp('unpause').zero?
+          @node.call_all(method, command, args).first.then(&TSF.call(block))
         elsif command[1].casecmp('reply').zero?
           @node.call_all(method, command, args).first.then(&TSF.call(block))
         elsif command[1].casecmp('setname').zero?
           @node.call_all(method, command, args).first.then(&TSF.call(block))
         else
-          assign_node(command).public_send(method, *args, command, &block)
+          # The other subcommands keep the default routing with the command tips.
+          send_command_by_spec(method, command, args, &block)
         end
       end
 
