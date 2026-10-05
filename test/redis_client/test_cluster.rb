@@ -136,18 +136,25 @@ class RedisClient
         @client.call('BLESS', 'SET', 'key0', 'NO-EVICT')
         wait_for_replication
 
-        router = @client.instance_variable_get(:@router)
-        node = router.instance_variable_get(:@node)
-        correct_node_key = router.find_node_key_by_key('key0', primary: true)
-        stale_node_key = node.primary_clients
-                             .map { |c| ::RedisClient::Cluster::NodeKey.build_from_client(c) }
-                             .find { |k| k != correct_node_key }
-        slot = ::RedisClient::Cluster::KeySlotConverter.convert('key0')
-        node.update_slot(slot, stale_node_key)
-        assert_equal(stale_node_key, router.find_node_key_by_key('key0', primary: true), 'Case: a stale slot mapping')
+        make_slot_mapping_stale('key0')
 
         # The keyed subcommands follow the MOVED redirection.
         assert_equal(%w[NO-EVICT], @client.call('BLESS', 'GET', 'key0'))
+        assert_equal(1, @redirect_count.get.moved)
+        @redirect_count.clear
+      end
+
+      def test_memory_usage_with_redirection
+        # The redis 5 replies without the redirection because it doesn't extract the key of MEMORY USAGE in the cluster mode.
+        skip('MEMORY USAGE is redirected in the redis 6.0 or later.') if TEST_REDIS_MAJOR_VERSION < 6
+
+        @client.call('SET', 'key0', '0')
+        wait_for_replication
+
+        make_slot_mapping_stale('key0')
+
+        # Even if the command is sent to a replica of the stale primary, the replica replies with MOVED.
+        assert_kind_of(Integer, @client.call('MEMORY', 'USAGE', 'key0'))
         assert_equal(1, @redirect_count.get.moved)
         @redirect_count.clear
       end
@@ -1189,6 +1196,16 @@ class RedisClient
             raw.close
           end
         end
+      end
+
+      # It uses the node keys of the topology because the `fixed_hostname` option overrides the host of the client config.
+      def make_slot_mapping_stale(key)
+        router = @client.instance_variable_get(:@router)
+        node = router.instance_variable_get(:@node)
+        correct_node_key = router.find_node_key_by_key(key, primary: true)
+        stale_node_key = node.instance_variable_get(:@topology).primary_clients.keys.find { |k| k != correct_node_key }
+        node.update_slot(::RedisClient::Cluster::KeySlotConverter.convert(key), stale_node_key)
+        assert_equal(stale_node_key, router.find_node_key_by_key(key, primary: true), 'Case: a stale slot mapping')
       end
 
       def bless_supported?

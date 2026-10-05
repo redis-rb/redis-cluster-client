@@ -351,7 +351,8 @@ class RedisClient
         elsif command[1].casecmp('purge').zero?
           @node.call_all(method, command, args).first.then(&TSF.call(block))
         else
-          assign_node(command).public_send(method, *args, command, &block)
+          # The other subcommands keep the default routing with the redirection handling.
+          send_command_by_spec(method, command, args, &block)
         end
       end
 
