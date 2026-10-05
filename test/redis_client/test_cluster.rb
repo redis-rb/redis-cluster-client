@@ -152,6 +152,26 @@ class RedisClient
         @redirect_count.clear
       end
 
+      def test_memory_usage_with_redirection
+        @client.call('SET', 'key0', '0')
+        wait_for_replication
+
+        router = @client.instance_variable_get(:@router)
+        node = router.instance_variable_get(:@node)
+        correct_node_key = router.find_node_key_by_key('key0', primary: true)
+        stale_node_key = node.primary_clients
+                             .map { |c| ::RedisClient::Cluster::NodeKey.build_from_client(c) }
+                             .find { |k| k != correct_node_key }
+        slot = ::RedisClient::Cluster::KeySlotConverter.convert('key0')
+        node.update_slot(slot, stale_node_key)
+        assert_equal(stale_node_key, router.find_node_key_by_key('key0', primary: true), 'Case: a stale slot mapping')
+
+        # Even if the command is sent to a replica of the stale primary, the replica replies with MOVED.
+        assert_kind_of(Integer, @client.call('MEMORY', 'USAGE', 'key0'))
+        assert_equal(1, @redirect_count.get.moved)
+        @redirect_count.clear
+      end
+
       def test_sscan
         10.times do |i|
           10.times { |j| @client.call('SADD', "key#{i}", "member#{j}") }
