@@ -983,6 +983,9 @@ class RedisClient
           { command: %w[CLUSTER SAVECONFIG], want: 'OK' },
           { command: %w[CLUSTER GETKEYSINSLOT 13252 1], want: %w[key0] },
           { command: %w[CLUSTER NODES], is_a: String },
+          { command: %w[CLUSTER MYID], is_a: String },
+          { command: %w[CLUSTER MYSHARDID], is_a: String, supported_redis_version: 8 },
+          { command: %w[CLUSTER LINKS], is_a: Array, supported_redis_version: 7 },
           { command: %w[READONLY], error: ::RedisClient::Cluster::OrchestrationCommandNotSupported },
           { command: %w[MEMORY STATS], is_a: Array },
           { command: %w[MEMORY PURGE], want: 'OK' },
@@ -1020,6 +1023,23 @@ class RedisClient
             assert_equal(c[:want], got.call, msg)
           end
         end
+      end
+
+      def test_cluster_replicas
+        primary_id = @client.call('CLUSTER', 'NODES').lines.map(&:split).find { |e| e[2].include?('master') }.first
+
+        assert_instance_of(Array, @client.call('CLUSTER', 'REPLICAS', primary_id))
+      end
+
+      def test_cluster_slot_stats
+        skip('The CLUSTER SLOT-STATS command is available in the redis 8.2 or later.') if @client.call('COMMAND', 'INFO', 'cluster|slot-stats').first.nil?
+
+        @captured_commands.clear
+        got = @client.call('CLUSTER', 'SLOT-STATS', 'SLOTSRANGE', '0', '16383')
+
+        # The statistics of every slot are gathered from all the shards.
+        assert_equal((0..16_383).to_a, got.map(&:first).sort)
+        assert_equal(TEST_SHARD_SIZE, @captured_commands.count('cluster', 'slot-stats'))
       end
 
       def test_compatibility_with_redis_gem
