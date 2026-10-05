@@ -379,8 +379,15 @@ class RedisClient
            command[1].casecmp('slots').zero? ||
            command[1].casecmp('shards').zero? ||
            command[1].casecmp('count-failure-reports').zero? ||
-           command[1].casecmp('slaves').zero?
+           command[1].casecmp('slaves').zero? ||
+           command[1].casecmp('replicas').zero? ||
+           command[1].casecmp('myid').zero? ||
+           command[1].casecmp('myshardid').zero? ||
+           command[1].casecmp('links').zero?
           assign_node(command).public_send(method, *args, command, &block)
+        elsif command[1].casecmp('slot-stats').zero?
+          # Each primary replies with the statistics of its own slots only.
+          @node.call_primaries(method, command, args).flatten(1).then(&TSF.call(block))
         elsif command[1].casecmp('saveconfig').zero?
           @node.call_all(method, command, args).first.then(&TSF.call(block))
         elsif command[1].casecmp('countkeysinslot').zero? || command[1].casecmp('getkeysinslot').zero?
