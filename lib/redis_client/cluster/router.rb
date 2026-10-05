@@ -394,15 +394,18 @@ class RedisClient
         if command[1].casecmp('debug').zero?
           @node.call_all(method, command, args).first.then(&TSF.call(block))
         elsif command[1].casecmp('kill').zero?
-          @node.call_all(method, command, args).first.then(&TSF.call(block))
+          # The primaries without any running script reply with the NOTBUSY error.
+          @node.call_primaries_leniently(method, command, args).first.then(&TSF.call(block))
         elsif command[1].casecmp('flush').zero?
-          @node.call_primaries(method, command, args).first.then(&TSF.call(block))
+          # The redis 7.0 or later doesn't propagate the scripts to the replicas.
+          @node.call_all(method, command, args).first.then(&TSF.call(block))
         elsif command[1].casecmp('load').zero?
-          @node.call_primaries(method, command, args).first.then(&TSF.call(block))
+          @node.call_all(method, command, args).first.then(&TSF.call(block))
         elsif command[1].casecmp('exists').zero?
           @node.call_all(method, command, args).transpose.map { |arr| arr.any?(&:zero?) ? 0 : 1 }.then(&TSF.call(block))
         else
-          assign_node(command).public_send(method, *args, command, &block)
+          # The other subcommands keep the default routing with the redirection handling.
+          send_command_by_spec(method, command, args, &block)
         end
       end
 

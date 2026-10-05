@@ -850,6 +850,20 @@ class RedisClient
         assert_equal(1, got.fetch('length'))
       end
 
+      def test_script_load_to_all_nodes
+        @captured_commands.clear
+        sha = @client.call('SCRIPT', 'LOAD', 'return 1')
+        loaded = @captured_commands.to_a.select { |e| e.command.first.casecmp('script').zero? }
+        node_keys = @client.instance_variable_get(:@router).node_keys
+
+        # The redis 7.0 or later doesn't propagate the scripts to the replicas.
+        assert_equal(node_keys.size, loaded.size)
+        assert_equal(node_keys.size, loaded.map(&:server_url).uniq.size)
+        assert_equal([1], @client.call('SCRIPT', 'EXISTS', sha))
+      ensure
+        @client&.call('SCRIPT', 'FLUSH')
+      end
+
       def test_command_tips_request_policy
         skip('The command tips are available in the redis 7.0 or later.') if TEST_REDIS_MAJOR_VERSION < 7
 
