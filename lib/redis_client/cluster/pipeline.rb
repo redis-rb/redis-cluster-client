@@ -277,7 +277,9 @@ class RedisClient
           try_redirection(node, pipeline, inner_index)
         elsif err.message.start_with?('ASK')
           node = @router.assign_asking_node(err.message)
-          try_asking(node) ? try_redirection(node, pipeline, inner_index) : err
+          node.with do |client|
+            try_asking(client) ? try_redirection(client, pipeline, inner_index) : err
+          end
         else
           err
         end

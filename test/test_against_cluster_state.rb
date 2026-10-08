@@ -268,7 +268,60 @@ module TestAgainstClusterState
     class Pooled < TestingWrapper
       include Mixin
 
+      module PingOnCheckin
+        def with(*args)
+          super do |client|
+            # Simulate another borrower consuming ASKING between pool checkouts.
+            yield(client).tap { client.call('PING') }
+          end
+        end
+      end
+
+      def test_asking_with_interleaved_commands
+        interleave_commands
+        do_resharding_test(number_of_keys: 10) do |keys|
+          keys.each do |key|
+            assert_equal(key, @client.call('GET', key))
+            assert_equal(key, @client.call_once('GET', key))
+            assert_equal(key, @client.blocking_call(TEST_TIMEOUT_SEC, 'GET', key))
+          end
+        end
+      end
+
+      def test_asking_with_interleaved_commands_in_pipeline
+        interleave_commands
+        do_resharding_test(number_of_keys: 10) do |keys|
+          [true, false].each do |exception|
+            got = @client.pipelined(exception: exception) do |pipeline|
+              keys.each { |key| pipeline.call('GET', key) { |v| "value: #{v}" } }
+              pipeline.call('ECHO', 'done')
+            end
+
+            assert_equal(keys.map { |key| "value: #{key}" } + ['done'], got)
+          end
+        end
+      end
+
+      def test_asking_with_interleaved_commands_in_transaction
+        interleave_commands
+        do_resharding_test(number_of_keys: 10) do |keys|
+          key = keys.first
+          got = @client.multi do |tx|
+            tx.call('SET', key, '10')
+            tx.call('INCR', key)
+          end
+
+          assert_equal(['OK', 11], got)
+          assert_equal('11', @client.call('GET', key))
+        end
+      end
+
       private
+
+      def interleave_commands
+        node = @client.instance_variable_get(:@router).instance_variable_get(:@node)
+        node.each { |pool| pool.singleton_class.prepend(PingOnCheckin) }
+      end
 
       def new_test_client(
         custom: { captured_commands: @captured_commands, redirect_count: @redirect_count },
