@@ -84,46 +84,56 @@ class RedisClient
       end
 
       def handle_redirection(node, command, retry_count:) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-        yield node
-      rescue ::RedisClient::CircuitBreaker::OpenCircuitError
-        raise
-      rescue ::RedisClient::CommandError => e
-        raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
-
-        retry_count -= 1
-        if e.message.start_with?('MOVED')
-          node = assign_redirection_node(e.message)
-          retry if retry_count >= 0
-        elsif e.message.start_with?('ASK')
-          node = assign_asking_node(e.message)
-          if retry_count >= 0
-            node.call('asking')
-            retry
-          end
-        elsif e.message.start_with?('CLUSTERDOWN')
-          renew_cluster_state
-          retry if retry_count >= 0
-        end
-
-        raise
-      rescue ::RedisClient::ConnectionError => e
-        raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
-
-        renew_cluster_state
-        raise if command.nil? || command.empty?
-
-        retry_count -= 1
-        raise if retry_count < 0
-
-        # Find the node to use for this command - if this fails for some reason, though, re-use
-        # the old node.
+        asking = false
         begin
-          node = find_node(find_node_key(command))
-        rescue StandardError
-          raise e
-        end
+          if asking
+            node.with do |client|
+              client.call('asking')
+              yield client
+            end
+          else
+            yield node
+          end
+        rescue ::RedisClient::CircuitBreaker::OpenCircuitError
+          raise
+        rescue ::RedisClient::CommandError => e
+          raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
 
-        retry
+          retry_count -= 1
+          asking = false
+          if e.message.start_with?('MOVED')
+            node = assign_redirection_node(e.message)
+            retry if retry_count >= 0
+          elsif e.message.start_with?('ASK')
+            node = assign_asking_node(e.message)
+            asking = true
+            retry if retry_count >= 0
+          elsif e.message.start_with?('CLUSTERDOWN')
+            renew_cluster_state
+            retry if retry_count >= 0
+          end
+
+          raise
+        rescue ::RedisClient::ConnectionError => e
+          raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
+
+          renew_cluster_state
+          raise if command.nil? || command.empty?
+
+          retry_count -= 1
+          raise if retry_count < 0
+
+          # Find the node to use for this command - if this fails for some reason, though, re-use
+          # the old node.
+          begin
+            node = find_node(find_node_key(command))
+          rescue StandardError
+            raise e
+          end
+
+          asking = false
+          retry
+        end
       end
 
       def scan(command, seed: nil, cursor_index: 1) # rubocop:disable Metrics/AbcSize
