@@ -129,6 +129,22 @@ class RedisClient
         @topology.clients.fetch(node_key)
       end
 
+      def find_or_connect(node_key)
+        client = @topology.clients[node_key]
+        return client unless client.nil?
+        raise ReloadNeeded if node_key.nil? || !@mutex.try_lock
+
+        begin
+          @topology.connect_to_node(node_key, @config.client_config_for_node(node_key))
+        ensure
+          @mutex.unlock
+        end
+      end
+
+      def primary_node_key?(node_key)
+        @replications.key?(node_key)
+      end
+
       def call_all(method, command, args, &block)
         call_multiple_nodes!(@topology.clients, method, command, args, &block)
       end
