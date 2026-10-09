@@ -211,6 +211,10 @@ class RedisClient
         @mutex.unlock if @mutex.owned?
       end
 
+      def mark_for_reload
+        @next_reload_time = nil
+      end
+
       def try_reload!
         with_reload_lock do
           with_reload_jitter do

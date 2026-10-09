@@ -214,6 +214,18 @@ module TestAgainstClusterState
       end
     end
 
+    def test_the_state_of_cluster_failover_within_reload_jitter
+      keys = Array.new(100) { |i| "key#{i}" }
+      @client.pipelined { |pipeline| keys.each { |key| pipeline.call('SET', key, key) } }
+      wait_for_replication
+      @controller.failover
+
+      node = @client.instance_variable_get(:@router).instance_variable_get(:@node)
+      # ensure that client is still within reload jitter
+      node.instance_variable_set(:@next_reload_time, node.send(:obtain_current_time) + 60_000_000)
+      keys.each { |key| assert_equal(key, @client.call('GET', key)) }
+    end
+
     private
 
     def wait_for_replication
