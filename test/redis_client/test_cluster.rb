@@ -1433,6 +1433,8 @@ class RedisClient
 
           assert_raises(::RedisClient::CheckoutTimeoutError) { client.multi { |tx| tx.call('GET', 'key') } }
           assert_equal(0, @captured_commands.count('cluster', 'shards'))
+          assert_equal(1, @captured_commands.count('multi'))
+          node.find_by(other_node_key).with { |cli| assert_predicate(cli, :connected?) }
         end
       ensure
         @redirect_count.clear
