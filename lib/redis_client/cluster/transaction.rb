@@ -124,7 +124,7 @@ class RedisClient
         end
       end
 
-      def send_pipeline(client, redirect:) # rubocop:disable Metrics/AbcSize
+      def send_pipeline(client, redirect:) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
         replies = client.ensure_connected_cluster_scoped(retryable: @retryable) do |connection|
           commands = @pipeline._commands
           client.middlewares.call_pipelined(commands, client.config) do
@@ -132,9 +132,10 @@ class RedisClient
           rescue ::RedisClient::CommandError => e
             ensure_the_same_slot!(commands)
             raise if redirect.zero?
-
             # Follow the redirection after leaving this block, so that errors from the other node don't close or retry this connection.
-            break e
+            break e if e.message.start_with?('MOVED', 'ASK')
+
+            handle_command_error!(e, redirect: redirect)
           end
         end
 
