@@ -155,7 +155,9 @@ class RedisClient
         result_values, errors = call_multiple_nodes(@topology.clients, method, command, args, &block)
         return result_values if errors.nil? || errors.empty?
 
-        raise ReloadNeeded if errors.values.any?(::RedisClient::ConnectionError)
+        raise ReloadNeeded if errors.values.any? do |err|
+          err.is_a?(::RedisClient::ConnectionError) && !err.is_a?(::RedisClient::CheckoutTimeoutError)
+        end
 
         raise ::RedisClient::Cluster::ErrorCollection.with_errors(errors)
       end

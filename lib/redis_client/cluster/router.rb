@@ -42,7 +42,7 @@ class RedisClient
         return send_command_by_spec(method, command, args, &block) if action.nil?
 
         send_command_by_action(action, method, command, args, &block)
-      rescue ::RedisClient::CircuitBreaker::OpenCircuitError
+      rescue ::RedisClient::CircuitBreaker::OpenCircuitError, ::RedisClient::CheckoutTimeoutError
         raise
       rescue ::RedisClient::Cluster::Node::ReloadNeeded
         renew_cluster_state
@@ -58,6 +58,7 @@ class RedisClient
         raise if e.errors.any?(::RedisClient::CircuitBreaker::OpenCircuitError)
 
         renew_cluster_state if e.errors.values.any? do |err|
+          next false if err.is_a?(::RedisClient::CheckoutTimeoutError)
           next false if ::RedisClient::Cluster::ErrorIdentification.identifiable?(err) && @node.none? { |c| ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(err, c) }
 
           err.message.start_with?('CLUSTERDOWN') || err.is_a?(::RedisClient::ConnectionError)
@@ -94,7 +95,7 @@ class RedisClient
           else
             yield node
           end
-        rescue ::RedisClient::CircuitBreaker::OpenCircuitError
+        rescue ::RedisClient::CircuitBreaker::OpenCircuitError, ::RedisClient::CheckoutTimeoutError
           raise
         rescue ::RedisClient::CommandError => e
           raise unless ::RedisClient::Cluster::ErrorIdentification.client_owns_error?(e, node)
@@ -156,6 +157,8 @@ class RedisClient
         client_index += 1 if result_cursor == 0
 
         [((result_cursor << 8) + client_index).to_s, result_keys]
+      rescue ::RedisClient::CheckoutTimeoutError
+        raise
       rescue ::RedisClient::ConnectionError
         renew_cluster_state
         raise

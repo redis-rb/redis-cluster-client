@@ -205,7 +205,7 @@ class RedisClient
             cluster_state_errors ||= {}
             cluster_state_errors[node_key] = v
           when StandardError
-            cluster_state_errors ||= {} if v.is_a?(::RedisClient::ConnectionError)
+            cluster_state_errors ||= {} if v.is_a?(::RedisClient::ConnectionError) && !v.is_a?(::RedisClient::CheckoutTimeoutError)
             errors ||= {}
             errors[node_key] = v
           else
@@ -283,6 +283,10 @@ class RedisClient
         else
           err
         end
+      rescue ::RedisClient::CheckoutTimeoutError
+        raise if @exception
+
+        err
       end
 
       def try_redirection(node, pipeline, inner_index)
@@ -307,6 +311,8 @@ class RedisClient
 
       def try_asking(node)
         node.call('asking') == 'OK'
+      rescue ::RedisClient::CheckoutTimeoutError
+        raise
       rescue StandardError
         false
       end

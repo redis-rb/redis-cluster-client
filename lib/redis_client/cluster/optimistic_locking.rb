@@ -34,6 +34,8 @@ class RedisClient
               @router.renew_cluster_state if e.message.start_with?('CLUSTERDOWN')
               raise
             end
+          rescue ::RedisClient::CheckoutTimeoutError
+            raise
           rescue ::RedisClient::ConnectionError
             @router.renew_cluster_state
             raise
@@ -52,6 +54,8 @@ class RedisClient
           times_block_executed += 1
           handle_asking_once(nd, &blk)
         end
+      rescue ::RedisClient::CheckoutTimeoutError
+        raise
       rescue ::RedisClient::ConnectionError
         # Deduct the number of retries that happened _inside_ router#handle_redirection from our remaining
         # _external_ retries. Always deduct at least one in case handle_redirection raises without trying the block.

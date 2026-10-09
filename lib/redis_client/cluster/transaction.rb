@@ -140,6 +140,8 @@ class RedisClient
         return if replies.last.nil?
 
         coerce_results!(replies.last)
+      rescue ::RedisClient::CheckoutTimeoutError
+        raise
       rescue ::RedisClient::ConnectionError
         @router.renew_cluster_state if @watching_slot.nil?
         raise
@@ -192,6 +194,8 @@ class RedisClient
 
       def try_asking(node)
         node.call('asking') == 'OK'
+      rescue ::RedisClient::CheckoutTimeoutError
+        raise
       rescue StandardError
         false
       end
