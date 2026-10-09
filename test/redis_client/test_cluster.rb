@@ -1343,9 +1343,105 @@ class RedisClient
     class Pooled < TestingWrapper
       include Mixin
 
+      def test_checkout_timeout_does_not_reload_cluster
+        with_exhausted_pool do |client, _router|
+          assert_raises(::RedisClient::CheckoutTimeoutError) { client.call('GET', 'key') }
+          assert_equal(0, @captured_commands.count('cluster', 'shards'))
+        end
+      end
+
+      def test_checkout_timeout_in_pipeline_does_not_reload_cluster
+        with_exhausted_pool do |client, _router|
+          err = assert_raises(::RedisClient::Cluster::ErrorCollection) do
+            client.pipelined { |pipeline| pipeline.call('GET', 'key') }
+          end
+
+          assert_instance_of(::RedisClient::CheckoutTimeoutError, err.errors.values.first)
+          assert_equal(0, @captured_commands.count('cluster', 'shards'))
+        end
+      end
+
+      def test_checkout_timeout_does_not_hide_connection_errors_in_pipeline
+        with_exhausted_pool do |client, router|
+          node_key = router.find_node_key_by_key('key', primary: true)
+          other_key = (0...100).map { |i| "other#{i}" }.find do |key|
+            router.find_node_key_by_key(key, primary: true) != node_key
+          end
+
+          err = swap_timeout(client, timeout: 0.01) do
+            assert_raises(::RedisClient::Cluster::ErrorCollection) do
+              client.pipelined do |pipeline|
+                pipeline.call('GET', 'key')
+                pipeline.blocking_call(0.01, 'BLPOP', other_key, 0)
+              end
+            end
+          end
+
+          assert_includes(err.errors.values.map(&:class), ::RedisClient::CheckoutTimeoutError)
+          assert_includes(err.errors.values.map(&:class), ::RedisClient::ReadTimeoutError)
+          assert_operator(@captured_commands.count('cluster', 'shards'), :>, 0)
+        end
+      end
+
+      def test_checkout_timeout_in_scan_does_not_reload_cluster
+        with_exhausted_pool do |client, _router|
+          assert_raises(::RedisClient::CheckoutTimeoutError) { client.scan.to_a }
+          assert_equal(0, @captured_commands.count('cluster', 'shards'))
+        end
+      end
+
+      def test_checkout_timeout_in_watch_does_not_reload_cluster
+        with_exhausted_pool do |client, _router|
+          assert_raises(::RedisClient::CheckoutTimeoutError) do
+            client.multi(watch: ['key']) { |tx| tx.call('GET', 'key') }
+          end
+
+          assert_equal(0, @captured_commands.count('cluster', 'shards'))
+        end
+      end
+
+      def test_checkout_timeout_in_fanout_does_not_reload_cluster
+        %w[PING DBSIZE].each do |command|
+          with_exhausted_pool do |client, _router|
+            err = assert_raises(::RedisClient::Cluster::ErrorCollection) { client.call(command) }
+
+            assert_instance_of(::RedisClient::CheckoutTimeoutError, err.errors.values.first)
+            assert_equal(0, @captured_commands.count('cluster', 'shards'))
+          end
+        end
+      end
+
+      def test_checkout_timeout_in_pubsub_does_not_reload_cluster
+        skip('Sharded Pub/Sub requires Redis 7 or later') if TEST_REDIS_MAJOR_VERSION < 7
+
+        with_exhausted_pool do |client, _router|
+          pubsub = client.pubsub
+          assert_raises(::RedisClient::CheckoutTimeoutError) { pubsub.call('SSUBSCRIBE', 'key') }
+          assert_equal(0, @captured_commands.count('cluster', 'shards'))
+        ensure
+          pubsub&.close
+        end
+      end
+
+      def test_checkout_timeout_in_redirected_transaction_does_not_reload_cluster
+        with_exhausted_pool do |client, router|
+          node = router.instance_variable_get(:@node)
+          slot = router.find_slot_by_key('key')
+          node_key = router.find_node_key_by_key('key', primary: true)
+          other_node_key = node.node_keys.find { |key| key != node_key }
+          node.update_slot(slot, other_node_key)
+
+          assert_raises(::RedisClient::CheckoutTimeoutError) { client.multi { |tx| tx.call('GET', 'key') } }
+          assert_equal(0, @captured_commands.count('cluster', 'shards'))
+        end
+      ensure
+        @redirect_count.clear
+      end
+
       def new_test_client(
         custom: { captured_commands: @captured_commands, redirect_count: @redirect_count },
         middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectCount],
+        pool: { timeout: TEST_TIMEOUT_SEC, size: 2 },
         **opts
       )
         config = ::RedisClient::ClusterConfig.new(
@@ -1357,7 +1453,38 @@ class RedisClient
           **TEST_GENERIC_OPTIONS,
           **opts
         )
-        ::RedisClient::Cluster.new(config, pool: { timeout: TEST_TIMEOUT_SEC, size: 2 })
+        ::RedisClient::Cluster.new(config, pool: pool)
+      end
+
+      private
+
+      def with_exhausted_pool
+        client = new_test_client(pool: { timeout: 0.01, size: 1 })
+        client.call('SET', 'key', 'value')
+        router = client.instance_variable_get(:@router)
+        node = router.instance_variable_get(:@node)
+        pool = router.find_primary_node_by_slot(router.find_slot_by_key('key'))
+        ready = Queue.new
+        release = Queue.new
+        holder = Thread.new do
+          pool.with do
+            ready << true
+            release.pop
+          end
+        end
+
+        Timeout.timeout(TEST_TIMEOUT_SEC) { ready.pop }
+        node.instance_variable_set(:@next_reload_time, nil)
+        @captured_commands.clear
+        yield client, router
+        other_key = (0...100).map { |i| "other#{i}" }.find do |key|
+          !router.find_primary_node_by_slot(router.find_slot_by_key(key)).equal?(pool)
+        end
+        assert_equal('OK', client.call('SET', other_key, 'available'))
+      ensure
+        release&.push(true)
+        holder&.join(TEST_TIMEOUT_SEC)
+        client&.close
       end
     end
   end

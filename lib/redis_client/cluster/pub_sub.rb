@@ -171,6 +171,8 @@ class RedisClient
 
       def handle_connection_error(node_key, ignore: false)
         yield
+      rescue ::RedisClient::CheckoutTimeoutError
+        raise
       rescue ::RedisClient::ConnectionError
         @state_dict[node_key]&.close
         @state_dict.delete(node_key)
@@ -186,6 +188,8 @@ class RedisClient
           @state_dict.clear
           @commands.each { |command| _call(command) }
           break
+        rescue ::RedisClient::CheckoutTimeoutError
+          raise
         rescue ::RedisClient::ConnectionError, ::RedisClient::Cluster::NodeMightBeDown
           attempt += 1
           raise if attempt >= 10

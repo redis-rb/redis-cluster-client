@@ -302,6 +302,48 @@ module TestAgainstClusterState
         end
       end
 
+      def test_checkout_timeout_in_asking_pipeline
+        client = new_test_client(pool: { timeout: 0.01, size: 1 })
+        client.call('ECHO', 'init')
+        router = client.instance_variable_get(:@router)
+        node = router.instance_variable_get(:@node)
+        ready = Queue.new
+        release = Queue.new
+        holder = nil
+
+        do_resharding_test(number_of_keys: 10) do |keys|
+          key = keys.first
+          source = router.find_primary_node_by_slot(router.find_slot_by_key(key))
+          err = assert_raises(::RedisClient::CommandError) { source.call('GET', key) }
+          assert_match(/^ASK /, err.message)
+          pool = router.assign_asking_node(err.message)
+          holder = Thread.new do
+            pool.with do
+              ready << true
+              release.pop
+            end
+          end
+
+          Timeout.timeout(TEST_TIMEOUT_SEC) { ready.pop }
+          node.instance_variable_set(:@next_reload_time, nil)
+          @captured_commands.clear
+
+          assert_raises(::RedisClient::CheckoutTimeoutError) do
+            client.pipelined { |pipeline| pipeline.call('GET', key) }
+          end
+
+          got = client.pipelined(exception: false) { |pipeline| pipeline.call('GET', key) }
+          assert_equal(1, got.size)
+          assert_instance_of(::RedisClient::CommandError, got.first)
+          assert_equal(err.message, got.first.message)
+          assert_equal(0, @captured_commands.count('cluster', 'shards'))
+        end
+      ensure
+        release&.push(true)
+        holder&.join(TEST_TIMEOUT_SEC)
+        client&.close
+      end
+
       def test_asking_with_interleaved_commands_in_transaction
         interleave_commands
         do_resharding_test(number_of_keys: 10) do |keys|
@@ -326,6 +368,7 @@ module TestAgainstClusterState
       def new_test_client(
         custom: { captured_commands: @captured_commands, redirect_count: @redirect_count },
         middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectCount],
+        pool: { timeout: TEST_TIMEOUT_SEC, size: 2 },
         **opts
       )
         ::RedisClient.cluster(
@@ -335,7 +378,7 @@ module TestAgainstClusterState
           custom: custom,
           **TEST_GENERIC_OPTIONS,
           **opts
-        ).new_pool(timeout: TEST_TIMEOUT_SEC, size: 2)
+        ).new_pool(**pool)
       end
     end
   end
