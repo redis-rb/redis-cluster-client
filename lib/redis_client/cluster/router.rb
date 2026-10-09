@@ -239,6 +239,7 @@ class RedisClient
       def assign_redirection_node(err_msg)
         _, slot, node_key = err_msg.split
         slot = slot.to_i
+        @node.mark_for_reload unless @node.node_keys.include?(node_key)
         @node.update_slot(slot, node_key)
         handle_node_reload_error { @node.find_by(node_key) }
       end
