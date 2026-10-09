@@ -1438,6 +1438,22 @@ class RedisClient
         @redirect_count.clear
       end
 
+      def test_checkout_timeout_in_redirected_transaction_keeps_the_redirecting_connection
+        with_exhausted_pool do |client, router|
+          node = router.instance_variable_get(:@node)
+          slot = router.find_slot_by_key('key')
+          node_key = router.find_node_key_by_key('key', primary: true)
+          other_node_key = node.node_keys.find { |key| key != node_key }
+          node.update_slot(slot, other_node_key)
+
+          assert_raises(::RedisClient::CheckoutTimeoutError) { client.multi { |tx| tx.call('GET', 'key') } }
+          assert_equal(1, @captured_commands.count('multi'))
+          node.find_by(other_node_key).with { |cli| assert_predicate(cli, :connected?) }
+        end
+      ensure
+        @redirect_count.clear
+      end
+
       def new_test_client(
         custom: { captured_commands: @captured_commands, redirect_count: @redirect_count },
         middlewares: [::Middlewares::CommandCapture, ::Middlewares::RedirectCount],

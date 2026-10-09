@@ -131,12 +131,14 @@ class RedisClient
             connection.call_pipelined(commands, nil)
           rescue ::RedisClient::CommandError => e
             ensure_the_same_slot!(commands)
-            return handle_command_error!(e, redirect: redirect) unless redirect.zero?
+            raise if redirect.zero?
 
-            raise
+            # Follow the redirection after leaving this block, so that errors from the other node don't close or retry this connection.
+            break e
           end
         end
 
+        return handle_command_error!(replies, redirect: redirect) if replies.is_a?(::RedisClient::CommandError)
         return if replies.last.nil?
 
         coerce_results!(replies.last)
