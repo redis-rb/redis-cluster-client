@@ -648,6 +648,20 @@ class RedisClient
         end
       end
 
+      def test_find_or_connect
+        replica_key = @test_node_info_list.find(&:replica?).node_key
+        got = @test_node.find_or_connect(replica_key)
+        assert_instance_of(::RedisClient, got)
+        refute_includes(got.config.connection_prelude, %w[readonly])
+        assert_same(got, @test_node.find_or_connect(replica_key))
+        assert_same(got, @test_node.find_by(replica_key))
+
+        node = make_node.tap(&:try_reload!)
+        node.instance_variable_get(:@mutex).synchronize do
+          assert_raises(::RedisClient::Cluster::Node::ReloadNeeded) { node.find_or_connect(replica_key) }
+        end
+      end
+
       def test_call_all
         want = (1..(@test_node_info_list.count(&:primary?))).map { |_| 'PONG' }
         got = @test_node.call_all(:call_v, ['PING'], [])

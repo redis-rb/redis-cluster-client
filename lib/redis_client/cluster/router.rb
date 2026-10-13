@@ -238,14 +238,16 @@ class RedisClient
 
       def assign_redirection_node(err_msg)
         _, slot, node_key = err_msg.split
-        slot = slot.to_i
-        @node.update_slot(slot, node_key)
-        handle_node_reload_error { @node.find_by(node_key) }
+        # A MOVED to anything but a known primary means the map is behind; the reload is throttled by the jitter.
+        renew_cluster_state unless @node.primary_node_key?(node_key)
+        node = handle_node_reload_error { @node.find_or_connect(node_key) }
+        @node.update_slot(slot.to_i, node_key)
+        node
       end
 
       def assign_asking_node(err_msg)
         _, _, node_key = err_msg.split
-        handle_node_reload_error { @node.find_by(node_key) }
+        handle_node_reload_error { @node.find_or_connect(node_key) }
       end
 
       def node_keys
