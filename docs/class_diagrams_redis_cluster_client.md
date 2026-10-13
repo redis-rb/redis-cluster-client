@@ -53,9 +53,13 @@ classDiagram
     +sample()
     +node_keys()
     +find_by()
+    +find_or_connect()
+    +primary_node_key?()
     +call_all()
     +call_primaries()
     +call_replicas()
+    +call_all_leniently()
+    +call_primaries_leniently()
     +send_ping()
     +clients()
     +primary_clients()
@@ -76,6 +80,7 @@ classDiagram
     +clients_for_scanning()
     +any_primary_node_key()
     +process_topology_update!()
+    +connect_to_node()
   }
 
   class RedisClient_Cluster_Node_PrimaryOnly {
