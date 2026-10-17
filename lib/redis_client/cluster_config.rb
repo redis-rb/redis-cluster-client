@@ -169,7 +169,7 @@ class RedisClient
       when Hash
         parse_node_option(addr)
       else
-        raise InvalidClientConfigError, "`nodes` option includes invalid type values: #{addr}"
+        raise InvalidClientConfigError, "`nodes` option includes invalid type values: #{addr.class}"
       end
     end
 
@@ -178,7 +178,7 @@ class RedisClient
 
       uri = URI(addr)
       scheme = uri.scheme || DEFAULT_SCHEME
-      raise InvalidClientConfigError, "`nodes` option includes a invalid uri scheme: #{addr}" unless VALID_SCHEMES.include?(scheme)
+      raise InvalidClientConfigError, "`nodes` option includes a invalid uri scheme: #{redact_url(addr)}" unless VALID_SCHEMES.include?(scheme)
 
       username = uri.user ? URI.decode_www_form_component(uri.user) : nil
       password = uri.password ? URI.decode_www_form_component(uri.password) : nil
@@ -190,7 +190,11 @@ class RedisClient
       { ssl: scheme == SECURE_SCHEME, username: username, password: password, host: host, port: port, db: db }
         .reject { |_, v| v.nil? || v == '' || v == false }
     rescue URI::InvalidURIError => e
-      raise InvalidClientConfigError, "#{e.message}: #{addr}"
+      raise InvalidClientConfigError, redact_url(e.message)
+    end
+
+    def redact_url(str)
+      str.sub(%r{//(.*)@}, '//REDACTED@')
     end
 
     def parse_node_option(addr)
