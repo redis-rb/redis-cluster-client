@@ -194,7 +194,11 @@ class RedisClient
     end
 
     def redact_url(str)
-      str.sub(%r{//(.*)@}, '//REDACTED@')
+      head = str.index('//')
+      tail = str.rindex('@')
+      return str if head.nil? || tail.nil? || tail < head + 2
+
+      "#{str[0, head]}//REDACTED#{str[tail..]}"
     end
 
     def parse_node_option(addr)
