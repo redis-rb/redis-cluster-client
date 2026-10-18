@@ -198,7 +198,7 @@ class RedisClient
       tail = str.rindex('@')
       return str if head.nil? || tail.nil? || tail < head + 2
 
-      "#{str[0, head]}//REDACTED#{str[tail..]}"
+      "#{str[0, head]}//REDACTED#{str[tail, str.size - tail]}"
     end
 
     def parse_node_option(addr)
