@@ -227,6 +227,24 @@ class RedisClient
       end
     end
 
+    def test_build_node_configs_redacts_secrets
+      config = ::RedisClient::ClusterConfig.new
+      [
+        { addr: 'redsi://:s3cret@127.0.0.1:6379', want: 'redsi://REDACTED@127.0.0.1:6379' },
+        { addr: 'redsi://foo:s3cret@127.0.0.1:6379', want: 'redsi://REDACTED@127.0.0.1:6379' },
+        { addr: 'redis://:s3cr^t@127.0.0.1:6379', want: 'redis://REDACTED@127.0.0.1:6379' },
+        { addr: 'redis://:s3cret@127.0.0.1:foo', want: 'redis://REDACTED@127.0.0.1:foo' },
+        { addr: URI('redis://:s3cret@127.0.0.1:6379'), want: 'URI::' }
+      ].each_with_index do |c, idx|
+        msg = "Case: #{idx}"
+        err = assert_raises(::RedisClient::ClusterConfig::InvalidClientConfigError, msg) do
+          config.send(:build_node_configs, [c[:addr]])
+        end
+        refute_includes(err.message, 's3c', msg)
+        assert_includes(err.message, c[:want], msg)
+      end
+    end
+
     def test_merge_generic_config
       config = ::RedisClient::ClusterConfig.new
       [
