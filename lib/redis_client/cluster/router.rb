@@ -480,6 +480,9 @@ class RedisClient
         elsif cmd.casecmp('del').zero?
           single_key_cmd = 'del'
           keys_step = 1
+        elsif cmd.casecmp('unlink').zero?
+          single_key_cmd = 'unlink'
+          keys_step = 1
         else
           raise NotImplementedError, cmd
         end
@@ -511,7 +514,7 @@ class RedisClient
         replies = pipeline.execute
         result = if cmd.casecmp('mset').zero?
                    replies.first
-                 elsif cmd.casecmp('del').zero?
+                 elsif cmd.casecmp('del').zero? || cmd.casecmp('unlink').zero?
                    replies.sum
                  else
                    replies
