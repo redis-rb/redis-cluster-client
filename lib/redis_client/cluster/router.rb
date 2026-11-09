@@ -509,10 +509,10 @@ class RedisClient
         end
 
         replies = pipeline.execute
-        result = if cmd.casecmp('mset').zero?
-                   replies.first
-                 elsif cmd.casecmp('mget').zero?
+        result = if cmd.casecmp('mget').zero?
                    replies
+                 elsif cmd.casecmp('mset').zero?
+                   replies.first
                  else
                    replies.sum
                  end
