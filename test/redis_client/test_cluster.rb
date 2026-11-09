@@ -1004,7 +1004,18 @@ class RedisClient
           { command: %w[MSET key1 val1 key2 val2], want: 'OK', wait: true },
           { command: %w[UNLINK key1 key2], want: 2, wait: true },
           { command: %w[MSET key1 val1 key2 val2], want: 'OK', wait: true },
-          { command: %w[UNLINK key1 key2], block: ->(r) { r == 2 }, want: true, wait: true }
+          { command: %w[UNLINK key1 key2], block: ->(r) { r == 2 }, want: true, wait: true },
+          { command: %w[MSET key1 val1 key2 val2 {key}1 val1 {key}2 val2], want: 'OK', wait: true },
+          { command: %w[EXISTS key1], want: 1 },
+          { command: %w[EXISTS {key}1 {key}2 {key}3], want: 2 },
+          { command: %w[EXISTS key1 key2 key3], want: 2 },
+          { command: %w[EXISTS key1 key1 key2], want: 3 },
+          { command: %w[EXISTS key1 key2], block: ->(r) { r == 2 }, want: true },
+          { command: %w[TOUCH key1], want: 1 },
+          { command: %w[TOUCH {key}1 {key}2 {key}3], want: 2 },
+          { command: %w[TOUCH key1 key2 key3], want: 2 },
+          { command: %w[TOUCH key1 key2], block: ->(r) { r == 2 }, want: true },
+          { command: %w[DEL key1 key2 {key}1 {key}2], want: 4, wait: true }
         ].each_with_index do |c, i|
           block = c.key?(:block) ? c.fetch(:block) : nil
           assert_equal(c.fetch(:want), @client.call_v(c.fetch(:command), &block), i + 1)
