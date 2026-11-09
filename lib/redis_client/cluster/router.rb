@@ -477,11 +477,8 @@ class RedisClient
         elsif cmd.casecmp('mset').zero?
           single_key_cmd = 'set'
           keys_step = 2
-        elsif cmd.casecmp('del').zero?
-          single_key_cmd = 'del'
-          keys_step = 1
-        elsif cmd.casecmp('unlink').zero?
-          single_key_cmd = 'unlink'
+        elsif cmd.casecmp('del').zero? || cmd.casecmp('unlink').zero? || cmd.casecmp('exists').zero? || cmd.casecmp('touch').zero?
+          single_key_cmd = cmd
           keys_step = 1
         else
           raise NotImplementedError, cmd
@@ -514,10 +511,10 @@ class RedisClient
         replies = pipeline.execute
         result = if cmd.casecmp('mset').zero?
                    replies.first
-                 elsif cmd.casecmp('del').zero? || cmd.casecmp('unlink').zero?
-                   replies.sum
-                 else
+                 elsif cmd.casecmp('mget').zero?
                    replies
+                 else
+                   replies.sum
                  end
         block_given? ? yield(result) : result
       end

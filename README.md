@@ -237,7 +237,7 @@ $ redis-cli -c cluster keyslot {key}3
 (integer) 12539
 ```
 
-In addition, this gem handles multiple keys without a hash tag in MGET, MSET, DEL and UNLINK commands
+In addition, this gem handles multiple keys without a hash tag in MGET, MSET, DEL, UNLINK, EXISTS and TOUCH commands
 using pipelining internally automatically.
 If the first key includes a hash tag, this gem sends the command to the node as is.
 If the first key doesn't have a hash tag, this gem converts the command into single-key commands
