@@ -46,6 +46,7 @@ class RedisClient
             'mget' => multiple_key_action,
             'mset' => multiple_key_action,
             'del' => multiple_key_action,
+            'unlink' => multiple_key_action,
             'acl' => all_node_first_action,
             'auth' => all_node_first_action,
             'bgrewriteaof' => all_node_first_action,
