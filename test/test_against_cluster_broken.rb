@@ -78,11 +78,17 @@ class TestAgainstClusterBroken < TestingWrapper
     wait_for_reload_jitter_elapsed(@clients[0])
 
     call_count = 0
-    # Begin a transaction, but shut the node down after the WATCH is issued
-    res = @clients[0].multi(watch: [test_key]) do |tx|
-      kill_a_node_and_wait_for_failover(sacrifice) if call_count == 0
-      call_count += 1
-      tx.call('SET', test_key, 'foobar2')
+    # The client retries a watched transaction only once, so the retry gets a single chance against the
+    # new primary. The regular timeout of this test case is tuned for detecting a dead node quickly, and
+    # it can be too tight for that write on a loaded CI runner. Don't make it much larger though, because
+    # every read from the dead node waits this long too.
+    res = swap_timeout(@clients[0], timeout: 1.0) do |client|
+      # Begin a transaction, but shut the node down after the WATCH is issued
+      client.multi(watch: [test_key]) do |tx|
+        kill_a_node_and_wait_for_failover(sacrifice) if call_count == 0
+        call_count += 1
+        tx.call('SET', test_key, 'foobar2')
+      end
     end
 
     # The transaction should have retried once and successfully completed
