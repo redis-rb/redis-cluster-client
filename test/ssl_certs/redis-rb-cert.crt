@@ -1,83 +1,25 @@
-Certificate:
-    Data:
-        Version: 3 (0x2)
-        Serial Number:
-            43:87:dc:06:13:ee:04:7f:3f:76:1c:50:61:69:37:54:6b:55:ea:36
-        Signature Algorithm: sha256WithRSAEncryption
-        Issuer: C=US, ST=Georgia, L=Atlanta, O=redis-rb, OU=redis-cluster-client, CN=127.0.0.1
-        Validity
-            Not Before: Oct  8 03:17:10 2022 GMT
-            Not After : Jul 28 03:17:10 2322 GMT
-        Subject: C=US, ST=Georgia, O=redis-rb, OU=redis-cluster-client, CN=127.0.0.1
-        Subject Public Key Info:
-            Public Key Algorithm: rsaEncryption
-                RSA Public-Key: (2048 bit)
-                Modulus:
-                    00:d6:4f:ad:73:24:2f:c8:0d:19:6b:39:a4:f3:9a:
-                    8a:c6:8e:cf:6c:bf:2a:63:90:ee:ed:52:3b:fe:41:
-                    eb:dd:04:99:bc:39:35:66:b6:70:66:d7:d7:55:1d:
-                    3d:71:33:a1:3a:d6:e5:45:51:43:36:da:bc:62:99:
-                    85:38:07:c4:20:97:58:6f:39:1c:9e:a2:3b:e9:ae:
-                    5f:b5:79:18:53:9a:dd:b5:9a:2a:9a:8f:e1:76:2c:
-                    a7:2f:a0:1e:59:8d:99:2a:d2:92:e3:a8:77:d1:4f:
-                    50:14:dd:43:e4:cf:3c:84:b6:ad:01:2f:b0:ff:b2:
-                    af:08:56:73:39:09:48:7e:b4:a8:41:c4:e5:a3:0b:
-                    0b:1f:a6:ab:27:cd:b5:6c:5a:a8:45:ed:e5:6e:76:
-                    49:58:9c:ce:77:fb:81:6a:37:91:67:8c:78:b6:ef:
-                    73:29:da:bb:c2:19:84:97:2b:c4:ed:b5:52:b9:47:
-                    64:70:9c:ac:af:5b:20:e3:1c:da:2c:ca:9c:26:32:
-                    af:72:06:4d:d0:a3:6e:3d:48:e5:00:08:68:0f:1b:
-                    81:74:16:fe:d1:32:78:c8:16:56:04:88:c1:3f:da:
-                    a5:a9:3b:13:2a:c8:ae:ee:c0:ef:ab:45:a7:f7:1a:
-                    6b:e0:fb:2a:fa:40:98:75:a1:04:10:97:40:65:54:
-                    15:09
-                Exponent: 65537 (0x10001)
-        X509v3 extensions:
-            X509v3 Basic Constraints: 
-                CA:FALSE
-            Netscape Comment: 
-                OpenSSL Generated Certificate
-            X509v3 Subject Key Identifier: 
-                02:53:41:2F:20:D1:67:C8:7C:64:B8:BE:3E:0A:E7:9C:CC:D3:F2:1C
-            X509v3 Authority Key Identifier: 
-                keyid:0B:58:F9:45:C7:E6:1B:BD:2E:94:9C:3C:11:CD:CB:94:87:53:62:70
-
-    Signature Algorithm: sha256WithRSAEncryption
-         04:88:63:a4:0d:93:df:2d:a3:56:e2:e6:31:2a:53:6b:bc:dc:
-         d2:b5:1c:81:e6:c9:dc:44:78:27:9e:76:b2:60:bc:ae:96:6f:
-         33:19:df:08:24:fb:cd:ae:6a:e0:56:63:dd:a8:ed:c9:93:7e:
-         ae:9a:14:16:e9:16:20:fe:4f:00:82:6c:32:39:95:58:8d:22:
-         97:a9:76:79:45:aa:90:8e:c8:78:08:92:eb:ab:14:c9:5a:b0:
-         04:c7:81:00:81:2c:f0:1c:f7:54:e4:d5:db:b3:b9:bf:a2:6a:
-         70:45:8b:2d:f1:fb:20:d6:ef:ea:80:15:d8:db:07:65:7d:f6:
-         69:dc:cf:21:00:24:01:40:10:b2:c2:4f:c4:12:70:50:d3:18:
-         37:89:fc:80:99:21:20:bb:1a:6c:44:f1:f2:31:03:4c:5d:b8:
-         1a:ec:2e:43:53:9b:8a:af:c1:7c:08:e8:a2:6a:44:37:d8:78:
-         6f:f5:14:4e:1c:16:66:b3:69:ec:aa:4c:d3:8c:55:b7:0c:a2:
-         69:c2:cc:0c:d0:27:f1:14:d4:16:51:8f:c4:f1:74:47:fc:d7:
-         1d:d0:03:41:7a:cb:c2:c7:99:9c:ca:4b:3f:ac:4a:7d:77:3b:
-         b9:bb:7b:73:3f:0f:1b:e6:52:c2:d8:3f:88:be:d3:42:5f:f5:
-         cc:b5:99:f5
 -----BEGIN CERTIFICATE-----
-MIID5zCCAs+gAwIBAgIUQ4fcBhPuBH8/dhxQYWk3VGtV6jYwDQYJKoZIhvcNAQEL
-BQAwdzELMAkGA1UEBhMCVVMxEDAOBgNVBAgMB0dlb3JnaWExEDAOBgNVBAcMB0F0
-bGFudGExETAPBgNVBAoMCHJlZGlzLXJiMR0wGwYDVQQLDBRyZWRpcy1jbHVzdGVy
-LWNsaWVudDESMBAGA1UEAwwJMTI3LjAuMC4xMCAXDTIyMTAwODAzMTcxMFoYDzIz
-MjIwNzI4MDMxNzEwWjBlMQswCQYDVQQGEwJVUzEQMA4GA1UECAwHR2VvcmdpYTER
-MA8GA1UECgwIcmVkaXMtcmIxHTAbBgNVBAsMFHJlZGlzLWNsdXN0ZXItY2xpZW50
-MRIwEAYDVQQDDAkxMjcuMC4wLjEwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
-AoIBAQDWT61zJC/IDRlrOaTzmorGjs9svypjkO7tUjv+QevdBJm8OTVmtnBm19dV
-HT1xM6E61uVFUUM22rximYU4B8Qgl1hvORyeojvprl+1eRhTmt21miqaj+F2LKcv
-oB5ZjZkq0pLjqHfRT1AU3UPkzzyEtq0BL7D/sq8IVnM5CUh+tKhBxOWjCwsfpqsn
-zbVsWqhF7eVudklYnM53+4FqN5FnjHi273Mp2rvCGYSXK8TttVK5R2RwnKyvWyDj
-HNosypwmMq9yBk3Qo249SOUACGgPG4F0Fv7RMnjIFlYEiME/2qWpOxMqyK7uwO+r
-Raf3Gmvg+yr6QJh1oQQQl0BlVBUJAgMBAAGjezB5MAkGA1UdEwQCMAAwLAYJYIZI
-AYb4QgENBB8WHU9wZW5TU0wgR2VuZXJhdGVkIENlcnRpZmljYXRlMB0GA1UdDgQW
-BBQCU0EvINFnyHxkuL4+CueczNPyHDAfBgNVHSMEGDAWgBQLWPlFx+YbvS6UnDwR
-zcuUh1NicDANBgkqhkiG9w0BAQsFAAOCAQEABIhjpA2T3y2jVuLmMSpTa7zc0rUc
-gebJ3ER4J552smC8rpZvMxnfCCT7za5q4FZj3ajtyZN+rpoUFukWIP5PAIJsMjmV
-WI0il6l2eUWqkI7IeAiS66sUyVqwBMeBAIEs8Bz3VOTV27O5v6JqcEWLLfH7INbv
-6oAV2NsHZX32adzPIQAkAUAQssJPxBJwUNMYN4n8gJkhILsabETx8jEDTF24Guwu
-Q1Obiq/BfAjoompEN9h4b/UUThwWZrNp7KpM04xVtwyiacLMDNAn8RTUFlGPxPF0
-R/zXHdADQXrLwseZnMpLP6xKfXc7ubt7cz8PG+ZSwtg/iL7TQl/1zLWZ9Q==
+MIIELjCCAxagAwIBAgIRAMnS5ru55CiuUwZudIrJ0zEwDQYJKoZIhvcNAQELBQAw
+eTELMAkGA1UEBhMCVVMxEDAOBgNVBAgMB0dlb3JnaWExEDAOBgNVBAcMB0F0bGFu
+dGExETAPBgNVBAoMCHJlZGlzLXJiMR0wGwYDVQQLDBRyZWRpcy1jbHVzdGVyLWNs
+aWVudDEUMBIGA1UEAwwLcmVkaXMtcmItY2EwIBcNMjYxMTI1MDYyNzUyWhgPMjMy
+NjA5MTQwNjI3NTJaMHcxCzAJBgNVBAYTAlVTMRAwDgYDVQQIDAdHZW9yZ2lhMRAw
+DgYDVQQHDAdBdGxhbnRhMREwDwYDVQQKDAhyZWRpcy1yYjEdMBsGA1UECwwUcmVk
+aXMtY2x1c3Rlci1jbGllbnQxEjAQBgNVBAMMCTEyNy4wLjAuMTCCASIwDQYJKoZI
+hvcNAQEBBQADggEPADCCAQoCggEBAMLIxUw8lZ4F/0iFlc8AZ4i2+GNZ/6TQcP8w
+RrMbvXYWGHpaNNDQvnqLlHGWdMfAQ/pa15W0g30nMVX3bcrlD1TTYKwQEIF7qauK
+brtDiVkV0kjiK8bV61sIgvCrqSx5TZ3y2s3s7yrNLr/hegO43QHty2POm6mY+JgV
+kmotXNQAsQab5o2GKOMk/JZTOYvsuJiqorCbWz8vGooOxQHLoWcdFtoR3k6l53U1
+NgSZrXvG46AdDsttbMnbKaTNaBysdlwkh0H6SJU7iGw3NQkwl/jyCwEpLfAXv6V7
+Pz9GeQQkcIih314A4n091Td5UyrTTGHSsxycXoSbL0+muz8sbd8CAwEAAaOBsDCB
+rTBrBgNVHREEZDBigglsb2NhbGhvc3SCBW5vZGUxggVub2RlMoIFbm9kZTOCBW5v
+ZGU0ggVub2RlNYIFbm9kZTaCBW5vZGU3ggVub2RlOIIFbm9kZTmHBH8AAAGHEAAA
+AAAAAAAAAAAAAAAAAAEwHQYDVR0OBBYEFH+xpxiPoDE/dtDEBiZbdpjWcaU3MB8G
+A1UdIwQYMBaAFBlcDmxBWaVz2eoPvE0Bkr38rsYrMA0GCSqGSIb3DQEBCwUAA4IB
+AQBm8rKDE9PPOOq+PQVZl0a6VJu/LmdqL91Iek0rcMEYIqKg/fBknNzGXq+igdsK
+0pQyWBFuWqEIevT3MENl1/TDndIWgZ/oOJemxdTMt//IXU2dNvKXyusWW6ZkGMf2
+/tZ3q9MlirLuagGCYEzl9BhwM7GECk4pA+2lrXtjP9jIrpHxPYr/gNP28yZC+b7i
+/QbMFLG29lZDHJANt0a78LdtbtRFiB4lIcfDT9dL6WT8w3ie0YVfXyb4dciz9Q+Q
+SZ+n8oHoQKPnkHYBhUEBAZlhvtXDFz21sjDmoWvikJNP1NdjdQfFD3Fbze5A0Vuc
+mHIgzAeLXMcwGOtpC5m/inJH
 -----END CERTIFICATE-----

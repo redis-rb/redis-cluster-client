@@ -8,6 +8,7 @@ services:
       --maxmemory-policy     allkeys-lru
       --appendonly           yes
       --cluster-enabled      yes
+      --cluster-bus-port-protected-mode no
       --cluster-config-file  nodes.conf
       --cluster-node-timeout 5000
     restart: "${RESTART_POLICY:-always}"
