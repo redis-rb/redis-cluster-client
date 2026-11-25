@@ -258,12 +258,16 @@ services:
       - "6384:6384"
   clustering:
     image: "redis:${REDIS_VERSION:-8}"
+    # The nodes are dialed by IP address, which the certificate cannot carry
+    # since Docker assigns it dynamically. redis-cli verifies the server
+    # identity by default since Redis 8.12, so name the expected one explicitly.
     command: >
       bash -c "yes yes | redis-cli
       --tls
       --cert   /etc/ssl/private/redis-rb-cert.crt
       --key    /etc/ssl/private/redis-rb-cert.key
       --cacert /etc/ssl/private/redis-rb-ca.crt
+      --tls-expected-peer-name 'node1 node2 node3 node4 node5 node6'
       --cluster create
       $$(getent hosts node1 | awk '{print $$1}'):6379
       $$(getent hosts node2 | awk '{print $$1}'):6380
