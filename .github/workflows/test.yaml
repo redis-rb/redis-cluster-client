@@ -72,6 +72,9 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby || '4.0' }}
           bundler-cache: true
+      - name: Omit directives unknown to Redis before 8.12
+        if: matrix.redis == '5' || matrix.redis == '6' || matrix.redis == '7'
+        run: echo 'REDIS_CLUSTER_BUS_ARGS=' >> "$GITHUB_ENV"
       - name: Pull Docker images
         run: docker compose --progress quiet -f $DOCKER_COMPOSE_FILE pull
       - name: Run containers
