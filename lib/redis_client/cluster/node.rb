@@ -53,10 +53,15 @@ class RedisClient
       end
 
       class CharArray
+        # A byte holds 256 values, and 0xff is reserved as the marker for an unassigned slot.
+        UNASSIGNED = 0xff
+        MAX_ELEMENTS = UNASSIGNED
+        private_constant :UNASSIGNED
+
         def initialize(size, elements)
           @elements = elements
           @string = String.new('', encoding: Encoding::BINARY, capacity: size)
-          size.times { @string << 0xff }
+          size.times { @string << UNASSIGNED }
         end
 
         def [](index)
@@ -72,7 +77,7 @@ class RedisClient
 
           pos = @elements.find_index(element) # O(N)
           if pos.nil?
-            raise(RangeError, 'full of elements') if @elements.size >= 256
+            raise(RangeError, 'full of elements') if @elements.size >= MAX_ELEMENTS
 
             pos = @elements.size
             @elements << element
@@ -263,7 +268,7 @@ class RedisClient
       end
 
       def make_array_for_slot_node_mappings(node_info_list)
-        return Array.new(SLOT_SIZE) if !USE_CHAR_ARRAY_SLOT || node_info_list.count(&:primary?) > 256
+        return Array.new(SLOT_SIZE) if !USE_CHAR_ARRAY_SLOT || node_info_list.count(&:primary?) > ::RedisClient::Cluster::Node::CharArray::MAX_ELEMENTS
 
         primary_node_keys = node_info_list.select(&:primary?).map(&:node_key)
         ::RedisClient::Cluster::Node::CharArray.new(SLOT_SIZE, primary_node_keys)
