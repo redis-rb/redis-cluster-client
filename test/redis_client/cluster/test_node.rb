@@ -862,8 +862,8 @@ class RedisClient
 
         got[0] = 'newbie:6379'
         assert_equal('newbie:6379', got[0])
-        assert_nil(got[1])
         assert_raises(RangeError) { got[0] = 'zombie:6379' } if USE_CHAR_ARRAY_SLOT
+        assert_nil(got[1])
 
         assert_raises(IndexError) { got[-1] = 'newbie:6379' } if USE_CHAR_ARRAY_SLOT
         assert_raises(IndexError) { got[-1] } if USE_CHAR_ARRAY_SLOT
