@@ -812,6 +812,24 @@ class RedisClient
       end
 
       def test_make_array_for_slot_node_mappings_optimized
+        node_info_list = Array.new(255) do |i|
+          ::RedisClient::Cluster::Node::Info.new(
+            node_key: "127.0.0.1:#{1024 + i + 1}",
+            role: 'master'
+          )
+        end
+
+        want = node_info_list.first.node_key
+        got = @test_node.send(:make_array_for_slot_node_mappings, node_info_list)
+        assert_instance_of(USE_CHAR_ARRAY_SLOT ? ::RedisClient::Cluster::Node::CharArray : Array, got)
+        SLOT_SIZE.times { |i| assert_nil(got[i], "Case: #{i}") }
+        SLOT_SIZE.times do |i|
+          got[i] = want
+          assert_equal(want, got[i], "Case: #{i}")
+        end
+      end
+
+      def test_make_array_for_slot_node_mappings_unoptimized
         node_info_list = Array.new(256) do |i|
           ::RedisClient::Cluster::Node::Info.new(
             node_key: "127.0.0.1:#{1024 + i + 1}",
@@ -821,24 +839,8 @@ class RedisClient
 
         want = node_info_list.first.node_key
         got = @test_node.send(:make_array_for_slot_node_mappings, node_info_list)
-        assert_instance_of(USE_CHAR_ARRAY_SLOT ? ::RedisClient::Cluster::Node::CharArray : Array, got)
-        SLOT_SIZE.times do |i|
-          got[i] = want
-          assert_equal(want, got[i], "Case: #{i}")
-        end
-      end
-
-      def test_make_array_for_slot_node_mappings_unoptimized
-        node_info_list = Array.new(257) do |i|
-          ::RedisClient::Cluster::Node::Info.new(
-            node_key: "127.0.0.1:#{1024 + i + 1}",
-            role: 'master'
-          )
-        end
-
-        want = node_info_list.first.node_key
-        got = @test_node.send(:make_array_for_slot_node_mappings, node_info_list)
         assert_instance_of(Array, got)
+        SLOT_SIZE.times { |i| assert_nil(got[i], "Case: #{i}") }
         SLOT_SIZE.times do |i|
           got[i] = want
           assert_equal(want, got[i], "Case: #{i}")
@@ -846,7 +848,7 @@ class RedisClient
       end
 
       def test_make_array_for_slot_node_mappings_max_shard_size
-        node_info_list = Array.new(255) do |i|
+        node_info_list = Array.new(254) do |i|
           ::RedisClient::Cluster::Node::Info.new(
             node_key: "127.0.0.1:#{1024 + i + 1}",
             role: 'master'
@@ -856,10 +858,11 @@ class RedisClient
         got = @test_node.send(:make_array_for_slot_node_mappings, node_info_list)
         assert_instance_of(USE_CHAR_ARRAY_SLOT ? ::RedisClient::Cluster::Node::CharArray : Array, got)
 
-        SLOT_SIZE.times { |i| got[i] = node_info_list.first.node_key }
+        SLOT_SIZE.times { |i| got[i] = node_info_list.first.node_key unless i == 1 }
 
         got[0] = 'newbie:6379'
         assert_equal('newbie:6379', got[0])
+        assert_nil(got[1])
         assert_raises(RangeError) { got[0] = 'zombie:6379' } if USE_CHAR_ARRAY_SLOT
 
         assert_raises(IndexError) { got[-1] = 'newbie:6379' } if USE_CHAR_ARRAY_SLOT
