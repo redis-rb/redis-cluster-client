@@ -56,6 +56,7 @@ class RedisClient
         # A byte holds 256 values, and 0xff is reserved as the marker for an unassigned slot.
         UNASSIGNED = 0xff
         MAX_ELEMENTS = UNASSIGNED
+        private_constant :UNASSIGNED
 
         def initialize(size, elements)
           @elements = elements
